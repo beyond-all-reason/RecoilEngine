@@ -151,7 +151,7 @@ void CSceneTarget::CreatePrograms()
 	programsCreated = true;
 
 	displayShader = shaderHandler->CreateProgramObject(SHADER_POOL, "PBRDisplay");
-	displayShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/PBRDisplayVS.glsl", "", GL_VERTEX_SHADER));
+	displayShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/FullscreenTriangleVS.glsl", "", GL_VERTEX_SHADER));
 	// the shader loader has no #include, so the shared curves are prepended; a source containing "void main()" is used as the source itself
 	const auto readShader = [](const char* path) {
 		CFileHandler file(path);
@@ -177,7 +177,7 @@ void CSceneTarget::CreatePrograms()
 	}
 
 	depthCopyShader = shaderHandler->CreateProgramObject(SHADER_POOL, "PBRSceneDepthCopy");
-	depthCopyShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/PBRDisplayVS.glsl", "", GL_VERTEX_SHADER));
+	depthCopyShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/FullscreenTriangleVS.glsl", "", GL_VERTEX_SHADER));
 	depthCopyShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/PBRSceneDepthCopyFS.glsl", "", GL_FRAGMENT_SHADER));
 	depthCopyShader->Link();
 	if (depthCopyShader->IsValid()) {
