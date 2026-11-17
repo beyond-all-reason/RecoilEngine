@@ -4082,6 +4082,8 @@ int LuaUnsyncedRead::GetMouseButtonsPressed(lua_State* L)
 		luaL_error(L, "Need to pass some button indexes.");
 	}
 
+	luaL_checkstack(L, numArgs, __func__);
+
 	for (int i = 1; i <= numArgs ; ++i) {
 		const int button = luaL_checkint(L, i);
 

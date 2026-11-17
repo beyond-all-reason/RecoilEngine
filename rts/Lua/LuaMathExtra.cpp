@@ -234,6 +234,7 @@ int LuaMathExtra::normalize(lua_State* L)
 	RECOIL_DETAILED_TRACY_ZONE;
 	lua_Number res = 0.0f;
 	const int param = lua_gettop(L);
+	luaL_checkstack(L, param, __func__);
 	for (int i = param; i >= 1; i--) {
 		res += Square(luaL_checknumber_noassert(L, i));
 	}
