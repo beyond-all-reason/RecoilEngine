@@ -1,0 +1,40 @@
+// Metal Factions on the SplinterFaction script's map, so the two differ in game
+// content and nothing else. Metal Factions has its own LuaUI with little in
+// common with SplinterFaction's, which is the point: every LuaUI finding so far
+// rests on one game.
+//
+// side=aven rather than leaving it blank. game_start.lua:43 reads the side from
+// the team block and falls back to "random", which would spawn a different
+// commander each run and make two runs not comparable. Its faction picker hides
+// itself once the game frame passes 0 (gui_red_factionpicker.lua:436), so it is
+// gone well before the probe freezes at frame 90.
+[game]
+{
+[player0]
+{
+team=0;
+spectator=0;
+name=probe;
+}
+[team0]
+{
+allyteam=0;
+teamleader=0;
+rgbcolor=1 0 0;
+handicap=0;
+side=aven;
+}
+[allyteam0]
+{
+numallies=0;
+}
+ishost=1;
+numallyteams=1;
+numusers=1;
+numteams=1;
+startpostype=0;
+gametype=Metal Factions v2.58;
+mapname=Valles Marineris 2.6.1;
+myplayername=probe;
+numplayers=1;
+}

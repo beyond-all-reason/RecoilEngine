@@ -50,6 +50,17 @@ endif (UNIX)
 if (APPLE)
 	find_library(COREFOUNDATION_LIBRARY Foundation)
 	list(APPEND engineLibraries ${COREFOUNDATION_LIBRARY})
+	if (MAC_EGL_ZINK)
+		# Zink dlopen()s @rpath/libvulkan.1.dylib; Mesa libs are dlopen()ed at runtime
+		# MacEGLBridge reads the display's native mode to cap MacRenderScale
+		find_library(COREGRAPHICS_LIBRARY CoreGraphics)
+		list(APPEND engineLibraries ${COREGRAPHICS_LIBRARY})
+		# and reads frames back into IOSurfaces that SDL draws without a copy
+		find_library(IOSURFACE_LIBRARY IOSurface)
+		find_library(COREVIDEO_LIBRARY CoreVideo)
+		list(APPEND engineLibraries ${IOSURFACE_LIBRARY} ${COREVIDEO_LIBRARY})
+		list(APPEND engineLibraries "-Wl,-rpath,@executable_path/mesa/lib" "-Wl,-rpath,${MAC_VULKAN_LIBDIR}" "-Wl,-rpath,${MAC_MESA_PREFIX}/lib")
+	endif ()
 endif (APPLE)
 
 list(APPEND engineLibraries squish rgetc1)

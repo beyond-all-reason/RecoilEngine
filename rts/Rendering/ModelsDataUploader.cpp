@@ -83,8 +83,11 @@ namespace Impl {
 			ul.SetNeedUpdateAll();
 		}
 
-		if (!ul.NeedUpdate())
+		if (!ul.NeedUpdate()) {
+			// No upload or rotation, but draws still read the last bound slot.
+			ssbo->MarkBoundBufferUsed();
 			return;
+		}
 
 		// may have been already unbound above, not a big deal
 		ssbo->UnbindBufferRange(uploader.GetBindingIdx());
@@ -331,11 +334,15 @@ void ModelUniformsUploader::Init()
 	if (!globalRendering->haveGL4)
 		return;
 
+	const bool persistent = globalRendering->supportPersistentMapping;
+
 	Impl::InitCommon<MyDataType>(
 		ssbo,
 		modelUniformsStorage,
 		MATUNI_SSBO_BINDING_IDX, ELEM_COUNT0, ELEM_COUNTI,
-		IStreamBufferConcept::Types::SB_BUFFERSUBDATA, true, 1,
+		persistent ? IStreamBufferConcept::Types::SB_PERSISTENTMAP : IStreamBufferConcept::Types::SB_BUFFERSUBDATA,
+		true,
+		persistent ? Impl::PERSISTENT_MAPPING_BUFFERING : 1,
 		className
 	);
 }

@@ -1,7 +1,12 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "InputHandler.h"
+#include "Rendering/GlobalRendering.h"
 #include "System/TimeProfiler.h"
+
+#ifdef __APPLE__
+#include "System/Platform/Mac/Keyboard.h"
+#endif
 
 InputHandler input;
 
@@ -26,6 +31,10 @@ void InputHandler::PushEvents()
 	while (SDL_PollEvent(&event)) {
 		// SDL_PollEvent may modify FPU flags
 		streflop::streflop_init<streflop::Simple>();
+#ifdef __APPLE__
+		MacKeyboard::TranslateEvent(event);
+#endif
+		globalRendering->EventToPixels(event);
 		PushEvent(event);
 	}
 }

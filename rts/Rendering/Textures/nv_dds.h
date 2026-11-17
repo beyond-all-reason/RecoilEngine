@@ -267,6 +267,7 @@ namespace nv_dds
 
             bool upload_texture1D() const;
             bool upload_texture2D(unsigned int imageIndex, int target) const;
+            bool upload_texture2D_decompressed(unsigned int imageIndex, int target) const;
             bool upload_texture3D() const;
             bool upload_textureRectangle() const;
             bool upload_textureCubemap() const;
@@ -349,6 +350,7 @@ namespace nv_dds
             inline TextureType get_type() const { return m_type; }
 
             bool is_compressed() const;
+            bool is_s3tc() const;
             // uncompressed pixel data stored as 16-bit floats (R16F, RG16F, RGBA16F)
             bool is_float() const;
 

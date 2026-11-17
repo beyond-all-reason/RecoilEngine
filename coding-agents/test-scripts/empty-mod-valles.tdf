@@ -1,0 +1,38 @@
+// Empty Mod on the same map the SplinterFaction script uses, so a run against it
+// differs in content only and not in terrain.
+//
+// It is a floor rather than a fair control: Empty Mod has no units and no LuaUI,
+// so it cannot separate a game's interface and effects from drawing units. What it
+// measures is what the map alone costs, which is 12.5ms of SplinterFaction's
+// 62.9ms frame at 3024x1832.
+//
+// Point run-capped.sh at it with SCRIPT=.
+[game]
+{
+[player0]
+{
+team=0;
+spectator=0;
+name=probe;
+}
+[team0]
+{
+allyteam=0;
+teamleader=0;
+rgbcolor=1 0 0;
+handicap=0;
+}
+[allyteam0]
+{
+numallies=0;
+}
+ishost=1;
+numallyteams=1;
+numusers=1;
+numteams=1;
+startpostype=0;
+gametype=Empty Mod;
+mapname=Valles Marineris 2.6.1;
+myplayername=probe;
+numplayers=1;
+}

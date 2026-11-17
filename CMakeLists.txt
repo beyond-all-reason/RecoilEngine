@@ -93,6 +93,16 @@ if    (APPLE)
 	if    (MACOSX_BUNDLE)
 		add_definitions(-DMACOSX_BUNDLE)
 	endif (MACOSX_BUNDLE)
+	find_library(IOKIT_FRAMEWORK IOKit REQUIRED)
+	find_library(COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
+	link_libraries(${IOKIT_FRAMEWORK} ${COREFOUNDATION_FRAMEWORK})
+	# Render through Mesa (EGL, Zink) -> Vulkan (KosmicKrisp/MoltenVK) -> Metal instead of Apple's GL 4.1
+	option(MAC_EGL_ZINK "macOS: create the GL context via Mesa EGL+Zink (offscreen) and present via SDL/Metal" TRUE)
+	set(MAC_MESA_PREFIX "/opt/homebrew/opt/mesa" CACHE PATH "macOS: Mesa install prefix used by MAC_EGL_ZINK")
+	set(MAC_VULKAN_LIBDIR "/opt/homebrew/lib" CACHE PATH "macOS: directory containing libvulkan.1.dylib (rpath for Zink)")
+	if    (MAC_EGL_ZINK)
+		add_definitions(-DMAC_EGL_ZINK -DMAC_MESA_PREFIX="${MAC_MESA_PREFIX}")
+	endif (MAC_EGL_ZINK)
 else  (APPLE)
 	set(MACOSX_BUNDLE FALSE)
 endif (APPLE)
@@ -635,6 +645,8 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
 	endif()
 endif()
 
+set(VERSION_OVERRIDE "" CACHE STRING "Report this engine version instead of the one derived from git, e.g. to match the upstream release a patched build is based on")
+
 # Declare template files as inputs (for proper dependency tracking)
 set(VERSION_TEMPLATE_FILES
 	"${CMAKE_SOURCE_DIR}/rts/System/VersionGenerated.h.template"
@@ -652,6 +664,7 @@ add_custom_command(
 		"-DCMAKE_MODULES_SPRING=${CMAKE_MODULES_SPRING}"
 		"-DGENERATE_DIR=${VERSION_GENERATE_DIR}"
 		"-DVERSION_ADDITIONAL=${VERSION_ADDITIONAL}"
+		"-DVERSION_OVERRIDE=${VERSION_OVERRIDE}"
 		-P "${CMAKE_MODULES_SPRING}/ConfigureVersion.cmake"
 		"${VERSION_GENERATE_DIR}"
 	DEPENDS ${VERSION_TEMPLATE_FILES} ${VERSION_GIT_DEPS}
