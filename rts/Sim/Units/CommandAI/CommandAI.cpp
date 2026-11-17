@@ -634,13 +634,13 @@ static inline bool AdjustGroundAttackCommand(const Command& c, bool fromSynced, 
 
 static bool CommandTouchesFinalizingUnit(const CUnit* owner, const Command& command)
 {
-	if (owner->DeathDependencesNotified())
+	if (owner->IsPreDeleting())
 		return true;
 
 	int targetParameter;
 	if (command.IsObjectCommand(targetParameter)) {
 		const CUnit* target = unitHandler.GetUnit(command.GetParam(targetParameter));
-		if (target != nullptr && target->DeathDependencesNotified())
+		if (target != nullptr && target->IsPreDeleting())
 			return true;
 	}
 	return false;
@@ -1641,7 +1641,7 @@ int CCommandAI::GetDefaultCmd(const CUnit* pointed, const CFeature* feature)
 
 void CCommandAI::AddDeathDependence(CObject* o, DependenceType dep) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (DeathDependencesNotified() || o->DeathDependencesNotified())
+	if (IsPreDeleting() || o->IsPreDeleting())
 		return;
 
 	if (dep == DEPENDENCE_COMMANDQUE) {

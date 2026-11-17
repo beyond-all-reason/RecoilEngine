@@ -1248,11 +1248,13 @@ void CLuaHandle::UnitDestroyed(const CUnit* unit, const CUnit* attacker, int wea
 }
 
 
-/*** Called before a unit is deleted, after its native death dependences are processed.
- * Unlike UnitDestroyed, this runs after the death script completes and before the
- * next unit movement update. The unit is still readable, but cannot receive new
- * orders or death dependences. Only synced handles with full read access receive
- * this callin. Use it to remove virtual queued targets before final invalidation.
+/*** Called before a unit's final native teardown, after its death script completes.
+ * The unit ID and normal synced read APIs remain valid during this callin, but
+ * new orders, targets, dependencies and mutations involving it are rejected.
+ * Native death dependencies have NOT been notified yet; their cleanup retains
+ * its original position after derived destructors. Do not assume native queues
+ * have advanced. Use this callin to prune virtual references to the dying unit.
+ * Only synced handles with full read access receive this callin.
  *
  * @function Callins:UnitPreDelete
  * @param unitID UnitID

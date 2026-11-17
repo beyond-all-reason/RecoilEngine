@@ -18,8 +18,8 @@ public:
 
 	CObject();
 	virtual ~CObject();
-	void NotifyDeathDependences();
-	bool DeathDependencesNotified() const { return deathDependencesNotified; }
+	bool IsPreDeleting() const { return preDeleting; }
+	void SetPreDeleting(bool value) { preDeleting = value; }
 
 	/// Request to not inform this when obj dies
 	virtual void DeleteDeathDependence(CObject* obj, DependenceType dep);
@@ -81,7 +81,7 @@ public:
 	typedef std::function<bool(const CObject*, int*)> TObjFilterPred;
 
 	bool detached;
-	bool deathDependencesNotified = false;
+	bool preDeleting = false;
 
 protected:
 	const TSyncSafeSet& GetListeners(const DependenceType dep) {

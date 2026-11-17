@@ -1769,7 +1769,7 @@ bool CUnit::IsIdle() const
 bool CUnit::AttackUnit(CUnit* targetUnit, bool isUserTarget, bool wantManualFire, bool fpsMode)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (DeathDependencesNotified() || (targetUnit != nullptr && targetUnit->DeathDependencesNotified()))
+	if (IsPreDeleting() || (targetUnit != nullptr && targetUnit->IsPreDeleting()))
 		return false;
 
 	// don't self-target

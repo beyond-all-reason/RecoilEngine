@@ -413,7 +413,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 static inline CUnit* ParseRawUnit(lua_State* L, const char* caller, int index, bool allowFinalizing = false)
 {
 	CUnit* unit = unitHandler.GetUnit(luaL_checkint(L, index));
-	return (unit != nullptr && (allowFinalizing || !unit->DeathDependencesNotified())) ? unit : nullptr;
+	return (unit != nullptr && (allowFinalizing || !unit->IsPreDeleting())) ? unit : nullptr;
 }
 
 static inline CUnit* ParseUnit(lua_State* L, const char* caller, int index, bool allowFinalizing = false)
@@ -3644,7 +3644,7 @@ int LuaSyncedCtrl::SetUnitTarget(lua_State* L)
 	}
 	else if (args >= 2) {
 		CUnit* target = unitHandler.GetUnit(luaL_checkint(L, 2));
-		if (target != nullptr && target->DeathDependencesNotified()) {
+		if (target != nullptr && target->IsPreDeleting()) {
 			lua_pushboolean(L, false);
 			return 1;
 		}
@@ -5974,7 +5974,7 @@ int LuaSyncedCtrl::GiveOrderToUnit(lua_State* L)
 
 	Command cmd = LuaUtils::ParseCommand(L, __func__, 2);
 
-	if (unit->DeathDependencesNotified() || !CanControlUnit(L, unit)) {
+	if (unit->IsPreDeleting() || !CanControlUnit(L, unit)) {
 		lua_pushboolean(L, false);
 		return 1;
 	}
@@ -6090,7 +6090,7 @@ int LuaSyncedCtrl::GiveOrderArrayToUnit(lua_State* L)
 	CUnit* const unit = ParseUnit(L, __func__, 1, true);
 	if (unit == nullptr)
 		luaL_error(L, "[%s] invalid unitID", __func__);
-	if (unit->DeathDependencesNotified() || !CanControlUnit(L, unit)) {
+	if (unit->IsPreDeleting() || !CanControlUnit(L, unit)) {
 		lua_pushboolean(L, false);
 		return 1;
 	}
