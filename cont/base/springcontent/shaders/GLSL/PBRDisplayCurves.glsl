@@ -11,7 +11,7 @@ const int TM_UCHIMURA        = 5;
 const int TM_REINHARD        = 6;
 const int TM_REINHARD_JODIE  = 7;
 const int TM_FILMIC_HEJL     = 8;
-const int TM_UNREAL          = 9;
+const int TM_FILMIC          = 9;
 const int TM_BAR_CUSTOM      = 10;
 const int TM_LEGACY          = 11;
 const int TM_LINEAR_DEBUG    = 12;
@@ -255,7 +255,7 @@ vec3 PBRApplyDisplayTransform(vec3 lin, int transform) {
 		case TM_REINHARD       : return SRGBEncode(Reinhard(lin));
 		case TM_REINHARD_JODIE : return SRGBEncode(ReinhardJodie(lin));
 		case TM_FILMIC_HEJL    : return FilmicHejl(lin);
-		case TM_UNREAL         : return UnrealFilmic(lin);
+		case TM_FILMIC         : return UnrealFilmic(lin);
 		case TM_BAR_CUSTOM     : return BarCustom(SRGBEncode(lin));
 		case TM_LINEAR_DEBUG   : return SRGBEncode(clamp(lin, 0.0, 1.0));
 		default                : return SRGBEncode(KhronosNeutral(lin));

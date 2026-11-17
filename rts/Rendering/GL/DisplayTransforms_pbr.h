@@ -26,7 +26,7 @@ enum class Transform : int32_t {
 	Reinhard       = 6,
 	ReinhardJodie  = 7,
 	FilmicHejl     = 8, // published form includes the display encode
-	Unreal         = 9, // inspired by Unreal's filmic tone mapper; the result includes the display encode
+	Filmic         = 9, // option "unreal", inspired by Unreal's filmic tone mapper; the result includes the display encode
 	BarCustom      = 10,
 	Legacy         = 11,
 	LinearDebug    = 12,
@@ -56,7 +56,7 @@ inline bool ParseTransform(std::string_view name, Transform& out) {
 inline std::string_view TransformName(Transform t) { return TRANSFORM_NAMES[size_t(t)]; }
 
 // Curves whose output is already display-encoded.
-inline bool CurveIncludesEncode(Transform t) { return t == Transform::FilmicHejl || t == Transform::Unreal; }
+inline bool CurveIncludesEncode(Transform t) { return t == Transform::FilmicHejl || t == Transform::Filmic; }
 
 static constexpr float REC709_LUMA[3] = {0.2126f, 0.7152f, 0.0722f};
 
@@ -347,7 +347,7 @@ inline RGB ApplyDisplayPass(Transform t, SceneTransfer transfer, float exposureL
 		case Transform::Reinhard      : return SRGBEncode(Reinhard(lin));
 		case Transform::ReinhardJodie : return SRGBEncode(ReinhardJodie(lin));
 		case Transform::FilmicHejl    : return FilmicHejl(lin);
-		case Transform::Unreal        : return UnrealFilmic(lin);
+		case Transform::Filmic        : return UnrealFilmic(lin);
 		case Transform::BarCustom     : return BarCustom(SRGBEncode(lin));
 		case Transform::LinearDebug   : return SRGBEncode(PerChannel(lin, Clamp01));
 		default                       : return stored;
