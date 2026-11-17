@@ -79,6 +79,9 @@ CMouseHandler* mouse = nullptr;
 
 static CInputReceiver*& activeReceiver = CInputReceiver::GetActiveReceiverRef();
 
+// while the game loads, its Lua handles are built on the load thread; mouse input must not reach them
+static bool IsGameLoading() { return (game != nullptr && !game->IsDoneLoading()); }
+
 
 CMouseHandler::CMouseHandler()
 {
@@ -250,6 +253,9 @@ void CMouseHandler::MouseMove(int x, int y, int dx, int dy)
 	// Origin for mousecursor on internal coordinates is top border of view screen
 	lasty = y - globalRendering->viewWindowOffsetY;
 
+	if (IsGameLoading())
+		return;
+
 	UpdateCursorCameraDir();
 
 	// switching to MMB-mode while user is moving mouse can generate
@@ -332,6 +338,9 @@ void CMouseHandler::MousePress(int x, int y, int button)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (button > NUM_BUTTONS)
+		return;
+
+	if (IsGameLoading())
 		return;
 
 	// Origin for mousecursor on internal coordinates is lower border of view screen
@@ -535,6 +544,9 @@ void CMouseHandler::MouseRelease(int x, int y, int button)
 	buttons[button].pressed = false;
 	pressedBitMask &= ~(1 << button);
 
+	if (IsGameLoading())
+		return;
+
 	if (inMapDrawer != nullptr && inMapDrawer->IsDrawMode()) {
 		inMapDrawer->MouseRelease(x, y, button);
 		return;
@@ -646,6 +658,9 @@ bool CMouseHandler::ButtonPressed()
 void CMouseHandler::MouseWheel(float delta)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (IsGameLoading())
+		return;
+
 	if (RmlGui::ProcessMouseWheel(delta)) {
 		return;
 	}
