@@ -272,8 +272,10 @@ namespace {
 	}
 
 	IOSurfaceRef CreateIOSurface(int sx, int sy, size_t rowBytes) {
-		constexpr int32_t pixelFormatRGBA = 0x52474241; // the four-char code 'RGBA'
-		const int32_t values[] = {sx, sy, 4, static_cast<int32_t>(rowBytes), pixelFormatRGBA};
+		// The pixels are RGBA, but CVPixelBufferCreateWithIOSurface rejects 'RGBA' surfaces and BGRA readback
+		// stalls Zink. The label is only read by CoreVideo, SDL makes an RGBA Metal texture from the format it is given.
+		constexpr int32_t pixelFormatLabel = 0x42475241; // the four-char code 'BGRA'
+		const int32_t values[] = {sx, sy, 4, static_cast<int32_t>(rowBytes), pixelFormatLabel};
 		const CFStringRef keys[] = {kIOSurfaceWidth, kIOSurfaceHeight, kIOSurfaceBytesPerElement, kIOSurfaceBytesPerRow, kIOSurfacePixelFormat};
 		CFTypeRef numbers[std::size(values)];
 
