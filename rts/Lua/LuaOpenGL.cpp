@@ -42,6 +42,7 @@
 
 #include "Game/Camera.h"
 #include "Game/CameraHandler.h"
+#include "Game/Game.h"
 #include "Game/UI/CommandColors.h"
 #include "Game/UI/MiniMap.h"
 #include "Map/BaseGroundDrawer.h"
@@ -56,6 +57,8 @@
 #include "Rendering/UnitDefImage.h"
 #include "Rendering/Common/ModelDrawerHelpers.h"
 #include "Rendering/Units/UnitDrawer.h"
+#include "Rendering/Env/CubeMapHandler.h"
+#include "Rendering/Env/DebugCubeMapTexture.h"
 #include "Rendering/Env/ISky.h"
 #include "Rendering/Env/SunLighting.h"
 #include "Rendering/Env/WaterRendering.h"
@@ -309,6 +312,12 @@ void LuaOpenGL::Init()
 		deprecatedGLWarned.reserve(4096); // deprecated calls are logged along with caller information
 }
 
+// gl.RenderEnvironmentFace target, shared by all Lua handles: the color attachment
+// is the caller's face, attached and detached within each call
+static GLuint environmentFaceFBO = 0;
+static GLuint environmentFaceDepth = 0;
+static GLsizei environmentFaceDepthSize = 0;
+
 void LuaOpenGL::Free()
 {
 	glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
@@ -317,6 +326,11 @@ void LuaOpenGL::Free()
 	// deletes the GL queries
 
 	ClearLuaDebugGroupGpuZones();
+
+	glDeleteFramebuffersEXT(1, &environmentFaceFBO);
+	glDeleteRenderbuffersEXT(1, &environmentFaceDepth);
+	environmentFaceFBO = environmentFaceDepth = 0;
+	environmentFaceDepthSize = 0;
 }
 
 /******************************************************************************/
@@ -404,6 +418,8 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	}
 	if (IS_GL_FUNCTION_AVAILABLE(glGenerateMipmapEXT))
 		REGISTER_LUA_CFUNC(GenerateMipmap);
+	if (FBO::IsSupported())
+		REGISTER_LUA_CFUNC(RenderEnvironmentFace);
 	REGISTER_LUA_CFUNC(PublishTexture);
 
 	REGISTER_LUA_CFUNC(ActiveTexture);
@@ -4764,6 +4780,151 @@ int LuaOpenGL::GenerateMipmap(lua_State* L)
 	glGenerateMipmapEXT(tex->target);
 
 	return 0;
+}
+
+
+
+/***
+ * Draws the engine sky, and optionally the terrain reflection pass, seen from a
+ * world position into one face of a Lua cube texture, the way the engine fills
+ * its reflection cube. Only mip level 0 is written. Allowed only in DrawGenesis.
+ *
+ * The caller's framebuffer, GL state and bound program are restored; the
+ * matrices are reset to the DrawGenesis identity. Terrain reuses the player camera's ROAM tessellation, so
+ * terrain the player camera has not tessellated is missing.
+ *
+ * @function gl.RenderEnvironmentFace
+ * @param texName string Lua cube texture of the calling handle
+ * @param face integer 0..5 in OpenGL order (+X, -X, +Y, -Y, +Z, -Z)
+ * @param x number
+ * @param y number
+ * @param z number
+ * @param skyOnly boolean? false also draws the terrain (default true)
+ * @param sunFree boolean? true leaves the sun's glow out of the sky, for
+ *   lighting where the sun is already the direct light; only ModernSky can
+ *   (default false)
+ * @return boolean success
+ * @return string? error
+ * @return boolean? sunRemoved with sunFree: whether the sun was left out
+ */
+int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
+{
+	CheckDrawingEnabled(L, __func__);
+
+	const int face = luaL_checkint(L, 2);
+	const float3 position(luaL_checkfloat(L, 3), luaL_checkfloat(L, 4), luaL_checkfloat(L, 5));
+	const bool skyOnly = luaL_optboolean(L, 6, true);
+	const bool sunFree = luaL_optboolean(L, 7, false);
+	bool sunRemoved = false;
+	const LuaTextures::Texture* tex = CLuaHandle::GetActiveTextures(L).GetInfo(luaL_checksstring(L, 1));
+
+	// returned rather than raised, so the caller keeps the rest of its call-in
+	const char* error = nullptr;
+	if (drawMode != DRAW_GENESIS)
+		error = "gl.RenderEnvironmentFace is only allowed in DrawGenesis";
+	else if (face < 0 || face > 5)
+		error = "gl.RenderEnvironmentFace: face must be 0..5";
+	else if (tex == nullptr || tex->target != GL_TEXTURE_CUBE_MAP)
+		error = "gl.RenderEnvironmentFace: not a Lua cube texture of this handle";
+
+	GLint previousFBO = 0;
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &previousFBO);
+
+	if (error == nullptr) {
+		if (environmentFaceFBO == 0)
+			glGenFramebuffersEXT(1, &environmentFaceFBO);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, environmentFaceFBO);
+		if (environmentFaceDepthSize != tex->xsize) {
+			if (environmentFaceDepth == 0)
+				glGenRenderbuffersEXT(1, &environmentFaceDepth);
+			glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, environmentFaceDepth);
+			const GLenum depthFormat = static_cast<GLenum>(CGlobalRendering::DepthBitsToFormat(globalRendering->supportDepthBufferBitDepth));
+			glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, depthFormat, tex->xsize, tex->xsize);
+			glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+			glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, environmentFaceDepth);
+			environmentFaceDepthSize = tex->xsize;
+		}
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, tex->id, 0);
+		// core form: the headless GL stubs have no EXT glCheckFramebufferStatus
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT)
+			error = "gl.RenderEnvironmentFace: capture framebuffer is incomplete";
+	}
+
+	if (error == nullptr) {
+		const auto& sky = ISky::GetSky();
+		const float3* fd = CubeMapHandler::faceDirs[face];
+
+		// the sky and terrain passes change blend, depth, cull and polygon state and
+		// leave program 0 bound; the Lua caller's state is unknown
+		glPushAttrib(GL_FOG_BIT | GL_DEPTH_BUFFER_BIT | GL_VIEWPORT_BIT | GL_ENABLE_BIT | GL_SCISSOR_BIT | GL_COLOR_BUFFER_BIT | GL_POLYGON_BIT);
+		GLint previousProgram = 0;
+		glGetIntegerv(GL_CURRENT_PROGRAM, &previousProgram);
+
+		glDisable(GL_SCISSOR_TEST);
+		glClearColor(sky->fogColor.x, sky->fogColor.y, sky->fogColor.z, 1.0f);
+		// Lua call-ins run with depth writes off, and glClear obeys the write masks
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+		glDepthMask(GL_TRUE);
+		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+		glDepthMask(skyOnly ? GL_FALSE : GL_TRUE);
+		if (skyOnly)
+			glDisable(GL_DEPTH_TEST);
+		else
+			glEnable(GL_DEPTH_TEST);
+
+		CCamera* prvCam = CCameraHandler::GetSetActiveCamera(CCamera::CAMTYPE_ENVMAP);
+		CCamera* curCam = CCameraHandler::GetActiveCamera();
+		// mirrored, as in CubeMapHandler::CreateReflectionFace
+		curCam->forward = fd[0];
+		curCam->right   = fd[1] * -1.0f;
+		curCam->up      = fd[2] * -1.0f;
+		curCam->SetVFOV(90.0f);
+		curCam->SetAspectRatio(1.0f);
+		curCam->SetPos(position);
+		curCam->UpdateLoadViewport(0, 0, tex->xsize, tex->xsize);
+		curCam->UpdateViewRange();
+		curCam->UpdateMatrices(globalRendering->viewSizeX, globalRendering->viewSizeY, curCam->GetAspectRatio());
+		curCam->UpdateFrustum();
+		// the SMF terrain shaders read the fixed-function matrices, not the camera UBO
+		curCam->LoadMatrices();
+
+		game->SetDrawMode(CGame::gameReflectionDraw);
+		if (!globalRendering->drawDebugCubeMap) {
+			sunRemoved = sunFree && sky->SupportsSunFreeDraw();
+			sky->drawWithoutSunLobe = sunRemoved;
+			sky->Draw();
+			sky->drawWithoutSunLobe = false;
+			if (!skyOnly)
+				readMap->GetGroundDrawer()->Draw(DrawPass::TerrainReflection);
+		} else {
+			debugCubeMapTexture.Draw(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face);
+		}
+		game->SetDrawMode(CGame::gameNormalDraw);
+		CCameraHandler::SetActiveCamera(prvCam->GetCamType());
+
+		glUseProgram(static_cast<GLuint>(previousProgram));
+		glPopAttrib();
+		ResetGenesisMatrices();
+	}
+
+	if (environmentFaceFBO != 0 && tex != nullptr) {
+		// detach, so the shared FBO never references a texture Lua may delete
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, environmentFaceFBO);
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, 0, 0);
+	}
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, previousFBO);
+
+	lua_pushboolean(L, error == nullptr);
+	if (error == nullptr) {
+		if (!sunFree)
+			return 1;
+		lua_pushnil(L);
+		lua_pushboolean(L, sunRemoved);
+		return 3;
+	}
+
+	lua_pushstring(L, error);
+	return 2;
 }
 
 

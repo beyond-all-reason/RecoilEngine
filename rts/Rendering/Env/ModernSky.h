@@ -23,6 +23,7 @@ public:
 	void UpdateSkyTexture() override {}
 
 	bool IsValid() const override { return valid; }
+	bool SupportsSunFreeDraw() const override { return true; }
 
 	std::string GetName() const override { return "ModernSky"; }
 private:
