@@ -1,8 +1,6 @@
 #version 330
 
-// Copies the PBR scene target's resolved depth into the window's depth buffer
-// when a blit cannot (PBRSceneDepthFormat=d32fs8, or a window depth format the
-// driver will not blit into). Stencil is not copied by this path.
+// Depth copy into the window for when a blit cannot (d32fs8, or a window depth format the driver will not blit into). No stencil.
 
 uniform sampler2D sceneDepth;
 

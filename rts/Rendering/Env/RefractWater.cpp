@@ -64,7 +64,7 @@ void CRefractWater::Draw()
 	glBindTexture(target, subSurfaceTex);
 	glEnable(target);
 	{
-		ScopedSceneReadResolve sceneRead; // a multisampled PBR scene target is copied from its resolve
+		ScopedSceneReadResolve sceneRead;
 		glCopyTexSubImage2D(target, 0, 0, 0, globalRendering->viewPosX, globalRendering->viewPosY, globalRendering->viewSizeX, globalRendering->viewSizeY);
 	}
 

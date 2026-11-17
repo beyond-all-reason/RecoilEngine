@@ -707,8 +707,7 @@ int LuaFBOs::RawBindFBO(lua_State* L)
 	//CheckDrawingEnabled(L, __func__);
 
 	if (lua_isnil(L, 1)) {
-		// revert to default or specified FB; during the world phase the default
-		// is the PBR scene target when it is active
+		// revert to default or specified FB
 		glBindFramebufferEXT((GLenum) luaL_optinteger(L, 2, GL_FRAMEBUFFER_EXT), luaL_optinteger(L, 3, sceneTarget.GetDefaultFBO()));
 		return 0;
 	}
@@ -807,8 +806,7 @@ int LuaFBOs::BlitFBO(lua_State* L)
 	GLint currentFBO;
 	glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &currentFBO);
 
-	// nil is the window, or the PBR scene target during the world phase; a
-	// multisampled scene is read through its resolve
+	// nil is the window, or the scene target during the world phase (read through its resolve if multisampled)
 	const GLuint defaultFBO = sceneTarget.GetDefaultFBO();
 	glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, (fboSrc == nullptr)? sceneTarget.ResolvedReadFBO(defaultFBO): fboSrc->id);
 	glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, (fboDst == nullptr)? defaultFBO: fboDst->id);

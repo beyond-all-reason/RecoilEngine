@@ -15,16 +15,16 @@
 #include "System/Misc/TracyDefs.h"
 #include "System/StringUtil.h"
 
-CONFIG(std::string, PBRSceneTarget).defaultValue("direct").description("PBR master switch: direct (draw the world into the window, today's rendering) or hdr (draw it into the RGBA16F scene target and present it through the one display pass). A failed allocation falls back to direct in the same frame.");
-CONFIG(std::string, PBRSceneTransfer).defaultValue("srgb-extended").description("How the scene target stores the legacy world: srgb-extended (legacy shaders unchanged, decoded once by the display pass). linear is reserved and falls back to srgb-extended.");
-CONFIG(std::string, PBRSceneDepthFormat).defaultValue("d24s8").description("Scene depth and stencil: d24s8 (copied into the window by a blit) or d32fs8 (depth copied by a shader, stencil not copied).");
-CONFIG(std::string, PBRHDRColorFormat).defaultValue("rgba16f").description("Scene colour format: rgba16f (default) or r11g11b10f (half the memory and bandwidth; no alpha, no negative values, about 6 bits of mantissa). compare is reserved and falls back to rgba16f.");
-CONFIG(std::string, PBRDisplayTransform).defaultValue("khronos-neutral").description("The one display transform: khronos-neutral, agx, aces, aces-hill, hable, uchimura, reinhard, reinhard-jodie, filmic-hejl, unreal, bar-custom, legacy (today's image unchanged) or linear-debug.");
-CONFIG(std::string, PBRExposureMode).defaultValue("manual").description("Exposure mode. Only manual is built; auto and compare are reserved and fall back to manual.");
-CONFIG(float, PBRExposureEV).defaultValue(0.0f).description("Manual exposure in EV stops applied by the display pass (linear multiplier 2^EV; 0 = 1.0).");
-CONFIG(std::string, PBRDisplayBoundary).defaultValue("after-world").description("Where the display pass runs: after-world (screen icons and screen effects draw display-referred into the window) or after-screen-effects (they draw into the scene and are tone-mapped).");
-CONFIG(std::string, PBRDisplayDither).defaultValue("unreal").description("Grain added to the display pass's 8-bit output to hide banding: unreal (Unreal's triangular grain of 1/255, the default) or off.");
-CONFIG(bool, PBRSceneTargetForceFailure).defaultValue(false).description("Test only: make the scene-target allocation fail so the fallback to direct can be checked.");
+CONFIG(std::string, PBRSceneTarget).defaultValue("direct").description("direct (draw into the window) or hdr (draw into an HDR scene target, presented through one display pass). A failed allocation falls back to direct.");
+CONFIG(std::string, PBRSceneTransfer).defaultValue("srgb-extended").description("How the scene target stores non-PBR colour: srgb-extended. linear is reserved and falls back to srgb-extended.");
+CONFIG(std::string, PBRSceneDepthFormat).defaultValue("d24s8").description("d24s8 (copied into the window by a blit) or d32fs8 (depth copied by a shader, stencil not copied).");
+CONFIG(std::string, PBRHDRColorFormat).defaultValue("rgba16f").description("rgba16f or r11g11b10f (half the memory; no alpha, no negative values, about 6 bits of mantissa). compare is reserved and falls back to rgba16f.");
+CONFIG(std::string, PBRDisplayTransform).defaultValue("khronos-neutral").description("khronos-neutral, agx, aces, aces-hill, hable, uchimura, reinhard, reinhard-jodie, filmic-hejl, unreal (inspired by Unreal's filmic tone mapper), bar-custom, legacy (no curve) or linear-debug.");
+CONFIG(std::string, PBRExposureMode).defaultValue("manual").description("Only manual is built; auto and compare are reserved and fall back to manual.");
+CONFIG(float, PBRExposureEV).defaultValue(0.0f).description("Manual exposure in EV stops (linear multiplier 2^EV).");
+CONFIG(std::string, PBRDisplayBoundary).defaultValue("after-world").description("after-world (screen effects draw into the window) or after-screen-effects (they draw into the scene and are tone-mapped).");
+CONFIG(std::string, PBRDisplayDither).defaultValue("unreal").description("unreal (triangular 1/255 grain hiding banding, as in Unreal's backbuffer dither) or off.");
+CONFIG(bool, PBRSceneTargetForceFailure).defaultValue(false).description("Test only: make the allocation fail to exercise the fallback to direct.");
 
 CSceneTarget sceneTarget;
 
@@ -32,10 +32,9 @@ namespace {
 	constexpr const char* SHADER_POOL = "[SceneTarget]";
 
 	constexpr const char* DEPTH_D24S8 = "d24s8";
-	constexpr float DITHER_8BIT = 1.0f / 255.0f;     // one step of an 8-bit window
+	constexpr float DITHER_8BIT = 1.0f / 255.0f;
 	constexpr unsigned DITHER_SEED_PERIOD = 1024u;  // keeps the float seed exact
 	constexpr const char* DEPTH_D32FS8 = "d32fs8";
-	// the PBR mask (see SceneTarget.h): one 8-bit channel is enough for 0 / 1 and blended edges
 	constexpr GLenum PBR_MASK_FORMAT = GL_R8;
 	constexpr GLenum PBR_MASK_ATTACHMENT = GL_COLOR_ATTACHMENT1;
 
@@ -62,7 +61,7 @@ namespace {
 		return tex;
 	}
 
-	// client format of the (empty) colour upload: three channels for R11F_G11F_B10F, four otherwise
+	// R11F_G11F_B10F has no alpha, so its client format is GL_RGB
 	GLenum ColorClientFormat(GLenum internalFormat) {
 		return (internalFormat == GL_R11F_G11F_B10F)? GL_RGB: GL_RGBA;
 	}
@@ -75,9 +74,7 @@ namespace {
 		return rbo;
 	}
 
-	// Saves and restores everything the display pass, the depth copy and the transform test change, one state at a
-	// time: no glPushAttrib, which a core profile lacks and whose stack depth is shared with every other caller.
-	// Add a state here before a pass inside the scope changes it.
+	// Saves and restores each state a pass changes (no glPushAttrib: absent in core profile). Add a state here before a pass changes it.
 	class ScopedPassState {
 	public:
 		ScopedPassState() {
@@ -97,7 +94,7 @@ namespace {
 			glGetIntegerv(GL_STENCIL_BACK_WRITEMASK, &stencilBackMask);
 			glGetIntegerv(GL_STENCIL_CLEAR_VALUE, &stencilClear);
 			glGetIntegerv(GL_VIEWPORT, viewport);
-			glGetIntegerv(GL_POLYGON_MODE, polygonMode); // front and back (compatibility profile)
+			glGetIntegerv(GL_POLYGON_MODE, polygonMode);
 
 			for (const GLenum cap: CAPABILITIES)
 				glDisable(cap); // GL_FRAMEBUFFER_SRGB too: the pass encodes itself
@@ -147,9 +144,7 @@ void CSceneTarget::Init()
 	settingsDirty = true;
 }
 
-// The display and depth-copy programs are built the first time a frame wants the
-// scene target (or the transform test runs), not at game start: a game that never
-// sets PBRSceneTarget=hdr compiles nothing and logs nothing.
+// Built on first use, so a game that never sets PBRSceneTarget=hdr compiles nothing.
 void CSceneTarget::CreatePrograms()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -157,8 +152,7 @@ void CSceneTarget::CreatePrograms()
 
 	displayShader = shaderHandler->CreateProgramObject(SHADER_POOL, "PBRDisplay");
 	displayShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/PBRDisplayVS.glsl", "", GL_VERTEX_SHADER));
-	// the shader loader has no #include: the curves shared with BAR's PBR unit shader are prepended here; a source
-	// string containing "void main()" is taken as the source itself (IShaderObject::GetShaderSource)
+	// the shader loader has no #include, so the shared curves are prepended; a source containing "void main()" is used as the source itself
 	const auto readShader = [](const char* path) {
 		CFileHandler file(path);
 		std::string text;
@@ -221,7 +215,7 @@ void CSceneTarget::ReadSettings()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	settingsFallback.clear();
-	blockedReason.clear(); // a settings change retries a failed allocation
+	blockedReason.clear();
 	const auto note = [this](const std::string& s) {
 		if (!settingsFallback.empty())
 			settingsFallback += "; ";
@@ -315,7 +309,6 @@ bool CSceneTarget::Allocate(const Desc& d, Resources& out, std::string& error) c
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, out.depthRBO);
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
-	// everything that binds the scene as "the window" writes the colour only
 	glDrawBuffer(GL_COLOR_ATTACHMENT0);
 	glReadBuffer(GL_COLOR_ATTACHMENT0);
 
@@ -336,7 +329,7 @@ bool CSceneTarget::Allocate(const Desc& d, Resources& out, std::string& error) c
 		status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 	}
 
-	// incomplete, or out of memory (which can leave a framebuffer "complete")
+	// out of memory can leave a framebuffer "complete" but set a GL error
 	const GLenum glError = glGetError();
 	glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
 
@@ -416,8 +409,7 @@ void CSceneTarget::BeginFrame()
 		return;
 	}
 
-	// The window's own sample count: the scene must match it so depth and stencil
-	// can be blitted into the window (multisample blits need equal counts).
+	// multisample blits need equal sample counts, so the scene matches the window
 	GLint windowSamples = 0;
 	glGetIntegerv(GL_SAMPLES, &windowSamples);
 
@@ -437,7 +429,7 @@ void CSceneTarget::BeginFrame()
 			info.allocationFailures++;
 			LOG_L(L_WARNING, "[SceneTarget] scene target allocation failed: %s", error.c_str());
 
-			// a format change that fails keeps the last valid target if it still fits the window
+			// a failed format change keeps the last valid target if it still fits the window
 			const bool keep = (res.sceneFBO != 0 && res.desc.width == want.width && res.desc.height == want.height && res.desc.samples == want.samples);
 			if (!keep) {
 				blockedReason = "allocation failed (" + error + "), using direct";
@@ -468,7 +460,7 @@ void CSceneTarget::BeginFrame()
 
 void CSceneTarget::ClearPBRMask()
 {
-	// glClearBuffer obeys the scissor test and the colour write mask of that draw buffer
+	// glClearBuffer obeys the scissor test and the colour write mask
 	const GLboolean scissor = glIsEnabled(GL_SCISSOR_TEST);
 	glDisable(GL_SCISSOR_TEST);
 	const GLenum both[] = {GL_COLOR_ATTACHMENT0, PBR_MASK_ATTACHMENT};
@@ -510,7 +502,7 @@ void CSceneTarget::ResolveScene(GLbitfield mask)
 	GLint prevRead = 0, prevDraw = 0;
 	glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevRead);
 	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevDraw);
-	// blits are clipped by the scissor test, which world-phase code may leave on
+	// blits obey the scissor test
 	const GLboolean scissor = glIsEnabled(GL_SCISSOR_TEST);
 	glDisable(GL_SCISSOR_TEST);
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, res.sceneFBO);
@@ -527,7 +519,7 @@ void CSceneTarget::ResolvePBRMask()
 	if (samples == 0 || res.resolveFBO == 0)
 		return;
 
-	// a blit copies the read buffer into the draw buffers: point both at the mask, then back at the colour
+	// point read and draw buffer at the mask for the blit, then back at the colour
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, res.sceneFBO);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res.resolveFBO);
 	glReadBuffer(PBR_MASK_ATTACHMENT);
@@ -579,12 +571,12 @@ void CSceneTarget::Present(Boundary at)
 		return;
 
 	SCOPED_GL_DEBUGGROUP("PBRDisplayPass");
-	worldPhase = false; // from here on "the window" is framebuffer 0 again
+	worldPhase = false;
 
 	{
 		ScopedPassState state;
 		if (maskWrites) {
-			// a draw that never switched the mask off: the scene is "the window" for everyone else again
+			// a draw left the mask on
 			glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
 			glDrawBuffer(GL_COLOR_ATTACHMENT0);
 			maskWrites = false;
@@ -633,8 +625,7 @@ void CSceneTarget::CopyDepthToWindow()
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 		glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT, GL_NEAREST);
 
-		// checked once per allocation: a window whose depth format differs from
-		// the scene's refuses the blit, and the shader copy below takes over
+		// checked once per allocation: a window with a different depth format refuses the blit
 		if (!depthBlitChecked) {
 			depthBlitChecked = true;
 			const GLenum err = glGetError();
@@ -659,7 +650,7 @@ void CSceneTarget::CopyDepthToWindow()
 	resolvedThisFrame = true;
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	// leave a defined stencil: zero, since this path cannot copy it
+	// this path cannot copy stencil, so leave it zero
 	glStencilMask(~0u);
 	glClearStencil(0);
 	glClear(GL_STENCIL_BUFFER_BIT);
@@ -693,15 +684,11 @@ DisplayTransformTestResult CSceneTarget::TestDisplayTransforms()
 		return result;
 	}
 
-	// A ramp 0..64 of scene-linear light, denser near black (quadratic spacing).
-	// Row 0 is gray (x, x, x) and must be monotonic; row 1 carries (x, x/2, x/4)
-	// so the colour curves see unequal channels (the matrix curves need not be
-	// monotonic per channel there).
+	// Row 0 is gray and must be monotonic; row 1 has unequal channels (matrix curves need not be monotonic per channel).
 	constexpr int RAMP_SIZE = 257;
 	constexpr int RAMP_ROWS = 2;
 	constexpr float RAMP_MAX = 64.0f;
-	// two half-float steps at 1.0 (2 * 2^-10): the input is quantised to RGBA16F
-	// and GPU pow/exp/log2 differ from the CPU's in the last bits
+	// two half-float steps at 1.0: RGBA16F quantisation plus GPU pow/exp/log2 differences
 	constexpr float TOLERANCE = 2.0f / 1024.0f;
 
 	constexpr int RAMP_TEXELS = RAMP_SIZE * RAMP_ROWS;
@@ -719,7 +706,7 @@ DisplayTransformTestResult CSceneTarget::TestDisplayTransforms()
 
 	const GLuint inTex = MakeTexture(GL_RGBA16F, GL_RGBA, GL_FLOAT, RAMP_SIZE, RAMP_ROWS);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, RAMP_SIZE, RAMP_ROWS, GL_RGBA, GL_FLOAT, ramp.data());
-	// the exact half-float inputs the GPU sees, so the CPU reference uses them too
+	// read back the quantised inputs for the CPU reference
 	glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, ramp.data());
 
 	const GLuint outTex = MakeTexture(GL_RGBA32F, GL_RGBA, GL_FLOAT, RAMP_SIZE, RAMP_ROWS);
@@ -741,8 +728,8 @@ DisplayTransformTestResult CSceneTarget::TestDisplayTransforms()
 		glBindVertexArray(emptyVAO.GetId());
 		displayShader->Enable();
 		displayShader->SetUniform("exposureLinear", 1.0f);
-		displayShader->SetUniform("ditherAmount", 0.0f); // the CPU reference has no grain
-		displayShader->SetUniform("useSceneMask", 0); // every ramp texel is PBR light
+		displayShader->SetUniform("ditherAmount", 0.0f);
+		displayShader->SetUniform("useSceneMask", 0);
 
 		using namespace PBRDisplay;
 		for (int transferIdx = 0; transferIdx <= int(SceneTransfer::Linear); ++transferIdx) {
@@ -761,7 +748,7 @@ DisplayTransformTestResult CSceneTarget::TestDisplayTransforms()
 
 					for (int c = 0; c < 3; ++c) {
 						const bool finite = std::isfinite(gpu[c]);
-						// relative for the unbounded pass-through of legacy
+						// relative error: the legacy transform is unbounded
 						const float scale = std::max(1.0f, std::fabs(cpu[c]));
 						const float err = finite? (std::fabs(gpu[c] - cpu[c]) / scale): 1e30f;
 						const bool monotonic = (i >= RAMP_SIZE) || (gpu[c] + TOLERANCE >= prev[c]);

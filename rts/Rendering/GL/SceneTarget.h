@@ -1,19 +1,11 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef SCENE_TARGET_H
-#define SCENE_TARGET_H
+#pragma once
 
-// The PBR HDR scene target and the one display pass. With PBRSceneTarget=hdr the world is drawn into an RGBA16F target
-// that replaces the window framebuffer during the world phase (FBO::Unbind and
-// Lua's nil framebuffer bind it); Present() then decodes, exposes, tone-maps and
-// encodes it once into the window and copies depth and stencil there, so the
-// screen phase draws display-referred as before. With PBRSceneTarget=direct
-// (the default) nothing here binds anything and the frame is today's.
-//
-// Only PBR pixels are curved: a second colour attachment holds a mask (1 where
-// a PBR model was drawn last), written only between SetPBRMaskWrites(true) and
-// (false); everything else (legacy models, terrain, water, sky) leaves it at 0
-// and its stored, already display-referred value reaches the window unchanged.
+// With PBRSceneTarget=hdr the world is drawn into an HDR target that stands in for the window
+// framebuffer; Present() then runs the one display pass into the window.
+// Only PBR pixels are curved: a second attachment holds a mask (1 where a PBR model was drawn),
+// written only between SetPBRMaskWrites(true) and (false).
 
 #include <array>
 #include <atomic>
@@ -62,44 +54,35 @@ class CSceneTarget {
 public:
 	enum class Boundary { AfterWorld, AfterScreenEffects };
 
-	// Before the world is drawn: reads the settings, (re)allocates, binds the
-	// scene target when hdr is active. Leaves framebuffer 0 bound otherwise.
+	// Before the world is drawn: reads settings, (re)allocates, binds the scene target when hdr is active.
 	void BeginFrame();
-	// Runs the display pass if this boundary is the configured one and the
-	// scene target is bound this frame; otherwise does nothing.
+	// Runs the display pass if `at` is the configured boundary and the scene target is bound.
 	void Present(Boundary at);
 
 	void Kill();
 
-	// True between BeginFrame and Present while hdr is active.
 	bool IsWorldPhase() const { return worldPhase; }
 
-	// The framebuffer that stands for "the window" right now (0 outside the world phase).
+	// The framebuffer standing for "the window" (0 outside the world phase).
 	GLuint GetDefaultFBO() const { return worldPhase? sceneFBO: 0; }
 	GLuint GetSceneFBO() const { return sceneFBO; }
 	bool IsMultisampled() const { return samples > 0; }
 
-	// Single-sample views of the scene for $scene_color / $scene_depth; inside
-	// the world phase a multisampled scene is resolved first.
+	// Single-sample views for $scene_color / $scene_depth; a multisampled scene is resolved first.
 	GLuint GetColorTexture();
 	GLuint GetDepthTexture();
 	std::array<int, 2> GetSize() const { return {width, height}; }
 
-	// For screen copies (gl.CopyToTexture, gl.ReadPixels, gl.BlitFBO(nil, ...)):
-	// when `readFBO` is the multisampled scene, resolves it and returns the
-	// single-sample resolve framebuffer to read from instead; else `readFBO`.
+	// For screen copies: if `readFBO` is the multisampled scene, resolves it and returns the resolve FBO instead.
 	GLuint ResolvedReadFBO(GLuint readFBO);
 
-	// Turns the PBR mask attachment on or off as a draw buffer (gl.SceneTargetPBRMask).
-	// While on, every fragment shader drawing must write output location 1: 1 for
-	// PBR, 0 for display-referred colour. Only acts while the scene target is the
-	// bound draw framebuffer; returns whether the mask is now being written.
+	// While on, every fragment shader drawn must write output location 1 (1 = PBR, 0 = display-referred).
+	// Only acts while the scene target is the bound draw framebuffer; returns whether the mask is written.
 	bool SetPBRMaskWrites(bool on);
 
 	SceneTargetInfo GetInfo() const { return info; }
 
-	// Renders a 0..64 brightness ramp through every curve on the GPU and compares
-	// with PBRDisplay::ApplyDisplayPass.
+	// Renders a 0..64 ramp through every curve on the GPU and compares with PBRDisplay::ApplyDisplayPass.
 	DisplayTransformTestResult TestDisplayTransforms();
 
 	void ConfigNotify(const std::string& key, const std::string& value);
@@ -117,15 +100,15 @@ private:
 	};
 	struct Resources {
 		GLuint sceneFBO = 0;
-		GLuint colorTex = 0;      // single-sample scene colour (no MSAA)
-		GLuint depthTex = 0;      // single-sample scene depth-stencil (no MSAA)
-		GLuint colorRBO = 0;      // multisampled scene colour
-		GLuint depthRBO = 0;      // multisampled scene depth-stencil
-		GLuint resolveFBO = 0;    // MSAA only: single-sample copies for reading
+		GLuint colorTex = 0;      // no MSAA
+		GLuint depthTex = 0;      // no MSAA
+		GLuint colorRBO = 0;      // MSAA
+		GLuint depthRBO = 0;      // MSAA
+		GLuint resolveFBO = 0;    // MSAA only
 		GLuint resolveColorTex = 0;
 		GLuint resolveDepthTex = 0;
-		GLuint maskTex = 0;        // single-sample PBR mask (no MSAA)
-		GLuint maskRBO = 0;        // multisampled PBR mask
+		GLuint maskTex = 0;        // no MSAA
+		GLuint maskRBO = 0;        // MSAA
 		GLuint resolveMaskTex = 0; // MSAA only
 		Desc desc;
 	};
@@ -148,7 +131,7 @@ private:
 	bool worldPhase = false;
 	std::atomic<bool> settingsDirty = {true};
 
-	// requested settings (re-read when a key changes)
+	// re-read when a config key changes
 	bool wantHDR = false;
 	bool forceFailure = false;
 	Boundary boundary = Boundary::AfterWorld;
@@ -181,10 +164,8 @@ private:
 
 extern CSceneTarget sceneTarget;
 
-// Makes a screen copy from the multisampled scene work: for the lifetime of this
-// object the read framebuffer is the scene's single-sample resolve, if the scene
-// was the read framebuffer. Copies from a multisampled framebuffer object into a
-// texture fail in GL, while the same copy from a multisampled window works.
+// Copies from a multisampled FBO into a texture fail in GL (unlike from a multisampled window), so while
+// this object lives the read framebuffer is the scene's single-sample resolve, if the scene was being read.
 class ScopedSceneReadResolve {
 public:
 	ScopedSceneReadResolve();
@@ -193,5 +174,3 @@ private:
 	GLint prevReadFBO = 0;
 	bool rebound = false;
 };
-
-#endif

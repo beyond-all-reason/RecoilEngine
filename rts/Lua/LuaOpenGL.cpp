@@ -4731,7 +4731,6 @@ int LuaOpenGL::RenderToTexture(lua_State* L)
 	if ((tex == nullptr) || (tex->fbo == 0))
 		return 0;
 
-	// restores "the window": the PBR scene target during the world phase
 	GLint currentFBO = sceneTarget.GetDefaultFBO();
 	if (drawMode == DRAW_WORLD_SHADOW) {
 		glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &currentFBO);
@@ -4971,14 +4970,10 @@ int LuaOpenGL::PublishTexture(lua_State* L)
 
 
 /***
- * Marks what the following draws put into the HDR scene target as PBR or not.
- *
- * With `PBRSceneTarget=hdr` the display pass curves only pixels whose mask is
- * 1; all others keep the display-referred colour they were drawn with, as under
- * `direct`. While the mask is on, every fragment shader drawing must write its
- * output location 1 (`1.0` in red for PBR, `0.0` for display-referred colour);
- * turn it off again before anything else draws. Does nothing, and returns
- * false, outside the HDR world phase or while another framebuffer is bound.
+ * With `PBRSceneTarget=hdr` the display pass only curves pixels marked PBR in the mask.
+ * While the mask is on, every fragment shader drawn must write output location 1
+ * (`1.0` for PBR, `0.0` for display-referred colour); turn it off afterwards.
+ * Does nothing and returns false outside the HDR world phase or while another framebuffer is bound.
  *
  * @function gl.SceneTargetPBRMask
  * @param enable boolean

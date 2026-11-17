@@ -901,7 +901,6 @@ void CBumpWater::Draw()
 	if (!waterRendering->forceRendering && !readMap->HasVisibleWater())
 		return;
 
-	// a multisampled PBR scene target is copied from its resolve
 	ScopedSceneReadResolve sceneRead;
 
 	if (refraction == 1) {

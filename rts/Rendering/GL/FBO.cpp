@@ -333,7 +333,6 @@ void FBO::Unbind()
 	//   do stuff
 	// FBO::Unbind(); <- not redundant!
 	//   continue with screen FBO
-	// During the world phase "the screen" is the PBR scene target when it is active.
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, sceneTarget.GetDefaultFBO());
 }
 

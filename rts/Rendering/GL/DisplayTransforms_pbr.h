@@ -1,16 +1,9 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef DISPLAY_TRANSFORMS_PBR_H
-#define DISPLAY_TRANSFORMS_PBR_H
+#pragma once
 
-// CPU reference of the PBR display pass (pure math in a header-only file without
-// GL, so a CPU test can check it). The GLSL in shaders/GLSL/PBRDisplayCurves.glsl
-// implements the same functions; test/engine/Rendering/PBR/testPBRDisplayTransforms.cpp
-// holds the reference values and Spring.TestDisplayTransforms() compares the GPU
-// pass against ApplyDisplayPass() below. Change both files together.
-//
-// One display pass = decode the scene's storage transfer, multiply by the
-// exposure, apply exactly one curve, encode once for an sRGB display.
+// GL-free CPU reference of the display pass; shaders/GLSL/PBRDisplayCurves.glsl implements the same
+// functions, so change both together. One pass = decode, exposure, one curve, one sRGB encode.
 
 #include <algorithm>
 #include <array>
@@ -22,28 +15,27 @@ namespace PBRDisplay {
 
 struct RGB { float r, g, b; };
 
-// The order is the shader's `displayTransform` uniform; append, never reorder.
+// The order is the shader's `displayTransform` uniform.
 enum class Transform : int32_t {
 	KhronosNeutral = 0,
 	AgX            = 1,
-	ACES           = 2, // Narkowicz 2015 fit
-	ACESHill       = 3, // Stephen Hill's fit of the RRT+ODT
+	ACES           = 2,
+	ACESHill       = 3,
 	Hable          = 4,
 	Uchimura       = 5,
 	Reinhard       = 6,
 	ReinhardJodie  = 7,
 	FilmicHejl     = 8, // published form includes the display encode
-	Unreal         = 9, // Unreal Filmic; the result includes the display encode
+	Unreal         = 9, // inspired by Unreal's filmic tone mapper; the result includes the display encode
 	BarCustom      = 10,
 	Legacy         = 11,
 	LinearDebug    = 12,
 	Count
 };
 
-// How the scene target stores colour (PBRSceneTransfer).
 enum class SceneTransfer : int32_t {
 	SRGBExtended = 0,
-	Linear       = 1, // reserved: the legacy world does not write linear yet
+	Linear       = 1, // reserved
 };
 
 static constexpr std::array<std::string_view, size_t(Transform::Count)> TRANSFORM_NAMES = {
@@ -63,19 +55,18 @@ inline bool ParseTransform(std::string_view name, Transform& out) {
 
 inline std::string_view TransformName(Transform t) { return TRANSFORM_NAMES[size_t(t)]; }
 
-// The two published curves whose output is already display-encoded.
+// Curves whose output is already display-encoded.
 inline bool CurveIncludesEncode(Transform t) { return t == Transform::FilmicHejl || t == Transform::Unreal; }
 
 static constexpr float REC709_LUMA[3] = {0.2126f, 0.7152f, 0.0722f};
 
-// IEC 61966-2-1 piecewise sRGB, extended above 1 by the same power segment so the
-// srgb-extended storage transfer round-trips scene values above one.
+// IEC 61966-2-1 sRGB, extended above 1 by the same power segment so values above one round-trip.
 inline float SRGBEncode(float x) {
 	x = std::max(x, 0.0f);
 	return (x <= 0.0031308f)? (x * 12.92f): (1.055f * std::pow(x, 1.0f / 2.4f) - 0.055f);
 }
 inline float SRGBDecode(float x) {
-	x = std::max(x, 0.0f); // the float scene can hold negatives an 8-bit window clamped
+	x = std::max(x, 0.0f); // the float scene can hold negatives
 	return (x <= 0.04045f)? (x / 12.92f): std::pow((x + 0.055f) / 1.055f, 2.4f);
 }
 inline RGB SRGBEncode(RGB c) { return {SRGBEncode(c.r), SRGBEncode(c.g), SRGBEncode(c.b)}; }
@@ -91,8 +82,7 @@ inline RGB Mul(const float m[3][3], RGB c) {
 template<typename F> inline RGB PerChannel(RGB c, F f) { return {f(c.r), f(c.g), f(c.b)}; }
 inline float Clamp01(float x) { return std::clamp(x, 0.0f, 1.0f); }
 
-// Khronos PBR Neutral, reference implementation from the specification
-// (github.com/KhronosGroup/ToneMapping, PBR_Neutral).
+// Khronos PBR Neutral (github.com/KhronosGroup/ToneMapping).
 inline RGB KhronosNeutral(RGB c) {
 	constexpr float START_COMPRESSION = 0.8f - 0.04f;
 	constexpr float DESATURATION = 0.15f;
@@ -114,8 +104,7 @@ inline RGB KhronosNeutral(RGB c) {
 	return {c.r + (newPeak - c.r) * g, c.g + (newPeak - c.g) * g, c.b + (newPeak - c.b) * g};
 }
 
-// AgX base (Troy Sobotka), analytic form with the 6th-order fit of the default
-// contrast curve (Benjamin Wrensch, 2023); returns linear light for the encode.
+// AgX (Troy Sobotka) with a 6th-order fit of the default contrast curve (Benjamin Wrensch); returns linear light.
 inline RGB AgX(RGB c) {
 	static constexpr float INSET[3][3] = {
 		{0.842479062253094f, 0.0784335999999992f, 0.0792237451477643f},
@@ -129,7 +118,7 @@ inline RGB AgX(RGB c) {
 	};
 	constexpr float MIN_EV = -12.47393f;
 	constexpr float MAX_EV = 4.026069f;
-	constexpr float MIN_POSITIVE = 1e-10f; // keeps log2 finite for black
+	constexpr float MIN_POSITIVE = 1e-10f;
 
 	c = Mul(INSET, c);
 	c = PerChannel(c, [&](float v) {
@@ -140,7 +129,7 @@ inline RGB AgX(RGB c) {
 		return 15.5f * v4 * v2 - 40.14f * v4 * v + 31.96f * v4 - 6.868f * v2 * v + 0.4298f * v2 + 0.1191f * v - 0.00232f;
 	});
 	c = Mul(OUTSET, c);
-	constexpr float AGX_DISPLAY_GAMMA = 2.2f; // the fit's own display transfer, undone here
+	constexpr float AGX_DISPLAY_GAMMA = 2.2f; // undoes the fit's own display transfer
 	return PerChannel(c, [](float v) { return std::pow(std::max(v, 0.0f), AGX_DISPLAY_GAMMA); });
 }
 
@@ -151,7 +140,7 @@ inline RGB ACESNarkowicz(RGB c) {
 	});
 }
 
-// Stephen Hill's fit of the ACES RRT+ODT (BakingLab, ACES.hlsl).
+// Stephen Hill's ACES RRT+ODT fit (BakingLab).
 inline RGB ACESHill(RGB c) {
 	static constexpr float INPUT[3][3] = {
 		{0.59719f, 0.35458f, 0.04823f},
@@ -170,7 +159,7 @@ inline RGB ACESHill(RGB c) {
 	return PerChannel(Mul(OUTPUT, c), Clamp01);
 }
 
-// John Hable's Uncharted 2 curve with its published exposure bias and white point.
+// John Hable's Uncharted 2 curve.
 inline float HablePartial(float x) {
 	constexpr float A = 0.15f, B = 0.50f, C = 0.10f, D = 0.20f, E = 0.02f, F = 0.30f;
 	return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
@@ -182,8 +171,7 @@ inline RGB Hable(RGB c) {
 	return PerChannel(c, [whiteScale](float x) { return HablePartial(std::max(x, 0.0f) * EXPOSURE_BIAS) * whiteScale; });
 }
 
-// Hajime Uchimura, "HDR theory and practice" (CEDEC 2017), the GT curve with its
-// published defaults.
+// Hajime Uchimura's GT tonemapper ("HDR theory and practice", CEDEC 2017).
 inline RGB Uchimura(RGB c) {
 	constexpr float P = 1.0f;  // max brightness
 	constexpr float a = 1.0f;  // contrast
@@ -201,7 +189,7 @@ inline RGB Uchimura(RGB c) {
 		const float CP = -C2 / P;
 
 		const float t = std::clamp(x / m, 0.0f, 1.0f);
-		const float w0 = 1.0f - t * t * (3.0f - 2.0f * t); // 1 - smoothstep(0, m, x)
+		const float w0 = 1.0f - t * t * (3.0f - 2.0f * t);
 		const float w2 = (x >= m + l0)? 1.0f: 0.0f;
 		const float w1 = 1.0f - w0 - w2;
 
@@ -216,7 +204,7 @@ inline RGB Reinhard(RGB c) {
 	return PerChannel(c, [](float x) { x = std::max(x, 0.0f); return x / (1.0f + x); });
 }
 
-// "Jodie" Reinhard (shadertoy 4dBcD1): luminance and per-channel Reinhard blended.
+// "Jodie" Reinhard (shadertoy 4dBcD1).
 inline RGB ReinhardJodie(RGB c) {
 	const float l = REC709_LUMA[0] * c.r + REC709_LUMA[1] * c.g + REC709_LUMA[2] * c.b;
 	return PerChannel(c, [l](float x) {
@@ -226,7 +214,7 @@ inline RGB ReinhardJodie(RGB c) {
 	});
 }
 
-// Jim Hejl and Richard Burgess-Dawson; the sRGB-like encode is part of the fit.
+// Jim Hejl and Richard Burgess-Dawson; includes the encode.
 inline RGB FilmicHejl(RGB c) {
 	return PerChannel(c, [](float x) {
 		x = std::max(0.0f, x - 0.004f);
@@ -234,10 +222,8 @@ inline RGB FilmicHejl(RGB c) {
 	});
 }
 
-// Unreal's Filmic display transform, default post-process settings: AP1 working space, gamut expansion 1.0,
-// blue correction 0.6, film slope 0.88 / toe 0.55 / shoulder 0.26 / black clip 0 / white clip 0.04, back to sRGB
-// primaries and the exact sRGB encode (the encode is part of the result). Same math as UnrealFilmic in
-// shaders/GLSL/PBRDisplayCurves.glsl; the combined matrices are products of the ACES AP0/AP1 matrices.
+// Filmic tone mapper inspired by Unreal's, with its default post-process settings; same math as UnrealFilmic in
+// PBRDisplayCurves.glsl. The matrices are products of the ACES AP0/AP1 matrices.
 struct Mat3 { float m[3][3]; };
 inline RGB Mul(const Mat3& a, RGB v) {
 	return {a.m[0][0] * v.r + a.m[0][1] * v.g + a.m[0][2] * v.b,
@@ -302,7 +288,7 @@ inline RGB UeFilmToneMap(RGB ap1) {
 		shoulderC = (logc > shoulderMatch)? shoulderC: straightC;
 		float t = std::clamp((logc - toeMatch) / (shoulderMatch - toeMatch), 0.0f, 1.0f);
 		if (shoulderMatch < toeMatch)
-			t = 1.0f - t; // true for the default settings (toe 0.55, shoulder 0.26)
+			t = 1.0f - t; // true for the default toe and shoulder
 		t = (3.0f - 2.0f * t) * t * t;
 		return toeC + (shoulderC - toeC) * t;
 	};
@@ -329,12 +315,9 @@ inline RGB UnrealFilmic(RGB lin) {
 	return PerChannel(SRGBEncode(film), Clamp01);
 }
 
-// BAR's CUS unit curve `CustomTM` (modelmaterials_gl4/templates/cus_gl4.frag.glsl)
-// with the constants that shader actually uses: its `pbrParams` array is a
-// GLSL constant (4.85, 0.85, 3.5, 0.85, 1.0), not the tonemapA-E config values
-// (whose defaults are 4.75 and 0.75). CUS runs with modelGamma 1, so the curve
-// works on display-encoded values; the pass re-encodes the decoded scene value
-// first and applies no encode after it, which reproduces a CUS unit pixel.
+// BAR's CUS unit curve `CustomTM` (cus_gl4.frag.glsl) with the constants that shader actually uses
+// (its `pbrParams` array, not the tonemapA-E config values). It works on display-encoded values, so
+// the pass re-encodes first and applies no encode after.
 static constexpr float BAR_CUSTOM_A = 4.85f;
 static constexpr float BAR_CUSTOM_B = 0.85f;
 static constexpr float BAR_CUSTOM_C = 3.5f;
@@ -346,12 +329,10 @@ inline RGB BarCustom(RGB encoded) {
 	});
 }
 
-// The full pass for one stored scene value. `stored` is what the scene target
-// holds; the result is what the pass writes into the display (before the
-// window's 8-bit quantisation).
+// The full pass for one stored scene value; the result is what the pass writes before 8-bit quantisation.
 inline RGB ApplyDisplayPass(Transform t, SceneTransfer transfer, float exposureLinear, RGB stored) {
 	if (t == Transform::Legacy)
-		return stored; // today's image, unchanged (no decode, exposure or curve)
+		return stored;
 
 	RGB lin = (transfer == SceneTransfer::SRGBExtended)? SRGBDecode(stored): stored;
 	lin = {lin.r * exposureLinear, lin.g * exposureLinear, lin.b * exposureLinear};
@@ -376,5 +357,3 @@ inline RGB ApplyDisplayPass(Transform t, SceneTransfer transfer, float exposureL
 inline float ExposureLinear(float ev) { return std::exp2(ev); }
 
 } // namespace PBRDisplay
-
-#endif

@@ -1,11 +1,6 @@
-// PBRDisplayCurves.glsl -- the display curves of the PBR HDR display pass, shared with BAR's PBR unit shader.
-// The engine prepends this file to PBRDisplayFS.glsl (SceneTarget.cpp: the shader loader has no #include); BAR's
-// cus_gl4.lua inserts it into cus_gl4_pbr.frag.glsl from the same VFS path, so the curve a unit shader applies while
-// it owns the curve (PBRSceneTarget=direct) and the curve of the display pass can never drift apart.
-// No version directive (the engine moves the first one it finds) and only these names at global scope: TM_*, REC709_LUMA, UE_*, SRGBEncode, SRGBDecode, the
-// curve functions and PBRApplyDisplayTransform. The CPU reference is rts/Rendering/GL/DisplayTransforms_pbr.h;
-// change both together (test_PBRDisplayTransforms, Spring.TestDisplayTransforms).
-// The TM_ values are the C++ enum PBRDisplay::Transform.
+// Display curves shared by the display pass (prepended to PBRDisplayFS.glsl) and BAR's PBR unit shader.
+// No version directive, so it can be inserted into another shader. The TM_ values are PBRDisplay::Transform;
+// the CPU reference is rts/Rendering/GL/DisplayTransforms_pbr.h, change both together.
 
 const int TM_KHRONOS_NEUTRAL = 0;
 const int TM_AGX             = 1;
@@ -30,7 +25,7 @@ vec3 SRGBEncode(vec3 x) {
 }
 
 vec3 SRGBDecode(vec3 x) {
-	x = max(x, vec3(0.0)); // the float scene can hold negatives an 8-bit window clamped
+	x = max(x, vec3(0.0)); // the float scene can hold negatives
 	return mix(pow((x + 0.055) / 1.055, vec3(2.4)), x / 12.92, lessThanEqual(x, vec3(0.04045)));
 }
 
@@ -142,11 +137,8 @@ vec3 FilmicHejl(vec3 x) {
 	return (x * (6.2 * x + 0.5)) / (x * (6.2 * x + 1.7) + 0.06);
 }
 
-// Unreal's Filmic display transform with the default post-process settings: sRGB in, AP1 working space, gamut
-// expansion 1.0, blue correction 0.6, film slope 0.88, toe 0.55, shoulder 0.26, black clip 0, white clip 0.04,
-// back to sRGB primaries and the exact sRGB encode. The analytic chain, not the 32^3 LUT (they agree to 1/255 on
-// the reference table); white balance at 6500 K is the identity within 0.1 % and is left out.
-// The combined matrices are products of the ACES AP0/AP1 matrices.
+// Filmic tone mapper inspired by Unreal's, with its default post-process settings. Analytic chain, not a LUT;
+// the 6500 K white balance is left out (identity within 0.1 %). The matrices are products of the ACES AP0/AP1 matrices.
 const mat3 UE_SRGB_2_AP1 = mat3(0.6130974024, 0.07019372251, 0.02061559286, 0.3395231461, 0.9163538791, 0.1095697729, 0.04737945145, 0.01345239859, 0.8698146341);
 const mat3 UE_AP1_2_SRGB = mat3(1.705050993, -0.1302564175, -0.02400335679, -0.6217921205, 1.140804736, -0.1289689761, -0.08325887216, -0.01054831904, 1.152972333);
 const mat3 UE_AP1_2_AP0 = mat3(0.6954522413, 0.04479456338, -0.005525882568, 0.1406786965, 0.8596711184, 0.004025210277, 0.1638690622, 0.0955343182, 1.001500672);
@@ -162,7 +154,7 @@ const float UE_FILM_BLACK_CLIP = 0.0;
 const float UE_FILM_WHITE_CLIP = 0.04;
 const float UE_BLUE_CORRECTION = 0.6;
 const float UE_EXPAND_GAMUT = 1.0;
-const float UE_LUT_INPUT_MAX = 43.7052; // the LUT's log-encoded input range saturates here
+const float UE_LUT_INPUT_MAX = 43.7052;
 
 float UeSaturation(vec3 c) {
 	float mn = min(min(c.r, c.g), c.b);
@@ -191,13 +183,13 @@ vec3 UeFilmToneMap(vec3 ap1) {
 	vec3 ap0 = UE_AP1_2_AP0 * ap1;
 	float sat = UeSaturation(ap0);
 	float s = UeSigmoidShaper((sat - 0.4) / 0.2);
-	ap0 *= 1.0 + UeGlowFwd(UeYC(ap0), 0.05 * s, 0.08);           // ACES glow module
+	ap0 *= 1.0 + UeGlowFwd(UeYC(ap0), 0.05 * s, 0.08);
 	float hue = UeHue(ap0);
 	if (hue > 180.0)
 		hue -= 360.0;
 	float hueWeight = smoothstep(0.0, 1.0, 1.0 - abs(2.0 * hue / 135.0));
 	hueWeight *= hueWeight;
-	ap0.r += hueWeight * sat * (0.03 - ap0.r) * (1.0 - 0.82);       // ACES red modifier
+	ap0.r += hueWeight * sat * (0.03 - ap0.r) * (1.0 - 0.82);
 	vec3 w = max(vec3(0.0), UE_AP0_2_AP1_FILM * ap0);
 	w = mix(vec3(dot(w, UE_AP1_RGB2Y)), w, 0.96);
 	float toeScale = 1.0 + UE_FILM_BLACK_CLIP - UE_FILM_TOE;
@@ -214,14 +206,14 @@ vec3 UeFilmToneMap(vec3 ap1) {
 	shoulderC = mix(straightC, shoulderC, greaterThan(logc, vec3(shoulderMatch)));
 	vec3 t = clamp((logc - toeMatch) / (shoulderMatch - toeMatch), 0.0, 1.0);
 	if (shoulderMatch < toeMatch)
-		t = 1.0 - t; // true for the default settings (toe 0.55, shoulder 0.26)
+		t = 1.0 - t; // true for the default toe and shoulder
 	t = (3.0 - 2.0 * t) * t * t;
 	vec3 tone = mix(toeC, shoulderC, t);
 	tone = mix(vec3(dot(tone, UE_AP1_RGB2Y)), tone, 0.93);
 	return max(vec3(0.0), tone);
 }
 
-// exposed scene-linear sRGB -> encoded display value (the encode is part of the chain)
+// exposed scene-linear sRGB -> encoded display value
 vec3 UnrealFilmic(vec3 lin) {
 	lin = clamp(lin, vec3(0.0), vec3(UE_LUT_INPUT_MAX));
 	vec3 c = UE_SRGB_2_AP1 * lin;
@@ -237,15 +229,13 @@ vec3 UnrealFilmic(vec3 lin) {
 	return clamp(SRGBEncode(max(vec3(0.0), UE_AP1_2_SRGB * c)), 0.0, 1.0);
 }
 
-// BAR's CUS CustomTM with BAR's default tonemapA-E; it works on display-encoded
-// values (CUS runs with modelGamma 1), so no encode follows it.
+// BAR's CUS CustomTM; it works on display-encoded values, so no encode follows it.
 vec3 BarCustom(vec3 encoded) {
-	const float A = 4.85, B = 0.85, C = 3.5, D = 0.85, E = 1.0; // CUS's own constants (DisplayTransforms_pbr.h)
+	const float A = 4.85, B = 0.85, C = 3.5, D = 0.85, E = 1.0;
 	return (encoded * (A * encoded + B)) / (encoded * (C * encoded + D) + E);
 }
 
-// Unreal's backbuffer dither (triangular grain, 1/255 for an 8-bit target): hides banding in dark gradients.
-// `seed` moves the grain every frame; amount 0 switches it off.
+// Triangular grain as in Unreal's backbuffer dither; `seed` moves it every frame, amount 0 switches it off.
 vec3 PBRDitherDisplay(vec3 encoded, vec2 pixel, float seed, float amount) {
 	float uniformGrain = fract(sin(pixel.x + seed + (pixel.y + seed) * 543.31) * 493013.0);
 	float n = uniformGrain * 2.0 - 1.0;
@@ -253,9 +243,8 @@ vec3 PBRDitherDisplay(vec3 encoded, vec2 pixel, float seed, float amount) {
 	return encoded + triangular * amount;
 }
 
-// One curve for an exposed scene-linear value; returns the encoded display value. legacy has no curve of its own:
-// the display pass passes the stored value through before calling this, and a material shader that owns the curve
-// treats it as khronos-neutral (today's look of the PBR units).
+// One curve for an exposed scene-linear value; returns the encoded display value.
+// legacy has no curve here: the display pass handles it, and a material shader treats it as khronos-neutral.
 vec3 PBRApplyDisplayTransform(vec3 lin, int transform) {
 	switch (transform) {
 		case TM_AGX            : return SRGBEncode(AgX(lin));

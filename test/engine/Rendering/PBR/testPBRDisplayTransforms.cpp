@@ -1,18 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-// CPU test of the PBR display pass curves. It checks
-//   1. every PBRDisplayTransform curve in rts/Rendering/GL/DisplayTransforms_pbr.h
-//      against float64 reference values from an independent implementation
-//      (generate_display_transform_golden.py next to this file);
-//   2. every curve is finite and monotonic on a gray ramp from 0 to 64;
-//   3. the 18% gray card at PBRExposureEV=0 and the exposure mapping 2^EV;
-//   4. the srgb-extended storage transfer round-trips values above one;
-//   5. legacy passes the stored value through unchanged, and every name parses.
-// The GPU side (the same curves in PBRDisplayFS.glsl) is checked in game by
-// Spring.TestDisplayTransforms() against the same header.
-//
-// Run: build the test_PBRDisplayTransforms target (part of `tests`), then run it
-// or `ctest -R PBRDisplayTransforms`. Expected: all assertions pass.
+// CPU test of the display curves in DisplayTransforms_pbr.h against float64 reference values from
+// generate_display_transform_golden.py. The GPU side is checked in game by Spring.TestDisplayTransforms().
 
 #include <cmath>
 #include <string_view>
@@ -30,17 +19,14 @@ namespace {
 		float out[3];
 	};
 
-	// float evaluation against float64 reference values; the curves divide and take
-	// pow/exp/log2, which keep about 6 significant digits in float
+	// float against float64: pow/exp/log2 keep about 6 significant digits
 	constexpr float GOLDEN_TOLERANCE = 2e-5f;
 	constexpr float ROUND_TRIP_RELATIVE_TOLERANCE = 1e-5f;
 	constexpr float GRAY_CARD = 0.18f;
-	// sRGB encode of Khronos PBR Neutral at the gray card: the curve only
-	// subtracts its 0.04 toe offset below the compression start (0.18 -> 0.14)
+	// sRGB encode of Khronos PBR Neutral at the gray card (0.18 -> 0.14 after the toe offset)
 	constexpr float GRAY_CARD_KHRONOS_NEUTRAL = 0.410020902f;
 	constexpr float RAMP_MAX = 64.0f;
 	constexpr int RAMP_STEPS = 4096;
-	// a later sample may dip below an earlier one by float rounding only
 	constexpr float MONOTONIC_SLACK = 1e-6f;
 
 	// GOLDEN BEGIN (generate_display_transform_golden.py)
@@ -142,14 +128,13 @@ TEST_CASE("PBRDisplayTransforms")
 			CHECK(int(parsed) == t);
 		}
 		Transform unused;
-		CHECK_FALSE(ParseTransform("tony-mcmapface", unused)); // reserved, needs a LUT file
+		CHECK_FALSE(ParseTransform("tony-mcmapface", unused));
 	}
 
 	SECTION("golden values") {
 		for (const GoldenRow& row: GOLDEN) {
 			Transform t;
 			REQUIRE(ParseTransform(row.transform, t));
-			// the reference inputs are scene-linear: use the linear transfer
 			const RGB out = ApplyDisplayPass(t, SceneTransfer::Linear, 1.0f, {row.in[0], row.in[1], row.in[2]});
 			const float got[3] = {out.r, out.g, out.b};
 			for (int c = 0; c < 3; ++c) {
@@ -180,12 +165,11 @@ TEST_CASE("PBRDisplayTransforms")
 		CHECK(ExposureLinear(1.0f) == 2.0f);
 		CHECK(ExposureLinear(-1.0f) == 0.5f);
 
-		// the stored value of a legacy gray card is its sRGB encoding
 		const float stored = SRGBEncode(GRAY_CARD);
 		const RGB out = ApplyDisplayPass(Transform::KhronosNeutral, SceneTransfer::SRGBExtended, ExposureLinear(0.0f), {stored, stored, stored});
 		CHECK(std::fabs(out.r - GRAY_CARD_KHRONOS_NEUTRAL) <= GOLDEN_TOLERANCE);
 
-		// one stop more exposure equals doubling the scene light
+		// one stop more exposure equals doubled light
 		const RGB brighter = ApplyDisplayPass(Transform::KhronosNeutral, SceneTransfer::SRGBExtended, ExposureLinear(1.0f), {stored, stored, stored});
 		const RGB doubled = ApplyDisplayPass(Transform::KhronosNeutral, SceneTransfer::Linear, 1.0f, {2.0f * GRAY_CARD, 2.0f * GRAY_CARD, 2.0f * GRAY_CARD});
 		CHECK(std::fabs(brighter.r - doubled.r) <= GOLDEN_TOLERANCE);
@@ -196,8 +180,8 @@ TEST_CASE("PBRDisplayTransforms")
 			INFO("value " << x);
 			CHECK(std::fabs(SRGBDecode(SRGBEncode(x)) - x) <= ROUND_TRIP_RELATIVE_TOLERANCE * std::max(1.0f, x));
 		}
-		CHECK(SRGBEncode(4.0f) > 1.0f); // kept above one, not clamped
-		CHECK(SRGBDecode(-0.5f) == 0.0f); // negatives an 8-bit window would have clamped
+		CHECK(SRGBEncode(4.0f) > 1.0f);
+		CHECK(SRGBDecode(-0.5f) == 0.0f);
 	}
 
 	SECTION("legacy is today's image") {

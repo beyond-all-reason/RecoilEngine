@@ -679,8 +679,7 @@ endif()
 
 ################################################################################
 ### PBRDisplayTransforms
-# The curves of the PBR display pass (rts/Rendering/GL/DisplayTransforms_pbr.h)
-# against float64 reference values from generate_display_transform_golden.py.
+# CPU curves of the PBR display pass against float64 reference values (generate_display_transform_golden.py).
 	set(test_name PBRDisplayTransforms)
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Rendering/PBR/testPBRDisplayTransforms.cpp"

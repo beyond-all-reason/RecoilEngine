@@ -1560,7 +1560,6 @@ bool CGame::Draw() {
 			FBO::Unbind();
 		camera->LoadViewport();
 
-		// PBRSceneTarget=hdr: the world draws into the HDR scene target
 		sceneTarget.BeginFrame();
 		worldDrawer.Draw();
 		worldDrawer.ResetMVPMatrices();

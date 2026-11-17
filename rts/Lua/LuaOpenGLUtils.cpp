@@ -65,7 +65,6 @@ LuaMatTexture::Type LuaOpenGLUtils::GetLuaMatTextureType(const std::string& name
 		case hashString(    "$reflection"): { return LuaMatTexture::LUATEX_MAP_REFLECTION; } break;
 		case hashString("$map_reflection"): { return LuaMatTexture::LUATEX_MAP_REFLECTION; } break;
 		case hashString("$sky_reflection"): { return LuaMatTexture::LUATEX_SKY_REFLECTION; } break;
-		// the PBR HDR scene target (PBRSceneTarget=hdr), single-sample views
 		case hashString(     "$scene_color"): { return LuaMatTexture::LUATEX_SCENE_COLOR    ; } break;
 		case hashString(     "$scene_depth"): { return LuaMatTexture::LUATEX_SCENE_DEPTH    ; } break;
 

@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
-"""Reference values of the PBR display transforms.
-
-An independent float64 implementation of the published curves, written from the
-sources named in rts/Rendering/GL/DisplayTransforms_pbr.h, not from that header.
-It prints the C++ table that testPBRDisplayTransforms.cpp embeds; the test then
-checks the engine's float header against it.
+"""Independent float64 implementation of the display curves, written from the published sources, not from
+DisplayTransforms_pbr.h. Prints the table that testPBRDisplayTransforms.cpp embeds.
 
 Usage (from the Recoil checkout):
     python -I test/engine/Rendering/PBR/generate_display_transform_golden.py
-Paste the printed block between the GOLDEN BEGIN / GOLDEN END markers of testPBRDisplayTransforms.cpp.
+Paste the output between the GOLDEN BEGIN / GOLDEN END markers of testPBRDisplayTransforms.cpp.
 """
 
 import math
@@ -126,8 +122,7 @@ def filmic_hejl(c):
     return tuple(out)
 
 
-# Unreal Filmic display transform (default post-process settings), float64, written from the Unreal reference
-# shaders. The combined matrices are the products of the ACES AP0/AP1 matrices that the header and the GLSL use too.
+# Filmic tone mapper inspired by Unreal's (default post-process settings).
 UE_SRGB_2_AP1 = [[0.6130974024, 0.3395231461, 0.04737945145], [0.07019372251, 0.9163538791, 0.01345239859], [0.02061559286, 0.1095697729, 0.8698146341]]
 UE_AP1_2_SRGB = [[1.705050993, -0.6217921205, -0.08325887216], [-0.1302564175, 1.140804736, -0.01054831904], [-0.02400335679, -0.1289689761, 1.152972333]]
 UE_AP1_2_AP0 = [[0.6954522413, 0.1406786965, 0.1638690622], [0.04479456338, 0.8596711184, 0.0955343182], [-0.005525882568, 0.004025210277, 1.001500672]]
@@ -211,7 +206,7 @@ def unreal(c):
 
 
 def bar_custom(encoded):
-    A, B, C, D, E = 4.85, 0.85, 3.5, 0.85, 1.0  # the constants cus_gl4.frag.glsl uses
+    A, B, C, D, E = 4.85, 0.85, 3.5, 0.85, 1.0
     return tuple((x * (A * x + B)) / (x * (C * x + D) + E) for x in encoded)
 
 
@@ -219,7 +214,6 @@ def enc(c):
     return tuple(srgb_encode(v) for v in c)
 
 
-# (name, function of exposed scene-linear light -> display value)
 TRANSFORMS = [
     ("khronos-neutral", lambda c: enc(khronos_neutral(c))),
     ("agx", lambda c: enc(agx(c))),
@@ -235,7 +229,7 @@ TRANSFORMS = [
     ("linear-debug", lambda c: enc(tuple(min(max(v, 0.0), 1.0) for v in c))),
 ]
 
-# scene-linear inputs: black, a dark value, the 18% gray card, white, HDR values, a coloured highlight
+# scene-linear inputs
 INPUTS = [
     (0.0, 0.0, 0.0),
     (0.02, 0.02, 0.02),

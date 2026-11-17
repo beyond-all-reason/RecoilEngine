@@ -2912,13 +2912,10 @@ int LuaUnsyncedRead::GetWaterMode(lua_State* L)
 
 
 /***
- * Returns the state of the PBR HDR scene target and its display pass
- * (PBRSceneTarget and the keys next to it). `requested` echoes the saved
- * PBRSceneTarget, `active` is "direct" or "hdr" this frame, and `fallback`
- * explains every substitution (an allocation failure, a reserved value).
- * `revision` increases on every successful (re)allocation (resize, depth
- * format). `depthCopy` is how depth reached the window after the display pass:
- * "blit", "shader" (stencil then not copied) or "none".
+ * State of the PBR HDR scene target and its display pass.
+ * `active` is "direct" or "hdr" this frame, `fallback` explains any substitution,
+ * `revision` increases on every successful (re)allocation, and `depthCopy` is
+ * "blit", "shader" (stencil not copied) or "none".
  *
  * @function Spring.GetSceneTargetInfo
  * @return table sceneTargetInfo
@@ -2952,14 +2949,9 @@ int LuaUnsyncedRead::GetSceneTargetInfo(lua_State* L)
 
 
 /***
- * Runs the display pass's GPU check: a brightness ramp from 0 to 64 (gray and
- * coloured rows) goes through every PBRDisplayTransform curve with both scene
- * transfers and is compared with the engine's CPU reference of the same curves.
- * `pass` needs every value within two half-float steps, finite, and the gray
- * row monotonic. Changes no setting; restores the GL state it touches.
- * A test tool: the first call builds the display pass programs (otherwise built
- * only when PBRSceneTarget=hdr is first wanted), so a game that never calls it
- * and never asks for hdr compiles none of them.
+ * Runs a 0..64 brightness ramp through every display curve on the GPU and compares it with the CPU reference.
+ * `pass` needs every value within two half-float steps and finite, and the gray row monotonic.
+ * The first call builds the display pass programs.
  *
  * @function Spring.TestDisplayTransforms
  * @return table result fields ran, pass, samples, maxError, worstTransform, failure
