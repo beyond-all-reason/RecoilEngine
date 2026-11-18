@@ -16,10 +16,10 @@
 #include "System/Misc/TracyDefs.h"
 #include "System/StringUtil.h"
 
-CONFIG(std::string, SceneTarget).defaultValue("direct").description("direct (draw into the window) or hdr (draw into an HDR scene target, presented through one display pass). A failed allocation falls back to direct.");
+CONFIG(std::string, SceneTarget).defaultValue("direct").description("direct (draw into the window) or hdr (draw into an HDR scene target, presented through one display pass). A failed allocation falls back to direct. With hdr, Lua reads the scene through the texture names $scene_color, $scene_depth and $scene_tonemap_mask.");
 CONFIG(std::string, SceneDepthFormat).defaultValue("d24s8").description("d24s8 (copied into the window by a blit) or d32fs8 (depth copied by a shader, stencil not copied).");
 CONFIG(std::string, SceneColorFormat).defaultValue("rgba16f").description("rgba16f or r11g11b10f (half the memory; no alpha, no negative values, about 6 bits of mantissa).");
-CONFIG(std::string, DisplayTransform).defaultValue("khronos-neutral").description("khronos-neutral, agx, aces, aces-hill, hable, uchimura, reinhard, reinhard-jodie, filmic-hejl, filmic-toe-shoulder (inspired by Unreal's filmic tone mapper), bar-custom, legacy (no curve) or linear-debug.");
+CONFIG(std::string, DisplayTransform).defaultValue("khronos-neutral").description("khronos-neutral, agx, aces, aces-hill, hable, uchimura, reinhard, reinhard-jodie, filmic-hejl, filmic-toe-shoulder (inspired by Unreal's filmic tone mapper), bar-custom (the curve of BAR's legacy model shader), legacy (no curve: pixels pass unchanged) or linear-debug (clamped scene-linear values, for checking).");
 CONFIG(float, DisplayExposureEV).defaultValue(0.0f).description("Manual exposure in EV stops (linear multiplier 2^EV).");
 CONFIG(std::string, DisplayBoundary).defaultValue("after-world").description("after-world (screen effects draw into the window) or after-screen-effects (they draw into the scene and are tone-mapped).");
 CONFIG(std::string, DisplayDither).defaultValue("triangular").description("triangular (grain of 1/255 hiding banding in the 8-bit output) or off.");

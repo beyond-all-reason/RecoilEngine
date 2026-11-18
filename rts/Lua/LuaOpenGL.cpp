@@ -4228,6 +4228,7 @@ int LuaOpenGL::Texture(lua_State* L)
 	// $specular    --  specular cube map
 	// $reflection  --  reflection cube map
 	// $heightmap   --  ground heightmap
+	// $scene_color, $scene_depth, $scene_tonemap_mask  --  the HDR scene target (SceneTarget = hdr)
 	// ...          --  named textures
 	//
 
