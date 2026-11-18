@@ -25,7 +25,6 @@ void main() {
 		fragColor = stored;
 		return;
 	}
-	// not PBR: stored value untouched
 	if (useSceneMask == 1 && texelFetch(sceneMask, ivec2(gl_FragCoord.xy), 0).r < 0.5) {
 		fragColor = stored;
 		return;

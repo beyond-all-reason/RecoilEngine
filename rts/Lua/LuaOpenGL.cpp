@@ -4977,7 +4977,7 @@ int LuaOpenGL::PublishTexture(lua_State* L)
  *
  * @function gl.SceneTargetPBRMask
  * @param enable boolean
- * @return boolean writing whether the mask is now written
+ * @return boolean writing true when the mask is written from now on
  */
 int LuaOpenGL::SceneTargetPBRMask(lua_State* L)
 {

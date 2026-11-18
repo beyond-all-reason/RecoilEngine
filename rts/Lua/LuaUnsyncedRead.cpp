@@ -2917,6 +2917,10 @@ int LuaUnsyncedRead::GetWaterMode(lua_State* L)
  * `revision` increases on every successful (re)allocation, `depthCopy` is
  * "blit", "shader" (stencil not copied) or "none", and `displayPass` is "engine", or "game"
  * when a `DrawSceneDisplay` call-in drew the last display pass.
+ * The other fields are the settings in effect (`requested`, `colorFormat`, `depthFormat`,
+ * `requestedDepthFormat`, `transfer`, `displayTransform`, `exposureMode`, `boundary`, `dither`,
+ * `exposureEV`, `exposureLinear`), the target's `width`, `height` and `samples`, `stencilCopied`
+ * and `allocationFailures`.
  *
  * @function Spring.GetSceneTargetInfo
  * @return table sceneTargetInfo
