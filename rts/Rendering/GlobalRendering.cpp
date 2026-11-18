@@ -1325,7 +1325,7 @@ void CGlobalRendering::SetWindowAttributes(SDL_Window* window)
 
 	WindowManagerHelper::SetWindowResizable(window, !borderless && !fullScreen);
 
-	// on X11 (openbox) the window was back on top after the changes above
+	// openbox raises the window again on the border and geometry changes above
 	if (backgroundWindow && (SDL_GetWindowFlags(window) & SDL_WINDOW_SHOWN) != 0)
 		WindowManagerHelper::LowerWindow(window);
 }

@@ -48,7 +48,7 @@ namespace WindowManagerHelper {
 	 * @brief asks the window manager not to focus the window when it is first shown
 	 * (--background-window); call it while the window is still hidden and after
 	 * SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN is set. On X11 it sets
-	 * _NET_WM_USER_TIME = 0 (with only the hint, openbox still focused the window);
+	 * _NET_WM_USER_TIME = 0, because openbox ignores the hint alone;
 	 * on Windows the hint is enough.
 	 */
 	void SetNoInitialFocus(SDL_Window* window);
