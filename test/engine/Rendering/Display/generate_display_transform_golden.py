@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Independent float64 implementation of the display curves, written from the published sources, not from
-DisplayTransforms.h. Prints the table that testPBRDisplayTransforms.cpp embeds.
+DisplayTransforms.h. Prints the table that testDisplayTransforms.cpp embeds.
 
 Usage (from the Recoil checkout):
-    python -I test/engine/Rendering/PBR/generate_display_transform_golden.py
-Paste the output between the GOLDEN BEGIN / GOLDEN END markers of testPBRDisplayTransforms.cpp.
+    python -I test/engine/Rendering/Display/generate_display_transform_golden.py
+Paste the output between the GOLDEN BEGIN / GOLDEN END markers of testDisplayTransforms.cpp.
 """
 
 import math

@@ -16,14 +16,14 @@
 #include "System/Misc/TracyDefs.h"
 #include "System/StringUtil.h"
 
-CONFIG(std::string, PBRSceneTarget).defaultValue("direct").description("direct (draw into the window) or hdr (draw into an HDR scene target, presented through one display pass). A failed allocation falls back to direct.");
-CONFIG(std::string, PBRSceneDepthFormat).defaultValue("d24s8").description("d24s8 (copied into the window by a blit) or d32fs8 (depth copied by a shader, stencil not copied).");
-CONFIG(std::string, PBRHDRColorFormat).defaultValue("rgba16f").description("rgba16f or r11g11b10f (half the memory; no alpha, no negative values, about 6 bits of mantissa).");
-CONFIG(std::string, PBRDisplayTransform).defaultValue("khronos-neutral").description("khronos-neutral, agx, aces, aces-hill, hable, uchimura, reinhard, reinhard-jodie, filmic-hejl, filmic-toe-shoulder (inspired by Unreal's filmic tone mapper), bar-custom, legacy (no curve) or linear-debug.");
-CONFIG(float, PBRExposureEV).defaultValue(0.0f).description("Manual exposure in EV stops (linear multiplier 2^EV).");
-CONFIG(std::string, PBRDisplayBoundary).defaultValue("after-world").description("after-world (screen effects draw into the window) or after-screen-effects (they draw into the scene and are tone-mapped).");
-CONFIG(std::string, PBRDisplayDither).defaultValue("triangular").description("triangular (grain of 1/255 hiding banding in the 8-bit output) or off.");
-CONFIG(bool, PBRSceneTargetForceFailure).defaultValue(false).description("Test only: make the allocation fail to exercise the fallback to direct.");
+CONFIG(std::string, SceneTarget).defaultValue("direct").description("direct (draw into the window) or hdr (draw into an HDR scene target, presented through one display pass). A failed allocation falls back to direct.");
+CONFIG(std::string, SceneDepthFormat).defaultValue("d24s8").description("d24s8 (copied into the window by a blit) or d32fs8 (depth copied by a shader, stencil not copied).");
+CONFIG(std::string, SceneColorFormat).defaultValue("rgba16f").description("rgba16f or r11g11b10f (half the memory; no alpha, no negative values, about 6 bits of mantissa).");
+CONFIG(std::string, DisplayTransform).defaultValue("khronos-neutral").description("khronos-neutral, agx, aces, aces-hill, hable, uchimura, reinhard, reinhard-jodie, filmic-hejl, filmic-toe-shoulder (inspired by Unreal's filmic tone mapper), bar-custom, legacy (no curve) or linear-debug.");
+CONFIG(float, DisplayExposureEV).defaultValue(0.0f).description("Manual exposure in EV stops (linear multiplier 2^EV).");
+CONFIG(std::string, DisplayBoundary).defaultValue("after-world").description("after-world (screen effects draw into the window) or after-screen-effects (they draw into the scene and are tone-mapped).");
+CONFIG(std::string, DisplayDither).defaultValue("triangular").description("triangular (grain of 1/255 hiding banding in the 8-bit output) or off.");
+CONFIG(bool, SceneTargetForceFailure).defaultValue(false).description("Test only: make the allocation fail to exercise the fallback to direct.");
 
 CSceneTarget sceneTarget;
 
@@ -34,13 +34,13 @@ namespace {
 	constexpr float DITHER_8BIT = 1.0f / 255.0f;
 	constexpr unsigned DITHER_SEED_PERIOD = 1024u;  // keeps the float seed exact
 	constexpr const char* DEPTH_D32FS8 = "d32fs8";
-	constexpr GLenum PBR_MASK_FORMAT = GL_R8;
-	constexpr GLenum PBR_MASK_ATTACHMENT = GL_COLOR_ATTACHMENT1;
+	constexpr GLenum TONEMAP_MASK_FORMAT = GL_R8;
+	constexpr GLenum TONEMAP_MASK_ATTACHMENT = GL_COLOR_ATTACHMENT1;
 
 	const std::vector<std::string> CONFIG_KEYS = {
-		"PBRSceneTarget", "PBRSceneDepthFormat", "PBRHDRColorFormat", "PBRDisplayTransform",
-		"PBRExposureEV", "PBRDisplayBoundary",
-		"PBRSceneTargetForceFailure", "PBRDisplayDither",
+		"SceneTarget", "SceneDepthFormat", "SceneColorFormat", "DisplayTransform",
+		"DisplayExposureEV", "DisplayBoundary",
+		"SceneTargetForceFailure", "DisplayDither",
 	};
 
 	const char* DepthFormatName(GLenum f) { return (f == GL_DEPTH32F_STENCIL8)? DEPTH_D32FS8: DEPTH_D24S8; }
@@ -143,13 +143,13 @@ void CSceneTarget::Init()
 	settingsDirty = true;
 }
 
-// Built on first use, so a game that never sets PBRSceneTarget=hdr compiles nothing.
+// Built on first use, so a game that never sets SceneTarget=hdr compiles nothing.
 void CSceneTarget::CreatePrograms()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	programsCreated = true;
 
-	displayShader = shaderHandler->CreateProgramObject(SHADER_POOL, "PBRDisplay");
+	displayShader = shaderHandler->CreateProgramObject(SHADER_POOL, "Display");
 	displayShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/FullscreenTriangleVS.glsl", "", GL_VERTEX_SHADER));
 	// the shader loader has no #include, so the shared curves are prepended; a source containing "void main()" is used as the source itself
 	const auto readShader = [](const char* path) {
@@ -163,7 +163,7 @@ void CSceneTarget::CreatePrograms()
 		}
 		return text;
 	};
-	const std::string displaySource = readShader("shaders/GLSL/PBRDisplayCurves.glsl") + "\n" + readShader("shaders/GLSL/PBRDisplayFS.glsl");
+	const std::string displaySource = readShader("shaders/GLSL/DisplayCurves.glsl") + "\n" + readShader("shaders/GLSL/DisplayFS.glsl");
 	displayShader->AttachShaderObject(shaderHandler->CreateShaderObject(displaySource, "", GL_FRAGMENT_SHADER));
 	displayShader->Link();
 	if (displayShader->IsValid()) {
@@ -172,12 +172,12 @@ void CSceneTarget::CreatePrograms()
 		displayShader->SetUniform("sceneMask", 1);
 		displayShader->Disable();
 	} else {
-		LOG_L(L_ERROR, "[SceneTarget] display pass shader failed; PBRSceneTarget=hdr will fall back to direct:\n%s", displayShader->GetLog().c_str());
+		LOG_L(L_ERROR, "[SceneTarget] display pass shader failed; SceneTarget=hdr will fall back to direct:\n%s", displayShader->GetLog().c_str());
 	}
 
-	depthCopyShader = shaderHandler->CreateProgramObject(SHADER_POOL, "PBRSceneDepthCopy");
+	depthCopyShader = shaderHandler->CreateProgramObject(SHADER_POOL, "SceneDepthCopy");
 	depthCopyShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/FullscreenTriangleVS.glsl", "", GL_VERTEX_SHADER));
-	depthCopyShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/PBRSceneDepthCopyFS.glsl", "", GL_FRAGMENT_SHADER));
+	depthCopyShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/SceneDepthCopyFS.glsl", "", GL_FRAGMENT_SHADER));
 	depthCopyShader->Link();
 	if (depthCopyShader->IsValid()) {
 		depthCopyShader->Enable();
@@ -221,49 +221,49 @@ void CSceneTarget::ReadSettings()
 		settingsFallback += s;
 	};
 
-	info.requested = configHandler->GetString("PBRSceneTarget");
+	info.requested = configHandler->GetString("SceneTarget");
 	wantHDR = (info.requested == "hdr");
 	if (!wantHDR && info.requested != "direct")
-		note("PBRSceneTarget=" + info.requested + " is unknown, using direct");
+		note("SceneTarget=" + info.requested + " is unknown, using direct");
 
-	info.requestedDepthFormat = configHandler->GetString("PBRSceneDepthFormat");
+	info.requestedDepthFormat = configHandler->GetString("SceneDepthFormat");
 	wantDepthFormat = (info.requestedDepthFormat == DEPTH_D32FS8)? GL_DEPTH32F_STENCIL8: GL_DEPTH24_STENCIL8;
 	if (info.requestedDepthFormat != DEPTH_D24S8 && info.requestedDepthFormat != DEPTH_D32FS8)
-		note("PBRSceneDepthFormat=" + info.requestedDepthFormat + " is unknown, using d24s8");
+		note("SceneDepthFormat=" + info.requestedDepthFormat + " is unknown, using d24s8");
 
-	const std::string colorName = configHandler->GetString("PBRHDRColorFormat");
+	const std::string colorName = configHandler->GetString("SceneColorFormat");
 	wantColorFormat = (colorName == "r11g11b10f")? GL_R11F_G11F_B10F: GL_RGBA16F;
 	if (colorName != "rgba16f" && colorName != "r11g11b10f")
-		note("PBRHDRColorFormat=" + colorName + " is unknown, using rgba16f");
+		note("SceneColorFormat=" + colorName + " is unknown, using rgba16f");
 
-	const std::string transformName = configHandler->GetString("PBRDisplayTransform");
-	if (!PBRDisplay::ParseTransform(transformName, transform)) {
-		transform = PBRDisplay::Transform::KhronosNeutral;
-		note("PBRDisplayTransform=" + transformName + " is unknown, using khronos-neutral");
+	const std::string transformName = configHandler->GetString("DisplayTransform");
+	if (!Display::ParseTransform(transformName, transform)) {
+		transform = Display::Transform::KhronosNeutral;
+		note("DisplayTransform=" + transformName + " is unknown, using khronos-neutral");
 	}
 
-	exposureEV = configHandler->GetFloat("PBRExposureEV");
+	exposureEV = configHandler->GetFloat("DisplayExposureEV");
 	if (!std::isfinite(exposureEV)) {
 		exposureEV = 0.0f;
-		note("PBRExposureEV is not finite, using 0");
+		note("DisplayExposureEV is not finite, using 0");
 	}
 
-	const std::string boundaryName = configHandler->GetString("PBRDisplayBoundary");
+	const std::string boundaryName = configHandler->GetString("DisplayBoundary");
 	boundary = (boundaryName == "after-screen-effects")? Boundary::AfterScreenEffects: Boundary::AfterWorld;
 	if (boundaryName != "after-world" && boundaryName != "after-screen-effects")
-		note("PBRDisplayBoundary=" + boundaryName + " is unknown, using after-world");
+		note("DisplayBoundary=" + boundaryName + " is unknown, using after-world");
 
-	forceFailure = configHandler->GetBool("PBRSceneTargetForceFailure");
+	forceFailure = configHandler->GetBool("SceneTargetForceFailure");
 
-	const std::string ditherName = configHandler->GetString("PBRDisplayDither");
+	const std::string ditherName = configHandler->GetString("DisplayDither");
 	dither = (ditherName != "off");
 	if (ditherName != "off" && ditherName != "triangular")
-		note("PBRDisplayDither=" + ditherName + " is unknown, using triangular");
+		note("DisplayDither=" + ditherName + " is unknown, using triangular");
 
 	info.colorFormat = (wantColorFormat == GL_R11F_G11F_B10F)? "r11g11b10f": "rgba16f";
-	info.displayTransform = std::string(PBRDisplay::TransformName(transform));
+	info.displayTransform = std::string(Display::TransformName(transform));
 	info.exposureEV = exposureEV;
-	info.exposureLinear = PBRDisplay::ExposureLinear(exposureEV);
+	info.exposureLinear = Display::ExposureLinear(exposureEV);
 	info.boundary = (boundary == Boundary::AfterScreenEffects)? "after-screen-effects": "after-world";
 	info.dither = dither? "triangular": "off";
 }
@@ -283,17 +283,17 @@ bool CSceneTarget::Allocate(const Desc& d, Resources& out, std::string& error) c
 	if (d.samples == 0) {
 		out.colorTex = MakeTexture(d.colorFormat, ColorClientFormat(d.colorFormat), GL_HALF_FLOAT, d.width, d.height);
 		out.depthTex = MakeTexture(d.depthFormat, GL_DEPTH_STENCIL, DepthFormatType(d.depthFormat), d.width, d.height);
-		out.maskTex = MakeTexture(PBR_MASK_FORMAT, GL_RED, GL_UNSIGNED_BYTE, d.width, d.height);
+		out.maskTex = MakeTexture(TONEMAP_MASK_FORMAT, GL_RED, GL_UNSIGNED_BYTE, d.width, d.height);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, out.colorTex, 0);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, PBR_MASK_ATTACHMENT, GL_TEXTURE_2D, out.maskTex, 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, TONEMAP_MASK_ATTACHMENT, GL_TEXTURE_2D, out.maskTex, 0);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, out.depthTex, 0);
 	} else {
 		out.colorRBO = MakeRenderbuffer(d.colorFormat, d.samples, d.width, d.height);
 		out.depthRBO = MakeRenderbuffer(d.depthFormat, d.samples, d.width, d.height);
-		out.maskRBO = MakeRenderbuffer(PBR_MASK_FORMAT, d.samples, d.width, d.height);
+		out.maskRBO = MakeRenderbuffer(TONEMAP_MASK_FORMAT, d.samples, d.width, d.height);
 		glBindRenderbuffer(GL_RENDERBUFFER, 0);
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, out.colorRBO);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, PBR_MASK_ATTACHMENT, GL_RENDERBUFFER, out.maskRBO);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, TONEMAP_MASK_ATTACHMENT, GL_RENDERBUFFER, out.maskRBO);
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, out.depthRBO);
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -307,10 +307,10 @@ bool CSceneTarget::Allocate(const Desc& d, Resources& out, std::string& error) c
 		glBindFramebuffer(GL_FRAMEBUFFER, out.resolveFBO);
 		out.resolveColorTex = MakeTexture(d.colorFormat, ColorClientFormat(d.colorFormat), GL_HALF_FLOAT, d.width, d.height);
 		out.resolveDepthTex = MakeTexture(d.depthFormat, GL_DEPTH_STENCIL, DepthFormatType(d.depthFormat), d.width, d.height);
-		out.resolveMaskTex = MakeTexture(PBR_MASK_FORMAT, GL_RED, GL_UNSIGNED_BYTE, d.width, d.height);
+		out.resolveMaskTex = MakeTexture(TONEMAP_MASK_FORMAT, GL_RED, GL_UNSIGNED_BYTE, d.width, d.height);
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, out.resolveColorTex, 0);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, PBR_MASK_ATTACHMENT, GL_TEXTURE_2D, out.resolveMaskTex, 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, TONEMAP_MASK_ATTACHMENT, GL_TEXTURE_2D, out.resolveMaskTex, 0);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, out.resolveDepthTex, 0);
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
 		glReadBuffer(GL_COLOR_ATTACHMENT0);
@@ -387,7 +387,7 @@ void CSceneTarget::BeginFrame()
 	if (!programsCreated)
 		CreatePrograms();
 	if (forceFailure) {
-		blockedReason = "forced allocation failure (PBRSceneTargetForceFailure), using direct";
+		blockedReason = "forced allocation failure (SceneTargetForceFailure), using direct";
 		info.allocationFailures++;
 		goDirect(blockedReason);
 		return;
@@ -441,17 +441,17 @@ void CSceneTarget::BeginFrame()
 	info.depthFormat = DepthFormatName(res.desc.depthFormat);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
-	ClearPBRMask();
+	ClearToneMapMask();
 	worldPhase = true;
 #endif
 }
 
-void CSceneTarget::ClearPBRMask()
+void CSceneTarget::ClearToneMapMask()
 {
 	// glClearBuffer obeys the scissor test and the colour write mask
 	const GLboolean scissor = glIsEnabled(GL_SCISSOR_TEST);
 	glDisable(GL_SCISSOR_TEST);
-	const GLenum both[] = {GL_COLOR_ATTACHMENT0, PBR_MASK_ATTACHMENT};
+	const GLenum both[] = {GL_COLOR_ATTACHMENT0, TONEMAP_MASK_ATTACHMENT};
 	glDrawBuffers(2, both);
 	glColorMaski(1, GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 	const GLfloat zero[] = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -462,7 +462,7 @@ void CSceneTarget::ClearPBRMask()
 		glEnable(GL_SCISSOR_TEST);
 }
 
-bool CSceneTarget::SetPBRMaskWrites(bool on)
+bool CSceneTarget::SetToneMapMaskWrites(bool on)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (!worldPhase)
@@ -472,7 +472,7 @@ bool CSceneTarget::SetPBRMaskWrites(bool on)
 	if (GLuint(drawFBO) != sceneFBO)
 		return false;
 	if (on) {
-		const GLenum both[] = {GL_COLOR_ATTACHMENT0, PBR_MASK_ATTACHMENT};
+		const GLenum both[] = {GL_COLOR_ATTACHMENT0, TONEMAP_MASK_ATTACHMENT};
 		glDrawBuffers(2, both);
 	} else {
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
@@ -502,7 +502,7 @@ void CSceneTarget::ResolveScene(GLbitfield mask)
 		glEnable(GL_SCISSOR_TEST);
 }
 
-void CSceneTarget::ResolvePBRMask()
+void CSceneTarget::ResolveToneMapMask()
 {
 	if (samples == 0 || res.resolveFBO == 0)
 		return;
@@ -510,8 +510,8 @@ void CSceneTarget::ResolvePBRMask()
 	// point read and draw buffer at the mask for the blit, then back at the colour
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, res.sceneFBO);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res.resolveFBO);
-	glReadBuffer(PBR_MASK_ATTACHMENT);
-	glDrawBuffer(PBR_MASK_ATTACHMENT);
+	glReadBuffer(TONEMAP_MASK_ATTACHMENT);
+	glDrawBuffer(TONEMAP_MASK_ATTACHMENT);
 	glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	glReadBuffer(GL_COLOR_ATTACHMENT0);
 	glDrawBuffer(GL_COLOR_ATTACHMENT0);
@@ -543,7 +543,7 @@ GLuint CSceneTarget::GetDepthTexture()
 	return res.resolveDepthTex;
 }
 
-GLuint CSceneTarget::GetPBRMaskTexture() const
+GLuint CSceneTarget::GetToneMapMaskTexture() const
 {
 	if (res.sceneFBO == 0)
 		return 0;
@@ -565,7 +565,7 @@ void CSceneTarget::Present(Boundary at)
 	if (!worldPhase || at != boundary)
 		return;
 
-	SCOPED_GL_DEBUGGROUP("PBRDisplayPass");
+	SCOPED_GL_DEBUGGROUP("DisplayPass");
 	worldPhase = false;
 
 	{
@@ -577,7 +577,7 @@ void CSceneTarget::Present(Boundary at)
 			maskWrites = false;
 		}
 		ResolveScene(GL_COLOR_BUFFER_BIT);
-		ResolvePBRMask();
+		ResolveToneMapMask();
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glViewport(0, 0, width, height);
 
@@ -600,7 +600,7 @@ void CSceneTarget::DrawDisplayPass()
 {
 	displayShader->Enable();
 	displayShader->SetUniform("displayTransform", int(transform));
-	displayShader->SetUniform("exposureLinear", PBRDisplay::ExposureLinear(exposureEV));
+	displayShader->SetUniform("exposureLinear", Display::ExposureLinear(exposureEV));
 	displayShader->SetUniform("ditherAmount", dither? DITHER_8BIT: 0.0f);
 	displayShader->SetUniform("ditherSeed", float(ditherFrame++ % DITHER_SEED_PERIOD));
 	displayShader->SetUniform("useSceneMask", 1);
@@ -735,8 +735,8 @@ DisplayTransformTestResult CSceneTarget::TestDisplayTransforms()
 		displayShader->SetUniform("ditherAmount", 0.0f);
 		displayShader->SetUniform("useSceneMask", 0);
 
-		using namespace PBRDisplay;
-		for (int t = 0; t < int(PBRDisplay::Transform::Count); ++t) {
+		using namespace Display;
+		for (int t = 0; t < int(Display::Transform::Count); ++t) {
 			displayShader->SetUniform("displayTransform", t);
 			glDrawArrays(GL_TRIANGLES, 0, 3);
 			glReadPixels(0, 0, RAMP_SIZE, RAMP_ROWS, GL_RGBA, GL_FLOAT, out.data());
@@ -744,7 +744,7 @@ DisplayTransformTestResult CSceneTarget::TestDisplayTransforms()
 			float prev[3] = {-1.0f, -1.0f, -1.0f};
 			for (int i = 0; i < RAMP_TEXELS; ++i) {
 				const RGB in = {ramp[i * 4 + 0], ramp[i * 4 + 1], ramp[i * 4 + 2]};
-				const RGB ref = ApplyDisplayPass(PBRDisplay::Transform(t), 1.0f, in);
+				const RGB ref = ApplyDisplayPass(Display::Transform(t), 1.0f, in);
 				const float gpu[3] = {out[i * 4 + 0], out[i * 4 + 1], out[i * 4 + 2]};
 				const float cpu[3] = {ref.r, ref.g, ref.b};
 
@@ -758,7 +758,7 @@ DisplayTransformTestResult CSceneTarget::TestDisplayTransforms()
 
 					if (err > result.maxError) {
 						result.maxError = err;
-						result.worstTransform = std::string(TransformName(PBRDisplay::Transform(t)));
+						result.worstTransform = std::string(TransformName(Display::Transform(t)));
 					}
 					if (!finite || err > TOLERANCE || !monotonic)
 						result.pass = false;

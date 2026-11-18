@@ -1,5 +1,5 @@
-// Display curves shared by the display pass (prepended to PBRDisplayFS.glsl) and BAR's PBR unit shader.
-// No version directive, so it can be inserted into another shader. The TM_ values are PBRDisplay::Transform;
+// Display curves shared by the display pass (prepended to DisplayFS.glsl) and BAR's PBR unit shader.
+// No version directive, so it can be inserted into another shader. The TM_ values are Display::Transform;
 // the CPU reference is rts/Rendering/GL/DisplayTransforms.h, change both together.
 
 const int TM_KHRONOS_NEUTRAL = 0;
@@ -236,7 +236,7 @@ vec3 BarCustom(vec3 encoded) {
 }
 
 // Triangular grain of +-1 step (the "triangular" option); `seed` moves it every frame, amount 0 switches it off.
-vec3 PBRDitherDisplay(vec3 encoded, vec2 pixel, float seed, float amount) {
+vec3 DitherDisplay(vec3 encoded, vec2 pixel, float seed, float amount) {
 	float uniformGrain = fract(sin(pixel.x + seed + (pixel.y + seed) * 543.31) * 493013.0);
 	float n = uniformGrain * 2.0 - 1.0;
 	float triangular = sign(n) - sign(n) * sqrt(clamp(1.0 - abs(n), 0.0, 1.0));
@@ -245,7 +245,7 @@ vec3 PBRDitherDisplay(vec3 encoded, vec2 pixel, float seed, float amount) {
 
 // One curve for an exposed scene-linear value; returns the encoded display value.
 // legacy has no curve here: the display pass handles it, and a material shader treats it as khronos-neutral.
-vec3 PBRApplyDisplayTransform(vec3 lin, int transform) {
+vec3 ApplyDisplayCurve(vec3 lin, int transform) {
 	switch (transform) {
 		case TM_AGX            : return SRGBEncode(AgX(lin));
 		case TM_ACES           : return SRGBEncode(ACESNarkowicz(lin));

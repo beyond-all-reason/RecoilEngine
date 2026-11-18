@@ -2,10 +2,10 @@
 
 #pragma once
 
-// With PBRSceneTarget=hdr the world is drawn into an HDR target that stands in for the window
+// With SceneTarget=hdr the world is drawn into an HDR target that stands in for the window
 // framebuffer; Present() then runs the one display pass into the window.
-// Only PBR pixels are curved: a second attachment holds a mask (1 where a PBR model was drawn),
-// written only between SetPBRMaskWrites(true) and (false).
+// Only masked pixels are tone mapped: a second attachment holds a mask (1 where scene-linear colour was drawn),
+// written only between SetToneMapMaskWrites(true) and (false).
 
 #include <array>
 #include <atomic>
@@ -19,15 +19,15 @@
 namespace Shader { struct IProgramObject; }
 
 struct SceneTargetInfo {
-	std::string requested;         // PBRSceneTarget as saved
+	std::string requested;         // SceneTarget as saved
 	std::string active;            // "direct" or "hdr"
 	std::string fallback;          // why active differs from requested, or what was substituted
-	std::string colorFormat;       // active PBRHDRColorFormat
-	std::string depthFormat;       // active PBRSceneDepthFormat
+	std::string colorFormat;       // active SceneColorFormat
+	std::string depthFormat;       // active SceneDepthFormat
 	std::string requestedDepthFormat;
-	std::string displayTransform;  // active PBRDisplayTransform
-	std::string boundary;          // PBRDisplayBoundary
-	std::string dither;            // PBRDisplayDither: "triangular" or "off"
+	std::string displayTransform;  // active DisplayTransform
+	std::string boundary;          // DisplayBoundary
+	std::string dither;            // DisplayDither: "triangular" or "off"
 	std::string displayPass;       // who drew the last display pass: "engine" or "game" (call-in DrawSceneDisplay)
 	std::string depthCopy;         // "blit", "shader" or "none"
 	bool stencilCopied = false;
@@ -70,20 +70,20 @@ public:
 	// Single-sample views for $scene_color / $scene_depth; a multisampled scene is resolved first.
 	GLuint GetColorTexture();
 	GLuint GetDepthTexture();
-	// $scene_pbr_mask; with MSAA the copy resolved by the display pass, so only valid from Present on
-	GLuint GetPBRMaskTexture() const;
+	// $scene_tonemap_mask; with MSAA the copy resolved by the display pass, so only valid from Present on
+	GLuint GetToneMapMaskTexture() const;
 	std::array<int, 2> GetSize() const { return {width, height}; }
 
 	// For screen copies: if `readFBO` is the multisampled scene, resolves it and returns the resolve FBO instead.
 	GLuint ResolvedReadFBO(GLuint readFBO);
 
-	// While on, every fragment shader drawn must write output location 1 (1 = PBR, 0 = display-referred).
+	// While on, every fragment shader drawn must write output location 1 (1 = scene-linear, tone mapped; 0 = display-referred).
 	// Only acts while the scene target is the bound draw framebuffer; returns whether the mask is written.
-	bool SetPBRMaskWrites(bool on);
+	bool SetToneMapMaskWrites(bool on);
 
 	SceneTargetInfo GetInfo() const { return info; }
 
-	// Renders a 0..64 ramp through every curve on the GPU and compares with PBRDisplay::ApplyDisplayPass.
+	// Renders a 0..64 ramp through every curve on the GPU and compares with Display::ApplyDisplayPass.
 	DisplayTransformTestResult TestDisplayTransforms();
 
 	void ConfigNotify(const std::string& key, const std::string& value);
@@ -121,8 +121,8 @@ private:
 	static void Free(Resources& res);
 	void Adopt(Resources& res);
 	void ResolveScene(GLbitfield mask);
-	void ResolvePBRMask();
-	void ClearPBRMask();
+	void ResolveToneMapMask();
+	void ClearToneMapMask();
 	void DrawDisplayPass();
 	void CopyDepthToWindow();
 
@@ -138,7 +138,7 @@ private:
 	Boundary boundary = Boundary::AfterWorld;
 	GLenum wantDepthFormat = 0;
 	GLenum wantColorFormat = GL_RGBA16F;
-	PBRDisplay::Transform transform = PBRDisplay::Transform::KhronosNeutral;
+	Display::Transform transform = Display::Transform::KhronosNeutral;
 	float exposureEV = 0.0f;
 	bool dither = true;
 	unsigned ditherFrame = 0;

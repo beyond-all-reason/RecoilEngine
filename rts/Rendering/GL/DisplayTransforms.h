@@ -2,7 +2,7 @@
 
 #pragma once
 
-// GL-free CPU reference of the display pass; shaders/GLSL/PBRDisplayCurves.glsl implements the same
+// GL-free CPU reference of the display pass; shaders/GLSL/DisplayCurves.glsl implements the same
 // functions, so change both together. One pass = decode, exposure, one curve, one sRGB encode.
 
 #include <algorithm>
@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <string_view>
 
-namespace PBRDisplay {
+namespace Display {
 
 struct RGB { float r, g, b; };
 
@@ -217,7 +217,7 @@ inline RGB FilmicHejl(RGB c) {
 	});
 }
 
-// Filmic tone mapper inspired by Unreal's filmic tone mapper; same math as PBRDisplayCurves.glsl.
+// Filmic tone mapper inspired by Unreal's filmic tone mapper; same math as DisplayCurves.glsl.
 // Matrices: products of the ACES AP0/AP1 primaries; the glow, red modifier and helpers: the ACES RRT (github.com/ampas/aces-dev).
 struct Mat3 { float m[3][3]; };
 inline RGB Mul(const Mat3& a, RGB v) {
@@ -354,4 +354,4 @@ inline RGB ApplyDisplayPass(Transform t, float exposureLinear, RGB stored) {
 
 inline float ExposureLinear(float ev) { return std::exp2(ev); }
 
-} // namespace PBRDisplay
+} // namespace Display

@@ -2912,7 +2912,7 @@ int LuaUnsyncedRead::GetWaterMode(lua_State* L)
 
 
 /***
- * State of the PBR HDR scene target and its display pass.
+ * State of the HDR scene target and its display pass.
  * `active` is "direct" or "hdr" this frame, `fallback` explains any substitution,
  * `revision` increases on every successful (re)allocation, `depthCopy` is
  * "blit", "shader" (stencil not copied) or "none", and `displayPass` is "engine", or "game"

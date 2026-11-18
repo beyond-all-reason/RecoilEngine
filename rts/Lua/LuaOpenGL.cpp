@@ -422,7 +422,7 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	if (FBO::IsSupported())
 		REGISTER_LUA_CFUNC(RenderEnvironmentFace);
 	REGISTER_LUA_CFUNC(PublishTexture);
-	REGISTER_LUA_CFUNC(SceneTargetPBRMask);
+	REGISTER_LUA_CFUNC(SceneTargetToneMapMask);
 
 	REGISTER_LUA_CFUNC(ActiveTexture);
 	REGISTER_LUA_CFUNC(TexEnv);
@@ -4970,19 +4970,19 @@ int LuaOpenGL::PublishTexture(lua_State* L)
 
 
 /***
- * With `PBRSceneTarget=hdr` the display pass only curves pixels marked PBR in the mask.
+ * With `SceneTarget=hdr` the display pass only tone maps pixels marked in the mask.
  * While the mask is on, every fragment shader drawn must write output location 1
- * (`1.0` for PBR, `0.0` for display-referred colour); turn it off afterwards.
+ * (`1.0` for scene-linear colour to tone map, `0.0` for display-referred colour); turn it off afterwards.
  * Does nothing and returns false outside the HDR world phase or while another framebuffer is bound.
  *
- * @function gl.SceneTargetPBRMask
+ * @function gl.SceneTargetToneMapMask
  * @param enable boolean
  * @return boolean writing true when the mask is written from now on
  */
-int LuaOpenGL::SceneTargetPBRMask(lua_State* L)
+int LuaOpenGL::SceneTargetToneMapMask(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
-	lua_pushboolean(L, sceneTarget.SetPBRMaskWrites(luaL_checkboolean(L, 1)));
+	lua_pushboolean(L, sceneTarget.SetToneMapMaskWrites(luaL_checkboolean(L, 1)));
 	return 1;
 }
 

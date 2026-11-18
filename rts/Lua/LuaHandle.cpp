@@ -3159,10 +3159,10 @@ void CLuaHandle::DrawScreenPost()
 }
 
 
-/*** Lets the game draw the display pass of the HDR scene target (`PBRSceneTarget=hdr`) instead of the engine.
+/*** Lets the game draw the display pass of the HDR scene target (`SceneTarget=hdr`) instead of the engine.
  *
- * Called once per frame at `PBRDisplayBoundary`, with the window framebuffer bound and `$scene_color` and
- * `$scene_pbr_mask` readable as single-sample textures. Return true after writing every window pixel;
+ * Called once per frame at `DisplayBoundary`, with the window framebuffer bound and `$scene_color` and
+ * `$scene_tonemap_mask` readable as single-sample textures. Return true after writing every window pixel;
  * the engine then skips its own display pass. The engine copies depth and stencil into the window afterwards.
  *
  * @function Callins:DrawSceneDisplay

@@ -678,11 +678,11 @@ endif()
 	endif()
 
 ################################################################################
-### PBRDisplayTransforms
-# CPU curves of the PBR display pass against float64 reference values (generate_display_transform_golden.py).
-	set(test_name PBRDisplayTransforms)
+### DisplayTransforms
+# CPU curves of the display pass against float64 reference values (generate_display_transform_golden.py).
+	set(test_name DisplayTransforms)
 	set(test_src
-			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Rendering/PBR/testPBRDisplayTransforms.cpp"
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Rendering/Display/testDisplayTransforms.cpp"
 			${test_Common_sources}
 		)
 	set(test_libs

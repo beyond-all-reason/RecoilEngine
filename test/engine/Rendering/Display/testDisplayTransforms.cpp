@@ -11,7 +11,7 @@
 #include <catch_amalgamated.hpp>
 
 namespace {
-	using namespace PBRDisplay;
+	using namespace Display;
 
 	struct GoldenRow {
 		const char* transform;
@@ -119,7 +119,7 @@ namespace {
 	// GOLDEN END
 }
 
-TEST_CASE("PBRDisplayTransforms")
+TEST_CASE("DisplayTransforms")
 {
 	SECTION("names") {
 		for (int t = 0; t < int(Transform::Count); ++t) {

@@ -46,7 +46,7 @@ class LuaMatTexture {
 			LUATEX_PUBLISHED, // "$pub:<name>"; data is the LuaTextures published-slot index
 			LUATEX_SCENE_COLOR, // "$scene_color"
 			LUATEX_SCENE_DEPTH, // "$scene_depth", depth-stencil
-			LUATEX_SCENE_PBR_MASK, // "$scene_pbr_mask", 1 where a PBR model was drawn
+			LUATEX_SCENE_TONEMAP_MASK, // "$scene_tonemap_mask", 1 where the colour is tone mapped
 
 
 			LUATEX_SHADOWMAP,
