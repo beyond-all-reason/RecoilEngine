@@ -19,6 +19,7 @@
 
 #include "System/Misc/TracyDefs.h"
 #include "Rendering/GL/FBO.h"
+#include "Rendering/GL/SceneTarget.h"
 #include "Rendering/GlobalRendering.h"
 
 
@@ -707,7 +708,7 @@ int LuaFBOs::RawBindFBO(lua_State* L)
 
 	if (lua_isnil(L, 1)) {
 		// revert to default or specified FB
-		glBindFramebufferEXT((GLenum) luaL_optinteger(L, 2, GL_FRAMEBUFFER_EXT), luaL_optinteger(L, 3, 0));
+		glBindFramebufferEXT((GLenum) luaL_optinteger(L, 2, GL_FRAMEBUFFER_EXT), luaL_optinteger(L, 3, sceneTarget.GetDefaultFBO()));
 		return 0;
 	}
 		
@@ -774,6 +775,7 @@ int LuaFBOs::BlitFBO(lua_State* L)
 		const GLbitfield mask = (GLbitfield)luaL_optint(L, 9, GL_COLOR_BUFFER_BIT);
 		const GLenum filter = (GLenum)luaL_optint(L, 10, GL_NEAREST);
 
+		ScopedSceneReadResolve resolve;
 		glBlitFramebufferEXT(x0Src, y0Src, x1Src, y1Src,  x0Dst, y0Dst, x1Dst, y1Dst,  mask, filter);
 		return 0;
 	}
@@ -804,8 +806,10 @@ int LuaFBOs::BlitFBO(lua_State* L)
 	GLint currentFBO;
 	glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &currentFBO);
 
-	glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, (fboSrc == nullptr)? 0: fboSrc->id);
-	glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, (fboDst == nullptr)? 0: fboDst->id);
+	// nil is the window, or the scene target during the world phase (read through its resolve if multisampled)
+	const GLuint defaultFBO = sceneTarget.GetDefaultFBO();
+	glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, (fboSrc == nullptr)? sceneTarget.ResolvedReadFBO(defaultFBO): fboSrc->id);
+	glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, (fboDst == nullptr)? defaultFBO: fboDst->id);
 
 	glBlitFramebufferEXT(x0Src, y0Src, x1Src, y1Src,  x0Dst, y0Dst, x1Dst, y1Dst,  mask, filter);
 

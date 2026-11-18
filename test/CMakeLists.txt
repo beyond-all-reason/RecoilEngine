@@ -688,6 +688,19 @@ endif()
 	endif()
 
 ################################################################################
+### DisplayTransforms
+# CPU curves of the display pass against float64 reference values (generate_display_transform_golden.py).
+	set(test_name DisplayTransforms)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Rendering/Display/testDisplayTransforms.cpp"
+			${test_Common_sources}
+		)
+	set(test_libs
+			""
+		)
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
+
+################################################################################
 
 
 add_subdirectory(headercheck)
