@@ -815,7 +815,7 @@ void CMouseHandler::Update()
 }
 
 
-void CMouseHandler::WarpMouse(int x, int y)
+void CMouseHandler::WarpMouse(int x, int y, bool moveSystemPointer)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (locked)
@@ -823,6 +823,11 @@ void CMouseHandler::WarpMouse(int x, int y)
 
 	lastx = x + globalRendering->viewPosX;
 	lasty = y;
+
+	if (!moveSystemPointer) {
+		mouseInput->SetPos({lastx, lasty});
+		return;
+	}
 
 	// WarpPos temporarily hides the SDL cursor on Wayland. Rebind the hardware
 	// cursor during the next update, after SDL has processed the warp.

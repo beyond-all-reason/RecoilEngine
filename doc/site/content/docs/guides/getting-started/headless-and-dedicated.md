@@ -21,7 +21,7 @@ It is **great for automated tasks** such as:
  * be a game server for a multiplayer game, though only **on limited scale** (perhaps for important games like tournaments). See below.
 
 For unattended tasks that **need rendering** (screenshots, captures, GPU tests), start the regular binary with `--background-window`: like headless, but rendering.
-The window opens **without the keyboard focus and behind other windows**, never minimizes, maximizes or goes fullscreen, and does not warp the system mouse pointer while unfocused.
+The window opens **without the keyboard focus and behind other windows**, and never minimizes, maximizes or goes fullscreen.
 Lua can check it with `Spring.IsBackgroundWindow()`.
 
 ### Dedicated (aka dedi)

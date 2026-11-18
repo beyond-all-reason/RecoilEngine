@@ -37,6 +37,7 @@
 #include "Game/UI/KeyBindings.h"
 #include "Game/UI/MiniMap.h"
 #include "Game/UI/MouseHandler.h"
+#include "System/Input/PointerWarp.h"
 #include "Game/UI/Groups/Group.h"
 #include "Game/UI/Groups/GroupHandler.h"
 #include "Map/MapInfo.h"
@@ -108,6 +109,7 @@
 #include <SDL_keyboard.h>
 #include <SDL_clipboard.h>
 #include <SDL_mouse.h>
+#include <SDL_video.h>
 
 // MinGW defines this for a WINAPI function
 #undef SendMessage
@@ -3176,8 +3178,8 @@ int LuaUnsyncedCtrl::SetCustomCommandDrawData(lua_State* L)
 
 /***
  *
- * Does not move the system pointer while the window has no focus and the engine
- * was started with `--background-window`; the engine still uses the new position.
+ * Does not move the system pointer while the window has no focus and the pointer is
+ * not over it (the player is in another window); the engine still uses the new position.
  *
  * @function Spring.WarpMouse
  * @param x integer
@@ -3188,7 +3190,10 @@ int LuaUnsyncedCtrl::WarpMouse(lua_State* L)
 {
 	const int x = luaL_checkint(L, 1);
 	const int y = globalRendering->viewSizeY - luaL_checkint(L, 2) - 1;
-	mouse->WarpMouse(x, y);
+	// SDL's mouse focus is the window under the pointer, null until the pointer first enters
+	SDL_Window* window = globalRendering->GetWindow();
+	const bool windowFocused = (SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS) != 0;
+	mouse->WarpMouse(x, y, PointerWarp::MovesSystemPointer(windowFocused, SDL_GetMouseFocus() == window));
 	return 0;
 }
 
