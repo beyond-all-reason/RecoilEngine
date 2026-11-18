@@ -17,11 +17,9 @@
 #include "System/StringUtil.h"
 
 CONFIG(std::string, PBRSceneTarget).defaultValue("direct").description("direct (draw into the window) or hdr (draw into an HDR scene target, presented through one display pass). A failed allocation falls back to direct.");
-CONFIG(std::string, PBRSceneTransfer).defaultValue("srgb-extended").description("How the scene target stores non-PBR colour: srgb-extended. linear is reserved and falls back to srgb-extended.");
 CONFIG(std::string, PBRSceneDepthFormat).defaultValue("d24s8").description("d24s8 (copied into the window by a blit) or d32fs8 (depth copied by a shader, stencil not copied).");
-CONFIG(std::string, PBRHDRColorFormat).defaultValue("rgba16f").description("rgba16f or r11g11b10f (half the memory; no alpha, no negative values, about 6 bits of mantissa). compare is reserved and falls back to rgba16f.");
+CONFIG(std::string, PBRHDRColorFormat).defaultValue("rgba16f").description("rgba16f or r11g11b10f (half the memory; no alpha, no negative values, about 6 bits of mantissa).");
 CONFIG(std::string, PBRDisplayTransform).defaultValue("khronos-neutral").description("khronos-neutral, agx, aces, aces-hill, hable, uchimura, reinhard, reinhard-jodie, filmic-hejl, filmic-toe-shoulder (inspired by Unreal's filmic tone mapper), bar-custom, legacy (no curve) or linear-debug.");
-CONFIG(std::string, PBRExposureMode).defaultValue("manual").description("Only manual is built; auto and compare are reserved and fall back to manual.");
 CONFIG(float, PBRExposureEV).defaultValue(0.0f).description("Manual exposure in EV stops (linear multiplier 2^EV).");
 CONFIG(std::string, PBRDisplayBoundary).defaultValue("after-world").description("after-world (screen effects draw into the window) or after-screen-effects (they draw into the scene and are tone-mapped).");
 CONFIG(std::string, PBRDisplayDither).defaultValue("triangular").description("triangular (grain of 1/255 hiding banding in the 8-bit output) or off.");
@@ -40,8 +38,8 @@ namespace {
 	constexpr GLenum PBR_MASK_ATTACHMENT = GL_COLOR_ATTACHMENT1;
 
 	const std::vector<std::string> CONFIG_KEYS = {
-		"PBRSceneTarget", "PBRSceneTransfer", "PBRSceneDepthFormat", "PBRHDRColorFormat",
-		"PBRDisplayTransform", "PBRExposureMode", "PBRExposureEV", "PBRDisplayBoundary",
+		"PBRSceneTarget", "PBRSceneDepthFormat", "PBRHDRColorFormat", "PBRDisplayTransform",
+		"PBRExposureEV", "PBRDisplayBoundary",
 		"PBRSceneTargetForceFailure", "PBRDisplayDither",
 	};
 
@@ -228,11 +226,6 @@ void CSceneTarget::ReadSettings()
 	if (!wantHDR && info.requested != "direct")
 		note("PBRSceneTarget=" + info.requested + " is unknown, using direct");
 
-	const std::string transferName = configHandler->GetString("PBRSceneTransfer");
-	transfer = PBRDisplay::SceneTransfer::SRGBExtended;
-	if (transferName != "srgb-extended")
-		note("PBRSceneTransfer=" + transferName + " is not built, using srgb-extended");
-
 	info.requestedDepthFormat = configHandler->GetString("PBRSceneDepthFormat");
 	wantDepthFormat = (info.requestedDepthFormat == DEPTH_D32FS8)? GL_DEPTH32F_STENCIL8: GL_DEPTH24_STENCIL8;
 	if (info.requestedDepthFormat != DEPTH_D24S8 && info.requestedDepthFormat != DEPTH_D32FS8)
@@ -241,17 +234,13 @@ void CSceneTarget::ReadSettings()
 	const std::string colorName = configHandler->GetString("PBRHDRColorFormat");
 	wantColorFormat = (colorName == "r11g11b10f")? GL_R11F_G11F_B10F: GL_RGBA16F;
 	if (colorName != "rgba16f" && colorName != "r11g11b10f")
-		note("PBRHDRColorFormat=" + colorName + " is not built, using rgba16f");
+		note("PBRHDRColorFormat=" + colorName + " is unknown, using rgba16f");
 
 	const std::string transformName = configHandler->GetString("PBRDisplayTransform");
 	if (!PBRDisplay::ParseTransform(transformName, transform)) {
 		transform = PBRDisplay::Transform::KhronosNeutral;
 		note("PBRDisplayTransform=" + transformName + " is unknown, using khronos-neutral");
 	}
-
-	const std::string exposureModeName = configHandler->GetString("PBRExposureMode");
-	if (exposureModeName != "manual")
-		note("PBRExposureMode=" + exposureModeName + " is not built, using manual");
 
 	exposureEV = configHandler->GetFloat("PBRExposureEV");
 	if (!std::isfinite(exposureEV)) {
@@ -272,9 +261,7 @@ void CSceneTarget::ReadSettings()
 		note("PBRDisplayDither=" + ditherName + " is unknown, using triangular");
 
 	info.colorFormat = (wantColorFormat == GL_R11F_G11F_B10F)? "r11g11b10f": "rgba16f";
-	info.transfer = "srgb-extended";
 	info.displayTransform = std::string(PBRDisplay::TransformName(transform));
-	info.exposureMode = "manual";
 	info.exposureEV = exposureEV;
 	info.exposureLinear = PBRDisplay::ExposureLinear(exposureEV);
 	info.boundary = (boundary == Boundary::AfterScreenEffects)? "after-screen-effects": "after-world";
@@ -613,7 +600,6 @@ void CSceneTarget::DrawDisplayPass()
 {
 	displayShader->Enable();
 	displayShader->SetUniform("displayTransform", int(transform));
-	displayShader->SetUniform("sceneTransfer", int(transfer));
 	displayShader->SetUniform("exposureLinear", PBRDisplay::ExposureLinear(exposureEV));
 	displayShader->SetUniform("ditherAmount", dither? DITHER_8BIT: 0.0f);
 	displayShader->SetUniform("ditherSeed", float(ditherFrame++ % DITHER_SEED_PERIOD));
@@ -750,35 +736,32 @@ DisplayTransformTestResult CSceneTarget::TestDisplayTransforms()
 		displayShader->SetUniform("useSceneMask", 0);
 
 		using namespace PBRDisplay;
-		for (int transferIdx = 0; transferIdx <= int(SceneTransfer::Linear); ++transferIdx) {
-			for (int t = 0; t < int(PBRDisplay::Transform::Count); ++t) {
-				displayShader->SetUniform("displayTransform", t);
-				displayShader->SetUniform("sceneTransfer", transferIdx);
-				glDrawArrays(GL_TRIANGLES, 0, 3);
-				glReadPixels(0, 0, RAMP_SIZE, RAMP_ROWS, GL_RGBA, GL_FLOAT, out.data());
+		for (int t = 0; t < int(PBRDisplay::Transform::Count); ++t) {
+			displayShader->SetUniform("displayTransform", t);
+			glDrawArrays(GL_TRIANGLES, 0, 3);
+			glReadPixels(0, 0, RAMP_SIZE, RAMP_ROWS, GL_RGBA, GL_FLOAT, out.data());
 
-				float prev[3] = {-1.0f, -1.0f, -1.0f};
-				for (int i = 0; i < RAMP_TEXELS; ++i) {
-					const RGB in = {ramp[i * 4 + 0], ramp[i * 4 + 1], ramp[i * 4 + 2]};
-					const RGB ref = ApplyDisplayPass(PBRDisplay::Transform(t), SceneTransfer(transferIdx), 1.0f, in);
-					const float gpu[3] = {out[i * 4 + 0], out[i * 4 + 1], out[i * 4 + 2]};
-					const float cpu[3] = {ref.r, ref.g, ref.b};
+			float prev[3] = {-1.0f, -1.0f, -1.0f};
+			for (int i = 0; i < RAMP_TEXELS; ++i) {
+				const RGB in = {ramp[i * 4 + 0], ramp[i * 4 + 1], ramp[i * 4 + 2]};
+				const RGB ref = ApplyDisplayPass(PBRDisplay::Transform(t), 1.0f, in);
+				const float gpu[3] = {out[i * 4 + 0], out[i * 4 + 1], out[i * 4 + 2]};
+				const float cpu[3] = {ref.r, ref.g, ref.b};
 
-					for (int c = 0; c < 3; ++c) {
-						const bool finite = std::isfinite(gpu[c]);
-						// relative error: the legacy transform is unbounded
-						const float scale = std::max(1.0f, std::fabs(cpu[c]));
-						const float err = finite? (std::fabs(gpu[c] - cpu[c]) / scale): 1e30f;
-						const bool monotonic = (i >= RAMP_SIZE) || (gpu[c] + TOLERANCE >= prev[c]);
-						prev[c] = gpu[c];
+				for (int c = 0; c < 3; ++c) {
+					const bool finite = std::isfinite(gpu[c]);
+					// relative error: the legacy transform is unbounded
+					const float scale = std::max(1.0f, std::fabs(cpu[c]));
+					const float err = finite? (std::fabs(gpu[c] - cpu[c]) / scale): 1e30f;
+					const bool monotonic = (i >= RAMP_SIZE) || (gpu[c] + TOLERANCE >= prev[c]);
+					prev[c] = gpu[c];
 
-						if (err > result.maxError) {
-							result.maxError = err;
-							result.worstTransform = std::string(TransformName(PBRDisplay::Transform(t))) + ((transferIdx == 0)? " srgb-extended": " linear");
-						}
-						if (!finite || err > TOLERANCE || !monotonic)
-							result.pass = false;
+					if (err > result.maxError) {
+						result.maxError = err;
+						result.worstTransform = std::string(TransformName(PBRDisplay::Transform(t)));
 					}
+					if (!finite || err > TOLERANCE || !monotonic)
+						result.pass = false;
 				}
 			}
 		}

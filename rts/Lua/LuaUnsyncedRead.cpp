@@ -2918,7 +2918,7 @@ int LuaUnsyncedRead::GetWaterMode(lua_State* L)
  * "blit", "shader" (stencil not copied) or "none", and `displayPass` is "engine", or "game"
  * when a `DrawSceneDisplay` call-in drew the last display pass.
  * The other fields are the settings in effect (`requested`, `colorFormat`, `depthFormat`,
- * `requestedDepthFormat`, `transfer`, `displayTransform`, `exposureMode`, `boundary`, `dither`,
+ * `requestedDepthFormat`, `displayTransform`, `boundary`, `dither`,
  * `exposureEV`, `exposureLinear`), the target's `width`, `height` and `samples`, `stencilCopied`
  * and `allocationFailures`.
  *
@@ -2928,16 +2928,14 @@ int LuaUnsyncedRead::GetWaterMode(lua_State* L)
 int LuaUnsyncedRead::GetSceneTargetInfo(lua_State* L)
 {
 	const SceneTargetInfo info = sceneTarget.GetInfo();
-	lua_createtable(L, 0, 21);
+	lua_createtable(L, 0, 19);
 	LuaPushNamedString(L, "requested", info.requested);
 	LuaPushNamedString(L, "active", info.active);
 	LuaPushNamedString(L, "fallback", info.fallback);
 	LuaPushNamedString(L, "colorFormat", info.colorFormat);
 	LuaPushNamedString(L, "depthFormat", info.depthFormat);
 	LuaPushNamedString(L, "requestedDepthFormat", info.requestedDepthFormat);
-	LuaPushNamedString(L, "transfer", info.transfer);
 	LuaPushNamedString(L, "displayTransform", info.displayTransform);
-	LuaPushNamedString(L, "exposureMode", info.exposureMode);
 	LuaPushNamedString(L, "boundary", info.boundary);
 	LuaPushNamedString(L, "dither", info.dither);
 	LuaPushNamedString(L, "displayPass", info.displayPass);

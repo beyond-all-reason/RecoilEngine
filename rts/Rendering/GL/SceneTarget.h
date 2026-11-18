@@ -25,9 +25,7 @@ struct SceneTargetInfo {
 	std::string colorFormat;       // active PBRHDRColorFormat
 	std::string depthFormat;       // active PBRSceneDepthFormat
 	std::string requestedDepthFormat;
-	std::string transfer;          // active PBRSceneTransfer
 	std::string displayTransform;  // active PBRDisplayTransform
-	std::string exposureMode;
 	std::string boundary;          // PBRDisplayBoundary
 	std::string dither;            // PBRDisplayDither: "triangular" or "off"
 	std::string displayPass;       // who drew the last display pass: "engine" or "game" (call-in DrawSceneDisplay)
@@ -141,7 +139,6 @@ private:
 	GLenum wantDepthFormat = 0;
 	GLenum wantColorFormat = GL_RGBA16F;
 	PBRDisplay::Transform transform = PBRDisplay::Transform::KhronosNeutral;
-	PBRDisplay::SceneTransfer transfer = PBRDisplay::SceneTransfer::SRGBExtended;
 	float exposureEV = 0.0f;
 	bool dither = true;
 	unsigned ditherFrame = 0;

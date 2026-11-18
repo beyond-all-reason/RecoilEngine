@@ -33,11 +33,6 @@ enum class Transform : int32_t {
 	Count
 };
 
-enum class SceneTransfer : int32_t {
-	SRGBExtended = 0,
-	Linear       = 1, // reserved
-};
-
 static constexpr std::array<std::string_view, size_t(Transform::Count)> TRANSFORM_NAMES = {
 	"khronos-neutral", "agx", "aces", "aces-hill", "hable", "uchimura", "reinhard",
 	"reinhard-jodie", "filmic-hejl", "filmic-toe-shoulder", "bar-custom", "legacy", "linear-debug",
@@ -329,14 +324,8 @@ inline RGB BarCustom(RGB encoded) {
 	});
 }
 
-// The full pass for one stored scene value; the result is what the pass writes before 8-bit quantisation.
-inline RGB ApplyDisplayPass(Transform t, SceneTransfer transfer, float exposureLinear, RGB stored) {
-	if (t == Transform::Legacy)
-		return stored;
-
-	RGB lin = (transfer == SceneTransfer::SRGBExtended)? SRGBDecode(stored): stored;
-	lin = {lin.r * exposureLinear, lin.g * exposureLinear, lin.b * exposureLinear};
-
+// One curve for an exposed scene-linear value; returns the encoded display value (Legacy returns its input).
+inline RGB ApplyDisplayTransform(Transform t, RGB lin) {
 	switch (t) {
 		case Transform::KhronosNeutral: return SRGBEncode(KhronosNeutral(lin));
 		case Transform::AgX           : return SRGBEncode(AgX(lin));
@@ -350,8 +339,17 @@ inline RGB ApplyDisplayPass(Transform t, SceneTransfer transfer, float exposureL
 		case Transform::Filmic        : return UnrealFilmic(lin);
 		case Transform::BarCustom     : return BarCustom(SRGBEncode(lin));
 		case Transform::LinearDebug   : return SRGBEncode(PerChannel(lin, Clamp01));
-		default                       : return stored;
+		default                       : return lin;
 	}
+}
+
+// The full pass for one stored (sRGB-encoded) scene value; the result is what the pass writes before 8-bit quantisation.
+inline RGB ApplyDisplayPass(Transform t, float exposureLinear, RGB stored) {
+	if (t == Transform::Legacy)
+		return stored;
+
+	const RGB lin = SRGBDecode(stored);
+	return ApplyDisplayTransform(t, {lin.r * exposureLinear, lin.g * exposureLinear, lin.b * exposureLinear});
 }
 
 inline float ExposureLinear(float ev) { return std::exp2(ev); }

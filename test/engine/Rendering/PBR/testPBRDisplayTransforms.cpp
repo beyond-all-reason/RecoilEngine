@@ -135,7 +135,7 @@ TEST_CASE("PBRDisplayTransforms")
 		for (const GoldenRow& row: GOLDEN) {
 			Transform t;
 			REQUIRE(ParseTransform(row.transform, t));
-			const RGB out = ApplyDisplayPass(t, SceneTransfer::Linear, 1.0f, {row.in[0], row.in[1], row.in[2]});
+			const RGB out = ApplyDisplayTransform(t, {row.in[0], row.in[1], row.in[2]});
 			const float got[3] = {out.r, out.g, out.b};
 			for (int c = 0; c < 3; ++c) {
 				INFO(row.transform << " in " << row.in[0] << "," << row.in[1] << "," << row.in[2] << " channel " << c);
@@ -149,7 +149,7 @@ TEST_CASE("PBRDisplayTransforms")
 			float prev = -1.0f;
 			for (int i = 0; i <= RAMP_STEPS; ++i) {
 				const float x = RAMP_MAX * float(i) / float(RAMP_STEPS);
-				const RGB out = ApplyDisplayPass(Transform(t), SceneTransfer::Linear, 1.0f, {x, x, x});
+				const RGB out = ApplyDisplayTransform(Transform(t), {x, x, x});
 				INFO(TransformName(Transform(t)) << " at " << x);
 				REQUIRE(std::isfinite(out.r));
 				REQUIRE(std::isfinite(out.g));
@@ -166,12 +166,12 @@ TEST_CASE("PBRDisplayTransforms")
 		CHECK(ExposureLinear(-1.0f) == 0.5f);
 
 		const float stored = SRGBEncode(GRAY_CARD);
-		const RGB out = ApplyDisplayPass(Transform::KhronosNeutral, SceneTransfer::SRGBExtended, ExposureLinear(0.0f), {stored, stored, stored});
+		const RGB out = ApplyDisplayPass(Transform::KhronosNeutral, ExposureLinear(0.0f), {stored, stored, stored});
 		CHECK(std::fabs(out.r - GRAY_CARD_KHRONOS_NEUTRAL) <= GOLDEN_TOLERANCE);
 
 		// one stop more exposure equals doubled light
-		const RGB brighter = ApplyDisplayPass(Transform::KhronosNeutral, SceneTransfer::SRGBExtended, ExposureLinear(1.0f), {stored, stored, stored});
-		const RGB doubled = ApplyDisplayPass(Transform::KhronosNeutral, SceneTransfer::Linear, 1.0f, {2.0f * GRAY_CARD, 2.0f * GRAY_CARD, 2.0f * GRAY_CARD});
+		const RGB brighter = ApplyDisplayPass(Transform::KhronosNeutral, ExposureLinear(1.0f), {stored, stored, stored});
+		const RGB doubled = ApplyDisplayTransform(Transform::KhronosNeutral, {2.0f * GRAY_CARD, 2.0f * GRAY_CARD, 2.0f * GRAY_CARD});
 		CHECK(std::fabs(brighter.r - doubled.r) <= GOLDEN_TOLERANCE);
 	}
 
@@ -186,7 +186,7 @@ TEST_CASE("PBRDisplayTransforms")
 
 	SECTION("legacy is today's image") {
 		const RGB stored = {0.25f, 1.5f, 0.0f};
-		const RGB out = ApplyDisplayPass(Transform::Legacy, SceneTransfer::SRGBExtended, ExposureLinear(3.0f), stored);
+		const RGB out = ApplyDisplayPass(Transform::Legacy, ExposureLinear(3.0f), stored);
 		CHECK(out.r == stored.r);
 		CHECK(out.g == stored.g);
 		CHECK(out.b == stored.b);
