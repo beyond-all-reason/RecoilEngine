@@ -10,6 +10,7 @@ Paste the output between the GOLDEN BEGIN / GOLDEN END markers of testPBRDisplay
 import math
 
 LUMA = (0.2126, 0.7152, 0.0722)
+FLT_MIN = 1.17549435e-38
 
 
 def mat(m, c):
@@ -246,7 +247,8 @@ def main():
     print("static const GoldenRow GOLDEN[] = {")
     for name, f in TRANSFORMS:
         for c in INPUTS:
-            r = f(c)
+            # a float table: values below the smallest normal float would truncate (and warn) in C++
+            r = tuple(0.0 if abs(v) < FLT_MIN else v for v in f(c))
             print('\t{"%s", {%.9g, %.9g, %.9g}, {%.9g, %.9g, %.9g}},' % ((name,) + c + r))
     print("};")
     print("// GOLDEN END")
