@@ -1,8 +1,11 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "System/Platform/WindowManagerHelper.h"
+#include <SDL_hints.h>
 #include <SDL_syswm.h>
 #include <windows.h>
+
+#include <cassert>
 
 
 namespace WindowManagerHelper {
@@ -65,6 +68,35 @@ void SetWindowResizable(SDL_Window* window, bool resizable)
 		style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
 	}
 	SetWindowLong(hwnd, GWL_STYLE, style);
+#endif
+}
+
+
+void LowerWindow(SDL_Window* window)
+{
+#ifndef HEADLESS
+	SDL_SysWMinfo info;
+	SDL_VERSION(&info.version);
+	if (!SDL_GetWindowWMInfo(window, &info))
+		return;
+
+	SetWindowPos(info.info.win.window, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+#endif
+}
+
+
+void SetNoInitialFocus(SDL_Window* window)
+{
+	// on Windows the hint alone keeps the focus away
+	assert(SDL_GetHintBoolean(SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN, SDL_FALSE));
+}
+
+
+void DisableWindowGhosting()
+{
+#ifndef HEADLESS
+	// affects the whole process, for the rest of its lifetime
+	DisableProcessWindowsGhosting();
 #endif
 }
 

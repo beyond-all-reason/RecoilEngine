@@ -46,6 +46,11 @@
 #include <SDL_syswm.h>
 #include <SDL_rect.h>
 
+// SDL before 2.0.18 (the Linux builds use Ubuntu 18.04's 2.0.8) has no name for this hint and ignores it
+#ifndef SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN
+#define SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN "SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN"
+#endif
+
 #include "System/Misc/TracyDefs.h"
 #include "System/Misc/TracyGpu.h"
 
@@ -361,6 +366,7 @@ CGlobalRendering::CGlobalRendering()
 	, dualScreenMiniMapOnLeft(false)
 	, fullScreen(configHandler->GetBool("Fullscreen"))
 	, borderless(configHandler->GetBool("WindowBorderless"))
+	, backgroundWindow(false)
 	, underExternalDebug(false)
 	, forceDWMFlush(configHandler->GetInt("DWMFlush"))
 	, sdlWindow{nullptr}
@@ -450,6 +456,8 @@ SDL_Window* CGlobalRendering::CreateSDLWindow(const char* title) const
 
 	uint32_t sdlFlags  = (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 	         sdlFlags |= (borderless_ ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN) * fullScreen_;
+	         // a background window is shown later, once it is behind the other windows
+	         sdlFlags |= (SDL_WINDOW_HIDDEN * backgroundWindow);
 	         sdlFlags |= (SDL_WINDOW_BORDERLESS * borderless_);
 
 	for (size_t i = 0; i < (aaLvls.size()) && (newWindow == nullptr); i++) {
@@ -590,10 +598,29 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 			++msaaLevel;
 	}
 
+	// a background window is created hidden and shown without activation, so it does
+	// not take the keyboard focus
+	if (backgroundWindow) {
+		SDL_SetHint(SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN, "1");
+		WindowManagerHelper::DisableWindowGhosting();
+	}
+
 	if ((sdlWindow = CreateSDLWindow(title)) == nullptr)
 		return false;
 
-	if (configHandler->GetInt("MinimizeOnFocusLoss") == 0)
+	// a window shown without activation still opens on top of the others, so it is
+	// lowered too; it stays behind until the user clicks it
+	if (backgroundWindow) {
+		WindowManagerHelper::SetNoInitialFocus(sdlWindow);
+		WindowManagerHelper::LowerWindow(sdlWindow);
+		SDL_ShowWindow(sdlWindow);
+		WindowManagerHelper::LowerWindow(sdlWindow);
+		// CreateSDLWindow measured the borders while the window was hidden
+		UpdateWindowBorders(sdlWindow);
+		LOG("[GR::%s] background window: shown without activation, lowered, never minimized", __func__);
+	}
+
+	if (backgroundWindow || configHandler->GetInt("MinimizeOnFocusLoss") == 0)
 		SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
 
 	SetWindowAttributes(sdlWindow);
@@ -1399,7 +1426,9 @@ void CGlobalRendering::SetWindowAttributes(SDL_Window* window)
 {
 	// Get wanted state
 	borderless = configHandler->GetBool("WindowBorderless");
-	fullScreen = configHandler->GetBool("Fullscreen");
+	// SetFullScreen's overlay only covers start-up; a later Fullscreen=1 (Spring.SetWindowGeometry)
+	// must not take a background window to fullscreen either
+	fullScreen = configHandler->GetBool("Fullscreen") && !backgroundWindow;
 	winPosX = configHandler->GetInt("WindowPosX");
 	winPosY = configHandler->GetInt("WindowPosY");
 
@@ -1430,10 +1459,15 @@ void CGlobalRendering::SetWindowAttributes(SDL_Window* window)
 
 	SDL_SetWindowBordered(window, borderless ? SDL_FALSE : SDL_TRUE);
 
-	if (newRes == maxRes)
+	// maximizing activates the window, which a background window must not be
+	if (newRes == maxRes && !backgroundWindow)
 		SDL_MaximizeWindow(window);
 
 	WindowManagerHelper::SetWindowResizable(window, !borderless && !fullScreen);
+
+	// openbox raises the window again on the border and geometry changes above
+	if (backgroundWindow && (SDL_GetWindowFlags(window) & SDL_WINDOW_SHOWN) != 0)
+		WindowManagerHelper::LowerWindow(window);
 }
 
 void CGlobalRendering::ConfigNotify(const std::string& key, const std::string& value)
@@ -1442,7 +1476,8 @@ void CGlobalRendering::ConfigNotify(const std::string& key, const std::string& v
 
 	// neither needs the window updated; SDL reads the hint on each focus loss
 	if (key == "MinimizeOnFocusLoss") {
-		SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, (configHandler->GetInt(key) == 0) ? "0" : "1");
+		const bool minimize = (configHandler->GetInt(key) != 0) && !backgroundWindow;
+		SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, minimize ? "1" : "0");
 		return;
 	}
 	if (key == "TeamNanoSpray") {
@@ -1606,6 +1641,13 @@ void CGlobalRendering::SetFullScreen(bool cliWindowed, bool cliFullScreen)
 
 	fullScreen = (cfgFullScreen && !cliWindowed  );
 	fullScreen = (cfgFullScreen ||  cliFullScreen);
+
+	// a background window is never fullscreen; the overlay keeps the saved setting
+	if (backgroundWindow) {
+		fullScreen = false;
+		configHandler->Set("Fullscreen", fullScreen, true);
+		return;
+	}
 
 	configHandler->Set("Fullscreen", fullScreen);
 }
@@ -2025,6 +2067,12 @@ bool CGlobalRendering::SetWindowMinMaximized(bool maximize) const
 	};
 	if ((SDL_GetWindowFlags(sdlWindow) & mmFlags[maximize]) != 0)
 		return false; //already in desired state
+
+	// minimizing stalls rendering, maximizing activates the window
+	if (backgroundWindow) {
+		LOG_L(L_WARNING, "[GR::%s] not %s: --background-window is set", __func__, maximize ? "maximizing" : "minimizing");
+		return false;
+	}
 
 	if (maximize)
 		SDL_MaximizeWindow(sdlWindow);

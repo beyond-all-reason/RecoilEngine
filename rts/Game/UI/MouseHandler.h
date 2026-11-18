@@ -43,7 +43,7 @@ public:
 	void ShowMouse();
 	void ToggleMiddleClickScroll(); /// lock+hide
 	void CancelButtonMovement(int button) { buttons[button].movement = 0; }
-	void WarpMouse(int x, int y);
+	void WarpMouse(int x, int y, bool moveSystemPointer = true);
 
 	void DrawSelectionBox() const; /// draw mousebox (selection box)
 	void DrawCursor();
