@@ -2,7 +2,7 @@
 #
 # Samples, without sending any input, whether the engine window takes the focus, is minimized
 # or covers the focused window (X11). The test cases and how to run them are in
-# doc/site/content/docs/guides/getting-started/background-window.md.
+# tools/background-window-test/README.md.
 #
 # Usage:
 #   window-focus-probe.sh <pid> [seconds=30] [interval=0.2] [csv]

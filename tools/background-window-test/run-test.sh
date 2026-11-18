@@ -1,13 +1,13 @@
 #!/bin/bash
 #
-# Runs the BackgroundWindow test cases on Linux (X11) and prints one result per case.
+# Runs the --background-window test cases on Linux (X11) and prints one result per case.
 # It starts the engine once per case, without a game or map (it opens its built-in menu), and
 # samples its window with window-focus-probe.sh. The cases and what they check are described
-# in doc/site/content/docs/guides/getting-started/background-window.md.
+# in tools/background-window-test/README.md.
 #
 # Usage:
 #   run-test.sh <path to spring> [seconds=25] [out dir]
-#   CASES="switch config" run-test.sh <path to spring>     a subset of: off switch fullscreen config
+#   CASES="off switch" run-test.sh <path to spring>     a subset of: off switch fullscreen
 #
 # Start it from the window that has the focus and keep that window focused.
 # Exit code 0 when every case with the feature passes, 1 when one fails, 2 on a usage error.
@@ -24,7 +24,7 @@ usage() {
 engine=$(readlink -f "$1")
 seconds=${2:-25}
 out=${3:-${TMPDIR:-/tmp}/recoil-background-window-test}
-cases=${CASES:-off switch fullscreen config}
+cases=${CASES:-off switch fullscreen}
 here=$(dirname "$(readlink -f "$0")")
 log_line="background window: shown without activation, lowered, never minimized"
 
@@ -51,10 +51,6 @@ case_setup() {
 		fullscreen)
 			case_config=("Fullscreen = 1")
 			case_args=(--background-window)
-			;;
-		config)
-			case_config=("Fullscreen = 0" "BackgroundWindow = 1")
-			case_args=()
 			;;
 		*)
 			echo "unknown case $1"

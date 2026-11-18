@@ -6,7 +6,7 @@
 	Every -IntervalMs it records whether the engine window has the focus, is minimized, is
 	above the focused window, or has been replaced by a "Not Responding" ghost window.
 	The test cases and how to run them are in
-	doc/site/content/docs/guides/getting-started/background-window.md.
+	tools/background-window-test/README.md.
 
 	The last line is one of:
 	  VERDICT background: PASS        window seen; engine_foreground, ghost_foreground,

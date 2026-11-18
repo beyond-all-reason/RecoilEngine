@@ -40,21 +40,22 @@ namespace WindowManagerHelper {
 
 	/**
 	 * @brief moves the window behind all other windows without activating it
-	 * (BackgroundWindow); a window shown without activation still opens on top
+	 * (--background-window); a window shown without activation still opens on top
 	 */
 	void LowerWindow(SDL_Window* window);
 
 	/**
 	 * @brief asks the window manager not to focus the window when it is first shown
-	 * (BackgroundWindow); call it while the window is still hidden. On X11 it sets
-	 * _NET_WM_USER_TIME = 0 (with only SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN,
-	 * openbox still focused the window); on Windows the hint is enough.
+	 * (--background-window); call it while the window is still hidden and after
+	 * SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN is set. On X11 it sets
+	 * _NET_WM_USER_TIME = 0 (with only the hint, openbox still focused the window);
+	 * on Windows the hint is enough.
 	 */
 	void SetNoInitialFocus(SDL_Window* window);
 
 	/**
 	 * @brief stops the OS from replacing a hung window by a "Not Responding" ghost
-	 * window (BackgroundWindow); on Windows the ghost is activated like a normal
+	 * window (--background-window); on Windows the ghost is activated like a normal
 	 * window and takes the keyboard focus. Only Windows has ghosting.
 	 */
 	void DisableWindowGhosting();

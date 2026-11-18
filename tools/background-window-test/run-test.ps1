@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-	Runs the BackgroundWindow test cases on Windows and prints one result per case.
+	Runs the --background-window test cases on Windows and prints one result per case.
 
 .DESCRIPTION
 	Starts the engine once per case, without a game or map (it opens its built-in menu), and
 	samples its window with window-focus-probe.ps1. The cases and what they check are described
-	in doc/site/content/docs/guides/getting-started/background-window.md.
+	in tools/background-window-test/README.md.
 
 	Start it from the window that has the focus and keep that window focused.
 	Exit code 0 when every case with the feature passes, 1 when one fails, 2 on a usage error.
@@ -14,7 +14,7 @@
 	powershell -NoProfile -ExecutionPolicy Bypass -File run-test.ps1 -Engine C:\path\to\spring.exe
 
 .EXAMPLE
-	powershell -NoProfile -ExecutionPolicy Bypass -File run-test.ps1 -Engine C:\path\to\spring.exe -Seconds 40 -Cases switch,config
+	powershell -NoProfile -ExecutionPolicy Bypass -File run-test.ps1 -Engine C:\path\to\spring.exe -Seconds 40 -Cases off,switch
 #>
 param(
 	# the spring.exe to test
@@ -27,8 +27,8 @@ param(
 	# one write directory per case is created below this folder
 	[string]$OutDir = (Join-Path $env:TEMP "recoil-background-window-test"),
 
-	# comma-separated subset of: off, switch, fullscreen, config
-	[string]$Cases = "off,switch,fullscreen,config"
+	# comma-separated subset of: off, switch, fullscreen
+	[string]$Cases = "off,switch,fullscreen"
 )
 
 $LogLine = "background window: shown without activation, lowered, never minimized"
@@ -60,11 +60,6 @@ function Get-CaseSetup([string]$Case)
 		"fullscreen"
 		{
 			return @{ Config = @("Fullscreen = 1"); Arguments = @("--background-window") }
-		}
-
-		"config"
-		{
-			return @{ Config = @("Fullscreen = 0", "BackgroundWindow = 1"); Arguments = @() }
 		}
 	}
 

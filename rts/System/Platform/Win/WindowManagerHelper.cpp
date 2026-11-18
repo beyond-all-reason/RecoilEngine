@@ -1,8 +1,11 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "System/Platform/WindowManagerHelper.h"
+#include <SDL_hints.h>
 #include <SDL_syswm.h>
 #include <windows.h>
+
+#include <cassert>
 
 
 namespace WindowManagerHelper {
@@ -84,7 +87,8 @@ void LowerWindow(SDL_Window* window)
 
 void SetNoInitialFocus(SDL_Window* window)
 {
-	// SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN already keeps the focus away on Windows
+	// on Windows the hint alone keeps the focus away
+	assert(SDL_GetHintBoolean(SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN, SDL_FALSE));
 }
 
 

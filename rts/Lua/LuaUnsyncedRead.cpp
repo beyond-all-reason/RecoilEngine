@@ -136,6 +136,7 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetSelectionBox);
 	REGISTER_LUA_CFUNC(IsAboveMiniMap);
 	REGISTER_LUA_CFUNC(IsGUIHidden);
+	REGISTER_LUA_CFUNC(IsBackgroundWindow);
 
 	REGISTER_LUA_CFUNC(IsAABBInView);
 	REGISTER_LUA_CFUNC(IsSphereInView);
@@ -2790,6 +2791,20 @@ int LuaUnsyncedRead::GetBoxSelectionByEngine(lua_State* L)
 int LuaUnsyncedRead::IsGUIHidden(lua_State* L)
 {
 	lua_pushboolean(L, game != nullptr && game->hideInterface);
+	return 1;
+}
+
+
+/***
+ *
+ * Whether the engine was started with `--background-window`.
+ *
+ * @function Spring.IsBackgroundWindow
+ * @return boolean
+ */
+int LuaUnsyncedRead::IsBackgroundWindow(lua_State* L)
+{
+	lua_pushboolean(L, globalRendering->backgroundWindow);
 	return 1;
 }
 
