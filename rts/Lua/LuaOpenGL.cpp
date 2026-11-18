@@ -4793,6 +4793,9 @@ int LuaOpenGL::GenerateMipmap(lua_State* L)
  * matrices are reset to the DrawGenesis identity. Terrain reuses the player camera's ROAM tessellation, so
  * terrain the player camera has not tessellated is missing.
  *
+ * sunFree is for lighting where the sun is already the direct light; only
+ * ModernSky can leave the sun out, and the third return value says whether it did.
+ *
  * @function gl.RenderEnvironmentFace
  * @param texName string Lua cube texture of the calling handle
  * @param face integer 0..5 in OpenGL order (+X, -X, +Y, -Y, +Z, -Z)
@@ -4800,9 +4803,7 @@ int LuaOpenGL::GenerateMipmap(lua_State* L)
  * @param y number
  * @param z number
  * @param skyOnly boolean? false also draws the terrain (default true)
- * @param sunFree boolean? true leaves the sun's glow out of the sky, for
- *   lighting where the sun is already the direct light; only ModernSky can
- *   (default false)
+ * @param sunFree boolean? true leaves the sun's glow out of the sky (default false)
  * @return boolean success
  * @return string? error
  * @return boolean? sunRemoved with sunFree: whether the sun was left out
