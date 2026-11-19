@@ -5,7 +5,9 @@
 
 #include <string>
 #include <memory>
+#include <variant>
 
+#include "ConnectionStats.h"
 #include "RawPacket.h"
 
 namespace netcode
@@ -62,10 +64,16 @@ public:
 	virtual bool NeedsReconnect() = 0;
 
 	unsigned int GetDataReceived() const { return dataRecv; }
+	virtual ConnectionStats GetStats() const { return BasicStats{dataSent, dataRecv}; }
 	unsigned int GetNumQueuedPings() const { return numPings; }
 	virtual unsigned int GetPacketQueueSize() const { return 0; }
 
-	virtual std::string Statistics() const = 0;
+	std::string Statistics() const {
+		const ConnectionStats stats = GetStats();
+
+		return "[" + GetFullAddress() + "]\n"
+		     + std::visit([](const auto& s) { return FormatConnectionStats(s); }, stats);
+	}
 	virtual std::string GetFullAddress() const = 0;
 	virtual void Unmute() = 0;
 	virtual void Close(bool flush = false) = 0;
