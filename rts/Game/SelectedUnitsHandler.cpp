@@ -1092,7 +1092,7 @@ bool CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 
 	if (totalPacketLen > 8192) {
 		LOG_L(L_WARNING, "[%s] discarded oversized (len=%i) NETMSG_AICOMMANDS packet", __func__, totalPacketLen);
-		return false; // do not send oversized packets
+		return false; // TODO: consider splitting into smaller packets rather than rejecting for oversize, as long as within throughput limits
 	}
 
 	netcode::PackPacket* packet = new netcode::PackPacket(totalPacketLen);
