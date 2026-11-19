@@ -3,10 +3,13 @@
 #ifndef LUA_LOADSCREEN_H
 #define LUA_LOADSCREEN_H
 
+#include <memory>
+
 #include "LuaHandle.h"
 
 
 struct lua_State;
+class CglFont;
 
 
 class CLuaIntro : public CLuaHandle
@@ -27,6 +30,9 @@ public: // call-ins
 
 	virtual bool SecondaryGLContext() const override { return true; }
 
+	/// LoadingMT=2: LuaIntro's copy of the global font, made in the load screen's own GL context
+	CglFont* GetDefaultFont() const { return defaultFont.get(); }
+
 protected:
 	CLuaIntro();
 	virtual ~CLuaIntro();
@@ -38,6 +44,8 @@ private:
 	static bool LoadUnsyncedReadFunctions(lua_State* L);
 	static bool LoadSyncedReadFunctions(lua_State* L);
 	static bool RemoveSomeOpenGLFunctions(lua_State* L);
+
+	std::shared_ptr<CglFont> defaultFont;
 };
 
 

@@ -49,8 +49,8 @@ void CVerticalSync::ConfigNotify(const std::string& key, const std::string& valu
 
 void CVerticalSync::Toggle()
 {
-	// no-arg switch, select smallest interval
-	switch (std::clamp(SDL_GL_GetSwapInterval(), -1, 1)) {
+	// no-arg switch, select smallest interval; while suspended the context runs at 0, so go by the recorded one
+	switch (std::clamp(suspended ? interval : SDL_GL_GetSwapInterval(), -1, 1)) {
 		case -1: { SetInterval( 0); } break;
 		case  0: { SetInterval(+1); } break;
 		case +1: { SetInterval(-1); } break;
@@ -68,6 +68,35 @@ void CVerticalSync::SetInterval(int i)
 
 	configHandler->Set("VSync", interval = i);
 
+	// applied by Resume
+	if (suspended)
+		return;
+
+	ApplyInterval();
+}
+
+void CVerticalSync::Suspend()
+{
+	suspended = true;
+
+	#if !defined HEADLESS
+	SDL_GL_SetSwapInterval(0);
+	effectiveInterval = 0;
+	LOG("[VSync::%s] interval=%d suspended", __func__, interval);
+	#endif
+}
+
+void CVerticalSync::Resume()
+{
+	if (!suspended)
+		return;
+
+	suspended = false;
+	ApplyInterval();
+}
+
+void CVerticalSync::ApplyInterval()
+{
 	#if defined HEADLESS
 	return;
 	#endif

@@ -100,6 +100,9 @@ std::shared_ptr<CglFont> CglFont::LoadFont(const std::string& fontFile, int size
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	try {
+		// LoadingMT: fonts are loaded from the loading and the main thread
+		auto lock = sync.GetScopedLock();
+
 		//return (new CglFont(fontFile, size, outlinewidth, outlineweight));
 		auto fnt = FindFont(fontFile, size, outlinewidth, outlineweight);
 		if (fnt)
@@ -121,9 +124,13 @@ std::shared_ptr<CglFont> CglFont::LoadFont(const std::string& fontFile, int size
 std::shared_ptr<CglFont> CglFont::FindFont(const std::string& fontFile, int size, int outlinewidth, float outlineweight)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const auto cmpFunc = [&fontFile, size, outlinewidth, outlineweight](std::weak_ptr<CFontTexture> item) {
+	// LoadingMT=2: a font drawn in the load screen's GL context can not be drawn in the
+	// game's (their VAOs are not shared), so each context gets its own
+	const bool introOwned = globalRendering->OnIntroContext();
+	const auto cmpFunc = [&fontFile, size, outlinewidth, outlineweight, introOwned](std::weak_ptr<CFontTexture> item) {
 		std::shared_ptr<CglFont> font = std::static_pointer_cast<CglFont>(item.lock());
 		return
+			introOwned == font->IsIntroOwned() &&
 			size == font->GetSize() &&
 			outlinewidth == font->GetOutlineWidth() &&
 			outlineweight == font->GetOutlineWeight() &&
