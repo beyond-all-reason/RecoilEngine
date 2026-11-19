@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "Lua/LuaRulesParams.h"
 #include "System/creg/creg_cond.h"
 #include "System/UnorderedMap.hpp"
 
@@ -28,6 +29,8 @@ public:
 	float startRectRight  = 1.0f;
 
 	std::vector<bool> allies;
+
+	LuaRulesParams::Params modParams;
 
 private:
 	customOpts customValues;
