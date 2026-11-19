@@ -1267,6 +1267,8 @@ int LuaOpenGL::GetNumber(lua_State* L)
 	if (count > 64)
 		return 0;
 
+	luaL_checkstack(L, count, __func__);
+
 	GLfloat values[64];
 	glGetFloatv(pname, values);
 	for (GLuint i = 0; i < count; i++) {

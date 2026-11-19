@@ -6408,11 +6408,13 @@ int LuaSyncedRead::GetUnitCurrentCommand(lua_State* L)
 		return 0;
 
 	const Command& cmd = queue->at(cmdIndex);
+	const unsigned int numParams = cmd.GetNumParams();
+	luaL_checkstack(L, 3 + numParams, __func__);
+
 	lua_pushnumber(L, cmd.GetID());
 	lua_pushnumber(L, cmd.GetOpts());
 	lua_pushnumber(L, cmd.GetTag());
 
-	const unsigned int numParams = cmd.GetNumParams();
 	for (unsigned int i = 0; i < numParams; ++i)
 		lua_pushnumber(L, cmd.GetParam(i));
 
