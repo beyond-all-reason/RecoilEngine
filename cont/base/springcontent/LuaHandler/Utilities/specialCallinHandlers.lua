@@ -73,9 +73,9 @@ function hHookFuncs.ConfigureLayout(command)
 end
 
 
-function hHookFuncs.Update(dt)
+function hHookFuncs.Update(dt, presentedDt)
 	for _,f in hCallInLists.Update:iter() do
-		f(dt)
+		f(dt, presentedDt)
 	end
 end
 
