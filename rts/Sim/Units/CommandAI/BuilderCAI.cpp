@@ -770,8 +770,8 @@ bool CBuilderCAI::TargetInterceptable(const CUnit* unit, float targetSpeed) {
 void CBuilderCAI::ExecuteRepair(Command& c)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// not all builders are repair-capable by default
-	if (!owner->unitDef->canRepair)
+	// not all builders are repair- or assist-capable by default
+	if (!owner->unitDef->canRepair && !owner->unitDef->canAssist)
 		return;
 
 	if (c.GetNumParams() == 1 || c.GetNumParams() == 5) {
@@ -806,7 +806,7 @@ void CBuilderCAI::ExecuteRepair(Command& c)
 		// do not consider units under construction irreparable
 		// even if they can be repaired
 		bool canRepairUnit = true;
-		canRepairUnit &= ((unit->beingBuilt) || (unit->unitDef->repairable && (unit->health < unit->maxHealth)));
+		canRepairUnit &= ((unit->beingBuilt) || (owner->unitDef->canRepair && unit->unitDef->repairable && (unit->health < unit->maxHealth)));
 		canRepairUnit &= ((unit != owner) || owner->unitDef->canSelfRepair);
 		canRepairUnit &= (!unit->soloBuilder || (unit->soloBuilder == owner));
 		canRepairUnit &= (!c.IsInternalOrder() || (c.GetOpts() & CONTROL_KEY) || !CBuilderCaches::IsUnitBeingReclaimed(unit, owner));
