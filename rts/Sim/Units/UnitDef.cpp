@@ -122,6 +122,7 @@ UnitDef::UnitDef()
 	, resurrectSpeed(0.0f)
 	, captureSpeed(0.0f)
 	, terraformSpeed(0.0f)
+	, nanoAimRate(0.0f)
 
 	, canSubmerge(false)
 	, canfly(false)
@@ -183,6 +184,8 @@ UnitDef::UnitDef()
 
 	, canBeAssisted(false)
 	, canSelfRepair(false)
+
+	, canBuildWhileMoving(false)
 
 	, canFireControl(false)
 	, canManualFire(false)
@@ -369,6 +372,7 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	resurrectSpeed = udTable.GetFloat("resurrectSpeed", buildSpeed);
 	captureSpeed   = udTable.GetFloat("captureSpeed",   buildSpeed);
 	terraformSpeed = udTable.GetFloat("terraformSpeed", buildSpeed);
+	nanoAimRate    = udTable.GetFloat("nanoAimRate",		  0.5f);
 
 	upDirSmoothing = std::clamp(udTable.GetFloat("upDirSmoothing", 0.0f), 0.0f, 0.95f);
 	separationDistance = std::max(udTable.GetInt("separationDistance", 0), 0);
@@ -409,6 +413,8 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 
 	canBeAssisted = udTable.GetBool("canBeAssisted", true);
 	canSelfRepair = udTable.GetBool("canSelfRepair", false);
+
+	canBuildWhileMoving = udTable.GetBool("canBuildWhileMoving", false);
 
 	canFireControl = !udTable.GetBool("noAutoFire", false);
 	canManualFire = udTable.GetBool("canManualFire", udTable.GetBool("canDGun", false));
