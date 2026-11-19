@@ -316,7 +316,7 @@ class CLuaHandle : public CEventClient
 
 	public:
 		// custom call-in  (inter-script calls)
-		bool HasXCall(const std::string& funcName) const { return HasCallIn(L, funcName); }
+		bool HasXCall(const std::string& funcName) const;
 		int XCall(lua_State* srcState, const char* funcName);
 
 		// cob callins
