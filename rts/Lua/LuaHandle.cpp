@@ -4002,6 +4002,7 @@ bool CLuaHandle::AllowQuit()
  * @function Callins:AddConsoleLine
  * @param msg string
  * @param priority integer
+ * @param section string Log section, empty for `Spring.Echo`.
  */
 bool CLuaHandle::AddConsoleLine(const string& msg, const string& section, int level)
 {
@@ -4014,9 +4015,10 @@ bool CLuaHandle::AddConsoleLine(const string& msg, const string& section, int le
 
 	lua_pushsstring(L, msg);
 	lua_pushnumber(L, level);
+	lua_pushsstring(L, section);
 
 	// call the function
-	return RunCallIn(L, cmdStr, 2, 0);
+	return RunCallIn(L, cmdStr, 3, 0);
 }
 
 
