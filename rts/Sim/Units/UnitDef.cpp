@@ -58,7 +58,7 @@ UnitDefWeapon::UnitDefWeapon(const WeaponDef* weaponDef, const LuaTable& weaponT
 
 	// allow weapon to swap muzzles every frame and accurately determine friendly fire, without waiting for slow update.
 	fastQueryPointUpdate = weaponTable.GetBool("fastQueryPointUpdate", fastQueryPointUpdate);
-
+  
 	// Determines how to handle burst fire, when target is out of arc. 0 = no restrictions (default), 1 = don't fire, 2 = fire in current direction of weapon 
 	burstControlWhenOutOfArc = weaponTable.GetInt("burstControlWhenOutOfArc", burstControlWhenOutOfArc);
 
@@ -67,6 +67,10 @@ UnitDefWeapon::UnitDefWeapon(const WeaponDef* weaponDef, const LuaTable& weaponT
 	// 1 = exact solution for non-parabolic shots and 1 accuracy iteration for parabolic shots
 	// 2+ = extra iterations for parabolic shots. Iterations terminate early once 1-frame accuracy is achieved. 
 	accurateLeading = weaponTable.GetInt("accurateLeading", accurateLeading);
+  
+  // allow weapon to aim at targets without a free line of fire
+	// weapon still prioritizes targets with a free line of fire
+	preaimAtBlockedTargets = weaponTable.GetBool("preaimAtBlockedTargets", preaimAtBlockedTargets);
 }
 
 
