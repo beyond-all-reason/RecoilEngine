@@ -2728,6 +2728,12 @@ const std::uint32_t QTPFS::PathSearch::GenerateVirtualNodeNumber(const QTPFS::No
 	uint32_t xoff = startNode->xmin();
 	uint32_t zoff = startNode->zmin();
 
+	/* Only a root node may be larger than nodeMaxSize. Otherwise the virtual
+	 * child digits are shifted as for a root child. Two different source
+	 * positions can then get the same number, their path requests are shared,
+	 * and one unit gets the path computed for the other position. */
+	assert(startNode->GetDepth() == 0 || nodeSize <= nodeMaxSize);
+
 	int depth = 0;
 	while (nodeSize > nodeMaxSize) {
 		// build the rest of the virtual node number
