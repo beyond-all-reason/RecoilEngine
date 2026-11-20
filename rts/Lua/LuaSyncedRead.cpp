@@ -138,6 +138,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetModOption);
 	REGISTER_LUA_CFUNC(GetModOptions);
 
+	REGISTER_LUA_CFUNC(GetMapGravity);
 	REGISTER_LUA_CFUNC(GetTidal);
 	REGISTER_LUA_CFUNC(GetWind);
 
@@ -943,6 +944,19 @@ int LuaSyncedRead::GetGameSeconds(lua_State* L)
  * Environment
  * @section environment
 ******************************************************************************/
+
+
+/***
+ *
+ * @function Spring.GetMapGravity
+ *
+ * @return number gravity Gravity in elmos per second squared.
+ */
+int LuaSyncedRead::GetMapGravity(lua_State *L)
+{
+	lua_pushnumber(L, -mapInfo->map.gravity * GAME_SPEED * GAME_SPEED);
+	return 1;
+}
 
 
 /***

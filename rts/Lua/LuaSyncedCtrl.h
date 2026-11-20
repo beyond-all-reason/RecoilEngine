@@ -240,6 +240,7 @@ class LuaSyncedCtrl
 		static int SetMapSquareTerrainType(lua_State* L);
 		static int SetTerrainTypeData(lua_State* L);
 
+		static int SetMapGravity(lua_State* L);
 		static int SetTidal(lua_State* L);
 		static int SetWind(lua_State* L);
 

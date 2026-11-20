@@ -122,6 +122,7 @@ CR_REG_METADATA(CGroundMoveType, (
 	CR_MEMBER(accRate),
 	CR_MEMBER(decRate),
 	CR_MEMBER(myGravity),
+	CR_MEMBER(useMapGravity),
 
 	CR_MEMBER(maxReverseDist),
 	CR_MEMBER(minReverseAngle),
@@ -524,7 +525,8 @@ CGroundMoveType::CGroundMoveType(CUnit* owner):
 	decRate = std::max(0.01f, ud->maxDec);
 
 	// unit-gravity must always be negative
-	myGravity = mix(-math::fabs(ud->myGravity), mapInfo->map.gravity, ud->myGravity == 0.0f);
+	useMapGravity = (ud->myGravity == 0.0f);
+	myGravity = mix(-math::fabs(ud->myGravity), mapInfo->map.gravity, useMapGravity);
 
 	ownerRadius = md->CalcFootPrintMinExteriorRadius();
 
@@ -537,6 +539,11 @@ CGroundMoveType::CGroundMoveType(CUnit* owner):
 	owner->zsize = md->zsize;
 
 	Connect();
+}
+
+float CGroundMoveType::GetMyGravity() const
+{
+	return useMapGravity ? mapInfo->map.gravity : myGravity;
 }
 
 CGroundMoveType::~CGroundMoveType()
@@ -708,7 +715,7 @@ void CGroundMoveType::UpdateUnitPosition() {
  	if (owner->UnderFirstPersonControl())
  		UpdateDirectControl();
 
-	UpdateOwnerPos(owner->speed, calcSpeedVectorFuncs[modInfo.allowGroundUnitGravity](owner, this, deltaSpeed, myGravity));
+	UpdateOwnerPos(owner->speed, calcSpeedVectorFuncs[modInfo.allowGroundUnitGravity](owner, this, deltaSpeed, GetMyGravity()));
 }
 
 void CGroundMoveType::UpdateCollisionDetections() {
@@ -3728,6 +3735,9 @@ bool CGroundMoveType::SetMemberValue(unsigned int memberHash, void* memberValue)
 		const auto pred = [memberHash](const std::pair<unsigned int, float*>& p) { return (memberHash == p.first); };
 		const auto iter = std::find_if(gmtMemberData.floats.begin(), gmtMemberData.floats.end(), pred);
 		if (iter != gmtMemberData.floats.end()) {
+			if (iter->second == &myGravity)
+				useMapGravity = false;
+
 			*(iter->second) = *(reinterpret_cast<float*>(memberValue));
 			return true;
 		}

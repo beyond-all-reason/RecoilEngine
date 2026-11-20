@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <cctype>
+#include <cmath>
 
 #include "LuaSyncedCtrl.h"
 
@@ -70,6 +71,7 @@
 #include "Sim/Units/CommandAI/CommandAI.h"
 #include "Sim/Units/CommandAI/FactoryCAI.h"
 #include "Sim/Units/UnitTypes/ExtractorBuilding.h"
+#include "Sim/Weapons/Cannon.h"
 #include "Sim/Weapons/PlasmaRepulser.h"
 #include "Sim/Weapons/Weapon.h"
 #include "Sim/Weapons/WeaponDefHandler.h"
@@ -357,6 +359,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetMapSquareTerrainType);
 	REGISTER_LUA_CFUNC(SetTerrainTypeData);
 
+	REGISTER_LUA_CFUNC(SetMapGravity);
 	REGISTER_LUA_CFUNC(SetTidal);
 	REGISTER_LUA_CFUNC(SetWind);
 
@@ -1158,6 +1161,40 @@ int LuaSyncedCtrl::GameOver(lua_State* L)
  * @section resources
  */
 
+/*** Set map gravity.
+ *
+ * Updates systems that use map gravity, preserving per-unit and per-weapon
+ * gravity overrides. Projectiles already in flight retain their assigned gravity.
+ *
+ * Use Spring.GetMapGravity for the current value. Game.gravity is a snapshot
+ * taken when the Lua state is initialized.
+ *
+ * @function Spring.SetMapGravity
+ * @param gravity number Finite gravity in elmos per second squared, clamped to at least 0.001.
+ * @return nil
+ */
+int LuaSyncedCtrl::SetMapGravity(lua_State* L)
+{
+	const float gravityStrength = luaL_checkfloat(L, 1);
+
+	if (!std::isfinite(gravityStrength)) {
+		return luaL_argerror(L, 1, "gravity must be finite");
+	}
+
+	float *mapGravity = const_cast<float *>(&mapInfo->map.gravity);
+	*mapGravity = -std::max(0.001f, gravityStrength) / (GAME_SPEED * GAME_SPEED);
+
+	for (CUnit *unit : unitHandler.GetActiveUnits()) {
+		for (CWeapon *weapon : unit->weapons) {
+			CCannon *cannon = dynamic_cast<CCannon *>(weapon);
+
+			if (cannon != nullptr)
+				cannon->UpdateMapGravity();
+		}
+	}
+
+	return 0;
+}
 
 /*** Set tidal strength
  *
