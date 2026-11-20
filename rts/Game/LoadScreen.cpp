@@ -335,7 +335,11 @@ bool CLoadScreen::Draw()
 void CLoadScreen::SetLoadMessage(const std::string& text, bool replaceLast)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	spring::UnfreezeSpring(WDT_LOAD);
+	// the loading thread must not pump window events, the main thread does that
+	if (mtLoading)
+		Watchdog::ClearTimer(WDT_LOAD);
+	else
+		spring::UnfreezeSpring(WDT_LOAD);
 
 	std::lock_guard<spring::recursive_mutex> lck(mutex);
 
