@@ -1,4 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 #include "UnitDrawerData.h"
+#include "Sim/Misc/CollisionHandler.h"
 
 #include "System/MemPoolTypes.h"
 #include "System/ContainerUtil.h"
@@ -12,6 +14,7 @@
 #include "Game/CameraHandler.h"
 #include "Game/UI/MiniMap.h"
 #include "Rendering/Common/ModelDrawerHelpers.h"
+#include "Rendering/Common/ModelDrawerState.hpp"
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/Models/IModelParser.h"
 #include "Rendering/LuaObjectDrawer.h"
@@ -47,9 +50,22 @@ static Transform MakeGhostWorldTransform(const float3& pos, int facing)
 
 ///////////////////////////
 
+CR_BIND(GhostTarget, )
+CR_REG_METADATA(GhostTarget, (
+	CR_MEMBER(aimPos),
+	CR_MEMBER(modelTransform),
+	CR_MEMBER(teamColor),
+	CR_MEMBER(modelName),
+	CR_MEMBER(unitID),
+	CR_MEMBER(selectionTransform),
+	CR_MEMBER(selectionVolume),
+	CR_MEMBER(selectable)
+))
+
 CR_BIND_POOL(GhostSolidObject, ,ghostMemPool.allocMem, ghostMemPool.freeMem)
 CR_REG_METADATA(GhostSolidObject, (
 	CR_MEMBER(modelName),
+	CR_MEMBER(targets),
 
 	CR_MEMBER(pos),
 	CR_MEMBER(midPos),
@@ -73,6 +89,7 @@ CR_REG_METADATA(GhostSolidObject, (
 CR_BIND(CUnitDrawerData::LiveGhostBuilding, )
 CR_REG_METADATA(CUnitDrawerData::LiveGhostBuilding, (
 	CR_MEMBER(unit),
+	CR_MEMBER(target),
 	CR_MEMBER(paletteIndex),
 	CR_MEMBER(team)
 ))
@@ -647,6 +664,7 @@ bool CUnitDrawerData::UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost
 			if (gso == nullptr) {
 				gso = ghostMemPool.alloc<GhostSolidObject>();
 
+				gso->targets.resize(savedData.deadGhostBuildings.size());
 				gso->pos = u->pos;
 				gso->midPos = u->midPos;
 				gso->modelName = gsoModel->name;
@@ -667,6 +685,14 @@ bool CUnitDrawerData::UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost
 
 				groundDecals->GhostCreated(u, gso);
 
+			}
+
+			// Preserve this observer's snapshot, including when destruction was not seen.
+			for (const auto& live : savedData.liveGhostBuildings[allyTeam][MDL_TYPE(u)]) {
+				if (live.unit == u) {
+					gso->targets[allyTeam] = live.target;
+					break;
+				}
 			}
 
 			// <gso> can be inserted for multiple allyteams
@@ -735,8 +761,21 @@ void CUnitDrawerData::UnitLeftLos(const CUnit* unit, int allyTeam)
 		auto& lgbs = savedData.liveGhostBuildings[allyTeam][MDL_TYPE(unit)];
 		const bool alreadyGhosted = std::any_of(lgbs.begin(), lgbs.end(),
 			[u](const LiveGhostBuilding& lgb) { return lgb.unit == u; });
-		if (!alreadyGhosted)
-			lgbs.push_back({ u, u->paletteIndex, static_cast<uint8_t>(u->team) });
+		if (!alreadyGhosted) {
+			GhostTarget target;
+			target.aimPos = u->aimPos;
+			target.unitID = u->id;
+			target.modelName = GetUnitModel(u)->name;
+			target.modelTransform.Translate(u->pos);
+			target.modelTransform.RotateY(-u->buildFacing * math::HALFPI);
+			target.teamColor = CModelDrawerHelper::GetTeamColor(u->team, 1.0f);
+			target.selectionTransform = u->GetTransformMatrix(false);
+			target.selectionTransform.Translate(u->relMidPos);
+			target.selectionTransform.Translate(u->selectionVolume.GetOffsets());
+			target.selectionVolume = u->selectionVolume;
+			target.selectable = !u->noSelect && !u->IsInVoid() && !u->selectionVolume.IgnoreHits();
+			lgbs.push_back({ u, target, u->paletteIndex, static_cast<uint8_t>(u->team) });
+		}
 	}
 
 	if (allyTeam != gu->myAllyTeam)
@@ -819,4 +858,81 @@ void CUnitDrawerData::RemoveDeadGhost(GhostSolidObject* gso, std::vector<GhostSo
 
 	dgb[index] = dgb.back();
 	dgb.pop_back();
+}
+
+bool CUnitDrawerData::TraceGhost(const float3& start, const float3& dir, float length, float3& aimPos, int& unitID, const CUnit* excludeUnit) const
+{
+	if (!gameSetup->ghostedBuildings || gu->spectatingFullView || gu->myAllyTeam < 0)
+		return false;
+
+	bool hit = false;
+	const auto trace = [&](const GhostTarget& target, int radarUnitID) {
+		if (!target.selectable)
+			return;
+		CollisionQuery query;
+		if (!CCollisionHandler::MouseHit(&target.selectionVolume, target.selectionTransform, start, start + dir * length, &query))
+			return;
+		const float distance = query.GetHitPosDist(start, dir);
+		if (distance >= length)
+			return;
+		length = distance;
+		aimPos = target.aimPos;
+		unitID = radarUnitID;
+		hit = true;
+	};
+
+	for (int type = MODELTYPE_3DO; type < MODELTYPE_CNT; ++type) {
+		for (const auto& live : savedData.liveGhostBuildings[gu->myAllyTeam][type]) {
+			if (live.unit != excludeUnit && (live.unit->losStatus[gu->myAllyTeam] & LOS_INLOS) == 0)
+				trace(live.target, (live.unit->losStatus[gu->myAllyTeam] & LOS_INRADAR) != 0 ? live.unit->id : -1);
+		}
+		for (const auto* dead : savedData.deadGhostBuildings[gu->myAllyTeam][type])
+			trace(dead->targets[gu->myAllyTeam], -1);
+	}
+	return hit;
+}
+
+void CUnitDrawerData::SetGhostColor(GhostColorState state, const float4* color)
+{
+	auto& overrideColor = ghostColorOverrides[static_cast<size_t>(state)];
+	if (color != nullptr)
+		overrideColor = *color;
+	else
+		overrideColor.reset();
+}
+
+float4 CUnitDrawerData::GetGhostColor(bool radar, bool highlighted) const
+{
+	const auto state = radar
+		? (highlighted ? GhostColorState::RadarHighlight : GhostColorState::Radar)
+		: (highlighted ? GhostColorState::Highlight : GhostColorState::Normal);
+	const auto& overrideColor = ghostColorOverrides[static_cast<size_t>(state)];
+	if (overrideColor.has_value())
+		return *overrideColor;
+
+	// Keep normal ghost opacity responsive to the UnitTransparency setting.
+	const float4 ghostColor = {0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y};
+	const float4 radarGhostColor = {0.9f, 0.9f, 0.9f, IModelDrawerState::alphaValues.z};
+	static constexpr float4 GhostHighlightColor = {1.0f, 0.85f, 0.45f, 0.55f};
+	static constexpr float4 RadarGhostHighlightColor = {1.0f, 0.85f, 0.45f, 0.55f};
+
+	if (highlighted)
+		return radar ? RadarGhostHighlightColor : GhostHighlightColor;
+	return radar ? radarGhostColor : ghostColor;
+}
+
+void CUnitDrawerData::SetGhostHighlight(const float3* aimPos)
+{
+	ghostHighlightFrame = (aimPos != nullptr) ? globalRendering->drawFrame : -1;
+	ghostHighlightAllyTeam = gu->myAllyTeam;
+	if (aimPos != nullptr)
+		ghostHighlightPos = *aimPos;
+}
+
+bool CUnitDrawerData::IsGhostHighlighted(const GhostTarget& target) const
+{
+	return !gu->spectatingFullView && target.selectable
+		&& ghostHighlightAllyTeam == gu->myAllyTeam
+		&& ghostHighlightFrame >= 0 && globalRendering->drawFrame <= ghostHighlightFrame + 1
+		&& target.aimPos == ghostHighlightPos;
 }

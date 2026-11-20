@@ -1,9 +1,14 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 #pragma once
 
+#include <array>
+#include <optional>
 #include <ranges>
 
 #include "System/float3.h"
+#include "System/float4.h"
+#include "System/Matrix44f.h"
+#include "Sim/Misc/CollisionVolume.h"
 #include "Rendering/Common/ModelDrawerData.h"
 #include "Rendering/UnitDefImage.h"
 #include "Game/GlobalUnsynced.h"
@@ -15,6 +20,19 @@ struct UnitDef;
 namespace GL {
 	struct GeometryBuffer;
 }
+
+// Frozen at LOS loss. Never read a hidden unit to resolve a player's target.
+struct GhostTarget {
+	CR_DECLARE_STRUCT(GhostTarget)
+	float3 aimPos;
+	CMatrix44f modelTransform;
+	float4 teamColor;
+	std::string modelName;
+	int unitID = -1;
+	CMatrix44f selectionTransform;
+	CollisionVolume selectionVolume;
+	bool selectable = false;
+};
 
 class GhostSolidObject {
 	CR_DECLARE_STRUCT(GhostSolidObject)
@@ -28,6 +46,7 @@ public:
 public:
 	std::string modelName;
 
+	std::vector<GhostTarget> targets; // per observing allyteam
 	float3 pos;
 	float3 midPos;
 	float3 dir;
@@ -77,6 +96,12 @@ public:
 	bool UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost);
 	void UnitLeavesGhostChanged(const CUnit* unit, const bool leaveDeadGhost);
 	void ReviewPrevLos(const CUnit* unit);
+	enum class GhostColorState { Normal, Highlight, Radar, RadarHighlight, Count };
+	void SetGhostColor(GhostColorState state, const float4* color);
+	float4 GetGhostColor(bool radar, bool highlighted) const;
+	void SetGhostHighlight(const float3* aimPos);
+	bool IsGhostHighlighted(const GhostTarget& target) const;
+	bool TraceGhost(const float3& start, const float3& dir, float length, float3& aimPos, int& unitID, const CUnit* excludeUnit) const;
 public:
 	class TempDrawUnit {
 		CR_DECLARE_STRUCT(TempDrawUnit)
@@ -103,6 +128,7 @@ public:
 	struct LiveGhostBuilding {
 		CR_DECLARE_STRUCT(LiveGhostBuilding)
 		CUnit* unit = nullptr;
+		GhostTarget target;
 		uint16_t paletteIndex = 0;
 		uint8_t team = 0;
 	};
@@ -214,6 +240,10 @@ public:
 	void ConfigNotify(const std::string& key, const std::string& value);
 private:
 	SavedData savedData;
+	std::array<std::optional<float4>, static_cast<size_t>(GhostColorState::Count)> ghostColorOverrides;
+	float3 ghostHighlightPos;
+	int ghostHighlightFrame = -1;
+	int ghostHighlightAllyTeam = -1;
 
 	std::vector<UnitDefImage> unitDefImages;
 

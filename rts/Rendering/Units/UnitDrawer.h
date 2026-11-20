@@ -54,6 +54,9 @@ public:
 	//static void UpdateStatic(); //use base
 public:
 	// Interface with CUnitDrawerData
+	static bool TraceGhost(const float3& start, const float3& dir, float length, float3& aimPos, int& unitID, const CUnit* excludeUnit) { return modelDrawerData->TraceGhost(start, dir, length, aimPos, unitID, excludeUnit); }
+	static void SetGhostColor(CUnitDrawerData::GhostColorState state, const float4* color) { modelDrawerData->SetGhostColor(state, color); }
+	static void SetGhostHighlight(const float3* aimPos) { modelDrawerData->SetGhostHighlight(aimPos); }
 	static void UpdateGhostedBuildings() { modelDrawerData->UpdateGhostedBuildings(); }
 
 	static uint32_t GetUnitDefImage(const UnitDef* ud) { return modelDrawerData->GetUnitDefImage(ud); }

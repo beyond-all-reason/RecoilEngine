@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef COLLISION_HANDLER_H
-#define COLLISION_HANDLER_H
+#pragma once
 
 #include "System/creg/creg_cond.h"
 #include "System/float3.h"
@@ -120,6 +119,13 @@ class CCollisionHandler {
 			const CollisionVolume* v,
 			CollisionQuery* cq = nullptr
 		);
+		static bool MouseHit(
+			const CollisionVolume* v,
+			const CMatrix44f& m,
+			const float3& p0,
+			const float3& p1,
+			CollisionQuery* cq = nullptr
+		);
 
 	private:
 		// HITTEST_DISC helpers for DetectHit
@@ -171,5 +177,3 @@ class CCollisionHandler {
 		static unsigned int numDiscTests; // number of discrete hit-tests executed
 		static unsigned int numContTests; // number of continuous hit-tests executed (inc. unsynced)
 };
-
-#endif // COLLISION_HANDLER_H

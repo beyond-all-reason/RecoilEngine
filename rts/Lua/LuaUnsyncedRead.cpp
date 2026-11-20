@@ -3360,10 +3360,10 @@ int LuaUnsyncedRead::WorldToScreenCoords(lua_State* L)
  * @param includeSky boolean? (Default: `false`)
  * @param ignoreWater boolean? (Default: `false`)
  * @param heightOffset number? (Default: `0`)
- * @return string? description of traced position
- * @return UnitID|FeatureID|string|xyz|nil unitID or feature, position triple when onlyCoords=true
- * @return FeatureID|string|nil featureID or ground
- * @return xyz? coords
+ * @param includeGhosts boolean? (Default: `false`) World view only; return "ghost" and its last observed aim-position triple. A remembered model with radar contact returns "unit", its targetable ID, and that frozen aim-position triple instead. Ignored with onlyCoords or the legacy argument layout.
+ * @return ("unit"|"feature"|"ground"|"sky"|"ghost")? description Type of the traced object or position.
+ * @return UnitID|FeatureID|xyz|nil result Unit or feature ID, world coordinates, or the frozen ghost aimpoint.
+ * @return xyz? ghostAimPos Last observed aimpoint when a remembered model resolves to a radar unit.
  */
 int LuaUnsyncedRead::TraceScreenRay(lua_State* L)
 {
@@ -3427,6 +3427,29 @@ int LuaUnsyncedRead::TraceScreenRay(lua_State* L)
 	// trace for player's allyteam
 	const float traceDist = TraceRay::GuiTraceRay(camPos, pxlDir, rawRange, nullptr, unit, feature, true, onlyCoords, ignoreWater);
 	const float planeDist = CGround::LinePlaneCol(camPos, pxlDir, rawRange, luaL_optnumber(L, newArgIdx, 0.0f));
+
+	if (!onlyCoords && optArgIdx == 3 && luaL_optboolean(L, 8, false)) {
+		float3 aimPos;
+		int radarUnitID = -1;
+		bool ghostHit = CUnitDrawer::TraceGhost(camPos, pxlDir, traceDist >= 0.0f ? traceDist : rawRange, aimPos, radarUnitID, unit);
+		if (!ghostHit && unit != nullptr && gu->myAllyTeam >= 0 && (unit->losStatus[gu->myAllyTeam] & (LOS_INLOS | LOS_INRADAR)) == LOS_INRADAR) {
+			ghostHit = CUnitDrawer::TraceGhost(camPos, pxlDir, rawRange, aimPos, radarUnitID, nullptr) && radarUnitID == unit->id;
+		}
+		if (ghostHit) {
+			if (radarUnitID >= 0) {
+				lua_pushliteral(L, "unit");
+				lua_pushnumber(L, radarUnitID);
+			} else {
+				lua_pushliteral(L, "ghost");
+			}
+			lua_createtable(L, 3, 0);
+			lua_pushnumber(L, aimPos.x); lua_rawseti(L, -2, 1);
+			lua_pushnumber(L, aimPos.y); lua_rawseti(L, -2, 2);
+			lua_pushnumber(L, aimPos.z); lua_rawseti(L, -2, 3);
+			return radarUnitID >= 0 ? 3 : 2;
+		}
+	}
+
 
 	const float3 tracePos = camPos + (pxlDir * traceDist);
 	const float3 planePos = camPos + (pxlDir * planeDist); // backup (for includeSky and onlyCoords)

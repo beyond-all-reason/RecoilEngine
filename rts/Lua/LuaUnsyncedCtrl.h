@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_UNSYNCED_CTRL_H
-#define LUA_UNSYNCED_CTRL_H
+#pragma once
 
 struct lua_State;
 
@@ -101,6 +100,8 @@ class LuaUnsyncedCtrl {
 		static int SetMapShadingTexture(lua_State* L);
 		static int SetSkyBoxTexture(lua_State* L);
 
+		static int SetGhostColor(lua_State* L);
+		static int SetGhostHighlight(lua_State* L);
 		static int SetUnitNoDraw(lua_State* L);
 		static int SetUnitEngineDrawMask(lua_State* L);
 		static int SetUnitAlwaysUpdateMatrix(lua_State* L);
@@ -240,5 +241,3 @@ class LuaUnsyncedCtrl {
 
 		static int Yield(lua_State* L);
 };
-
-#endif /* LUA_UNSYNCED_CTRL_H */

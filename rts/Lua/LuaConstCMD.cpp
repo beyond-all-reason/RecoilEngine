@@ -37,6 +37,8 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	LuaPushNamedNumber(L, "OPT_RIGHT",    RIGHT_MOUSE_KEY);
 	/*** @field CMD.OPT_INTERNAL 8 */
 	LuaPushNamedNumber(L, "OPT_INTERNAL", INTERNAL_ORDER);
+	/*** @field CMD.OPT_KEEP_HEIGHT 1 Preserve the Y coordinate of positional attack commands. */
+	LuaPushNamedNumber(L, "OPT_KEEP_HEIGHT", KEEP_TARGET_HEIGHT);
 	/*** @field CMD.OPT_META 4 */
 	LuaPushNamedNumber(L, "OPT_META",     META_KEY);
 
