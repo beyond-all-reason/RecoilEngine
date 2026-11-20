@@ -83,8 +83,11 @@ namespace Impl {
 			ul.SetNeedUpdateAll();
 		}
 
-		if (!ul.NeedUpdate())
+		if (!ul.NeedUpdate()) {
+			// No upload or rotation, but draws still read the last bound slot.
+			ssbo->MarkBoundBufferUsed();
 			return;
+		}
 
 		// may have been already unbound above, not a big deal
 		ssbo->UnbindBufferRange(uploader.GetBindingIdx());
