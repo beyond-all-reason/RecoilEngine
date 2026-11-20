@@ -408,10 +408,14 @@ public:
 		if (readOnly)
 			return;
 
-		if (vbo)
+		if (vbo) {
 			vbo->SwapBuffer();
-		if (ebo)
+			vbo->Invalidate();
+		}
+		if (ebo) {
 			ebo->SwapBuffer();
+			ebo->Invalidate();
+		}
 
 		Clear();
 	}
