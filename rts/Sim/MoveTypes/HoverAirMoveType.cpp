@@ -970,7 +970,8 @@ bool CHoverAirMoveType::Update()
 			UpdateTakeoff();
 			break;
 		case AIRCRAFT_FLYING:
-			UpdateFlying();
+			if (!owner->UnderFirstPersonControl())
+				UpdateFlying();
 			break;
 		case AIRCRAFT_LANDING:
 			UpdateLanding();
