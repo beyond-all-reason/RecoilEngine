@@ -731,6 +731,8 @@ void RenderInterface_GL3_Recoil::BeginFrame()
 	glGetIntegerv(GL_SCISSOR_BOX, glstate_backup.scissor);
 
 	glGetIntegerv(GL_ACTIVE_TEXTURE, &glstate_backup.active_texture);
+	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &glstate_backup.draw_framebuffer);
+	glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &glstate_backup.read_framebuffer);
 
 	glGetIntegerv(GL_STENCIL_CLEAR_VALUE, &glstate_backup.stencil_clear_value);
 	glGetFloatv(GL_COLOR_CLEAR_VALUE, glstate_backup.color_clear_value);
@@ -810,8 +812,8 @@ void RenderInterface_GL3_Recoil::EndFrame()
 	glBlitFramebuffer(0, 0, fb_active.width, fb_active.height, 0, 0, fb_postprocess.width, fb_postprocess.height,
 					  GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
-	// Draw to backbuffer
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	// Composite into the caller's draw framebuffer.
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, glstate_backup.draw_framebuffer);
 	glViewport(viewport_offset_x, viewport_offset_y, viewport_width, viewport_height);
 
 	// Assuming we have an opaque background, we can just write to it with the premultiplied alpha blend mode and we'll get the correct result.
@@ -826,6 +828,8 @@ void RenderInterface_GL3_Recoil::EndFrame()
 	UseProgram(ProgramId::None);
 
 	// Restore GL state.
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, glstate_backup.draw_framebuffer);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, glstate_backup.read_framebuffer);
 	if (glstate_backup.enable_cull_face)
 		glEnable(GL_CULL_FACE);
 	else
