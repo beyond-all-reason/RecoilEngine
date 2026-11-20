@@ -655,8 +655,8 @@ void CReadMap::UpdateMipHeightmaps(const SRectangle& rect, bool initialize)
 		float* topMipMap = mipPointerHeightMaps[i    ];
 		float* subMipMap = mipPointerHeightMaps[i + 1];
 
-		for (int y = sy; y < ey; y += 2) {
-			for (int x = sx; x < ex; x += 2) {
+		for (int y = sy; y <= ey; y += 2) {
+			for (int x = sx; x <= ex; x += 2) {
 				const float height =
 					topMipMap[(x    ) + (y    ) * hmapx] +
 					topMipMap[(x    ) + (y + 1) * hmapx] +
