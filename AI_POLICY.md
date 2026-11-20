@@ -6,10 +6,10 @@ The Recoil project has strict rules for AI usage:
   the tool you used (e.g. Claude Code, Cursor, Amp) along with
   the extent that the work was AI-assisted.
 
-- **Pull requests created in any way by AI can only be for accepted issues.**
-  Drive-by pull requests that do not reference an accepted issue will be
+- **Pull requests created in any way by AI can only be for open issues.**
+  Drive-by pull requests that do not reference an open issue will be
   closed. If AI isn't disclosed but a maintainer suspects its use, the
-  PR will be closed. If you want to share code for a non-accepted issue,
+  PR will be closed. If you want to share code for something not covered,
   open a discussion or attach it to an existing discussion.
 
 - **Pull requests created by AI must have been fully verified with
