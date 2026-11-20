@@ -382,12 +382,9 @@ bool CWeapon::CheckAimingAngle() const
 
 bool CWeapon::CanCallAimingScript(bool validAngle) const {
 	RECOIL_DETAILED_TRACY_ZONE;
-	constexpr float maxAimOffset = 0.93969262078590838405410927732473; // math::cos(20.0f * math::DEG_TO_RAD);
-
 	bool ret = (gs->frameNum >= (lastAimedFrame + reaimTime));
 
 	ret |= (wantedDir.dot(lastRequestedDir) <= weaponDef->maxFireAngle);
-	ret |= (wantedDir.dot(lastRequestedDir) <= maxAimOffset);
 
 	// NOTE: angleGood checks unit/maindir, not the weapon's current dir
 	// ret |= (!validAngle);
