@@ -29,6 +29,7 @@ public:
 	CCannon(CUnit* owner = nullptr, const WeaponDef* def = nullptr): CWeapon(owner, def) {}
 
 	void Init() override final;
+	void UpdateMapGravity();
 	void UpdateRange(const float val) override final;
 	void UpdateWantedDir() override final { wantedDir = GetWantedDir(currentTargetPos - aimFromPos); }
 	void SlowUpdate() override final;

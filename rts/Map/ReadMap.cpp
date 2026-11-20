@@ -186,6 +186,8 @@ CReadMap* CReadMap::LoadMap(const std::string& mapName)
 void CReadMap::Serialize(creg::ISerializer* s)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	float *mapGravity = const_cast<float *>(&mapInfo->map.gravity);
+	s->Serialize(mapGravity, sizeof(*mapGravity));
 	SerializeMapChangesBeforeMatch(s);
 	SerializeMapChangesDuringMatch(s);
 	SerializeTypeMap(s);

@@ -106,7 +106,7 @@ public:
 
 	float GetAccRate() const { return accRate; }
 	float GetDecRate() const { return decRate; }
-	float GetMyGravity() const { return myGravity; }
+	float GetMyGravity() const;
 	float GetOwnerRadius() const { return ownerRadius; }
 
 	float GetMaxReverseSpeed() const { return maxReverseSpeed; }
@@ -186,23 +186,23 @@ private:
 		int curThread
 	);
 
-    void HandleUnitCollisions(
-        CUnit *collider,
-        const float3 &colliderParams,
-        const UnitDef *colliderUD,
-        const MoveDef *colliderMD,
-        int curThread);
-    float3 CalculatePushVector(const float3 &colliderParams, const float2 &collideeParams, const bool allowUCO, const float4 &separationVect, CUnit *collider, CUnit *collidee);
-    void HandleFeatureCollisions(
-        CUnit *collider,
-        const float3 &colliderParams,
-        const UnitDef *colliderUD,
-        const MoveDef *colliderMD,
-        int curThread);
+	void HandleUnitCollisions(
+	    CUnit *collider,
+	    const float3 &colliderParams,
+	    const UnitDef *colliderUD,
+	    const MoveDef *colliderMD,
+	    int curThread);
+	float3 CalculatePushVector(const float3 &colliderParams, const float2 &collideeParams, const bool allowUCO, const float4 &separationVect, CUnit *collider, CUnit *collidee);
+	void HandleFeatureCollisions(
+	    CUnit *collider,
+	    const float3 &colliderParams,
+	    const UnitDef *colliderUD,
+	    const MoveDef *colliderMD,
+	    int curThread);
 
 public:
-    void SetMainHeading();
-    void ChangeSpeed(float, bool, bool = false);
+	void SetMainHeading();
+	void ChangeSpeed(float, bool, bool = false);
 	void ChangeHeading(short newHeading);
 private:
 	void UpdateSkid();
@@ -245,6 +245,7 @@ private:
 	float accRate = 0.01f;
 	float decRate = 0.01f;
 	float myGravity = 0.0f;
+	bool useMapGravity = true;
 
 	float maxReverseDist = 0.0f;
 	float minReverseAngle = 0.0f;

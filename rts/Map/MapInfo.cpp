@@ -28,7 +28,8 @@
 // Before delete, the const is const_cast'ed away. There are
 // no (other) situations where mapInfo may be modified, except
 //   LuaUnsyncedCtrl may change water
-//   LuaSyncedCtrl may change terrainTypes
+//   LuaSyncedCtrl may change terrainTypes and map.gravity
+//   CReadMap may restore map.gravity when loading a saved game
 const CMapInfo* mapInfo = nullptr;
 
 

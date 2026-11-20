@@ -38,6 +38,18 @@ void CCannon::Init()
 	CWeapon::Init();
 }
 
+void CCannon::UpdateMapGravity()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (weaponDef->myGravity != 0.0f || gravity == mapInfo->map.gravity)
+		return;
+
+	gravity = mapInfo->map.gravity;
+	heightBoostFactor = weaponDef->heightBoostFactor;
+	UpdateRange(range);
+	lastLaunchDir = CalcWantedDir(lastTargetVec);
+}
+
 void CCannon::UpdateRange(const float val)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
