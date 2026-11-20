@@ -200,6 +200,25 @@ void CSoundSource::Stop()
 	CheckError("CSoundSource::Stop");
 }
 
+bool CSoundSource::StopItem(size_t itemID, const IAudioChannel* channel)
+{
+	const bool stopAsync = (asyncPlayItem.id == itemID) && (channel == nullptr || asyncPlayItem.channel == channel);
+	const bool stopCur = (curPlayingItem.id == itemID) && (channel == nullptr || curChannel == channel);
+
+	if (stopAsync) {
+		// curChannel still lists this source for what it plays now
+		if (asyncPlayItem.channel != curChannel)
+			asyncPlayItem.channel->SoundSourceFinished(this);
+
+		asyncPlayItem = AsyncSoundItemData();
+	}
+
+	if (stopCur)
+		Stop();
+
+	return (stopAsync || stopCur);
+}
+
 void CSoundSource::Play(IAudioChannel* channel, SoundItem* item, float3 pos, float3 velocity, float volume, bool relative)
 {
 	assert(!curStream);

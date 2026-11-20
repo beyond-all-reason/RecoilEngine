@@ -42,6 +42,7 @@ public:
 	int GetCurrentPriority() const;
 	bool IsPlaying(const bool checkOpenAl = false) const;
 	void Stop();
+	bool StopItem(size_t itemID, const IAudioChannel* channel);
 
 	/// will stop a currently playing sound, if any
 	void Play(IAudioChannel* channel, SoundItem* item, float3 pos, float3 velocity, float volume, bool relative = false);
