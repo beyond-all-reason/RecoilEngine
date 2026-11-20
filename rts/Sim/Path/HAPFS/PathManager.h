@@ -31,7 +31,7 @@ class CPathFinder;
 class CPathManager: public IPathManager {
 public:
 	struct MultiPath {
-		MultiPath(): moveDef(nullptr), caller(nullptr) {}
+		MultiPath(): searchResult(IPath::Error), moveDef(nullptr), caller(nullptr) {}
 		MultiPath(const MoveDef* moveDef, const float3& startPos, const float3& goalPos, float goalRadius)
 			: searchResult(IPath::Error)
 			, start(startPos)
