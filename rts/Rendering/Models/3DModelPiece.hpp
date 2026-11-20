@@ -105,6 +105,8 @@ public:
 	S3DModelPiece* parent = nullptr;
 	CollisionVolume colvol;
 
+	uint32_t rank = 0;
+
 	// bind-pose transform, including baked rots
 	Transform bposeTransform;
 
