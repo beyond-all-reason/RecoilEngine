@@ -1484,12 +1484,13 @@ void CCommandAI::ExecuteAttack(Command& c)
 
 	if (inCommand == CMD_ATTACK) {
 		if (targetDied || (c.GetNumParams() == 1 && UpdateTargetLostTimer(int(c.GetParam(0))) == 0)) {
-			FinishCommand();
+			// Lost sensor contact can recover; a dead target cannot.
+			FinishCommand(targetDied);
 			return;
 		}
 		if (SkipCrashingTarget(orderTarget)) {
 			owner->DropCurrentAttackTarget();
-			FinishCommand();
+			FinishCommand(true);
 			return;
 		}
 		if (!(c.GetOpts() & ALT_KEY) && SkipParalyzeTarget(orderTarget)) {
@@ -1501,11 +1502,11 @@ void CCommandAI::ExecuteAttack(Command& c)
 			CUnit* targetUnit = unitHandler.GetUnit(c.GetParam(0));
 
 			if (targetUnit == nullptr) {
-				FinishCommand();
+				FinishCommand(true);
 				return;
 			}
 			if (targetUnit == owner) {
-				FinishCommand();
+				FinishCommand(true);
 				return;
 			}
 			if (targetUnit->GetTransporter() != nullptr && !modInfo.targetableTransportedUnits) {
@@ -1513,7 +1514,7 @@ void CCommandAI::ExecuteAttack(Command& c)
 				return;
 			}
 			if (SkipCrashingTarget(targetUnit)) {
-				FinishCommand();
+				FinishCommand(true);
 				return;
 			}
 
@@ -1656,17 +1657,16 @@ void CCommandAI::DependentDied(CObject* o)
 
 
 
-void CCommandAI::FinishCommand()
+void CCommandAI::FinishCommand(bool dontRepeat)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(!commandQue.empty());
 
 	const Command cmd = commandQue.front(); // copy is needed here
 
-	const bool dontRepeat = (cmd.IsInternalOrder());
 	const bool pushCommand = (cmd.GetID() != CMD_STOP && cmd.GetID() != CMD_PATROL);
 
-	if (repeatOrders && !dontRepeat && pushCommand)
+	if (repeatOrders && !dontRepeat && !cmd.IsInternalOrder() && pushCommand)
 		commandQue.push_back(cmd);
 
 	commandQue.pop_front();
