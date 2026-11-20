@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _LINE_DRAWER_H
-#define _LINE_DRAWER_H
+#pragma once
 
 #include <vector>
 #include <array>
@@ -19,7 +18,7 @@ class CLineDrawer {
 		void SetupLineStipple();
 		void UpdateLineStipple();
 		               
-		void StartPath(const float3& pos, const float* color);
+		void StartPath(const float3& pos, const float* color, bool drawStart = true);
 		void FinishPath() const;
 		void DrawLine(const float3& endPos, const float* color);
 		void DrawLineAndIcon(int cmdID, const float3& endPos, const float* color);
@@ -34,6 +33,7 @@ class CLineDrawer {
 		void DrawAll();
 
 	private:
+		bool skipFirstSegment = false;
 		bool lineStipple;
 		bool useColorRestarts;
 		bool useRestartColor;
@@ -130,8 +130,9 @@ inline void CLineDrawer::RestartSameColor()
 }
 
 
-inline void CLineDrawer::StartPath(const float3& pos, const float* color)
+inline void CLineDrawer::StartPath(const float3& pos, const float* color, bool drawStart)
 {
+	skipFirstSegment = !drawStart;
 	lastPos = pos;
 	lastColor = color;
 	Restart();
@@ -140,6 +141,13 @@ inline void CLineDrawer::StartPath(const float3& pos, const float* color)
 
 inline void CLineDrawer::DrawLine(const float3& endPos, const float* color)
 {
+	if (skipFirstSegment) {
+		skipFirstSegment = false;
+		Break(endPos, color);
+		Restart();
+		return;
+	}
+
 	LinePair *ptr;
 	if (lineStipple) {
 		ptr = &stippled.back();
@@ -198,6 +206,3 @@ inline void CLineDrawer::DrawIconAtLastPos(int cmdID)
 {
 	cursorIcons.AddIcon(cmdID, lastPos);
 }
-
-
-#endif // _LINE_DRAWER_H
