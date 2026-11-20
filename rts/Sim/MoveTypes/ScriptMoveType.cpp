@@ -73,8 +73,9 @@ CScriptMoveType::~CScriptMoveType()
 	RECOIL_DETAILED_TRACY_ZONE;
 	// clean up if noBlocking was made true at
 	// some point during this script's lifetime
-	// and not reset
-	owner->UnBlock();
+	// and not reset; the previous movetype does
+	// not re-block a unit that is standing still
+	owner->Block();
 
 	Sim::registry.remove<GeneralMoveType>(owner->entityReference);
 }
