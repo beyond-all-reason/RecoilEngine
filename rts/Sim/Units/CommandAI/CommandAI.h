@@ -138,7 +138,7 @@ protected:
 	virtual bool SelectNewAreaAttackTargetOrPos(const Command& ac) { return true; }
 
 	bool IsAttackCapable() const;
-	bool SkipCrashingTarget(const CUnit* target) const;
+	bool SkipTarget(const CUnit* target) const;
 	bool SkipParalyzeTarget(const CUnit* target) const;
 
 	void GiveAllowedCommand(const Command& c, bool fromSynced = true);
