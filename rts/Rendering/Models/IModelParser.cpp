@@ -447,6 +447,7 @@ void CModelLoader::PostProcessGeometry(S3DModel* model)
 	for (size_t i = 0; i < model->pieceObjects.size(); ++i) {
 		auto* p = model->pieceObjects[i];
 		p->PostProcessGeometry(static_cast<uint32_t>(i));
+		p->BuildCollisionVerts();
 		p->CreateShatterPieces();
 	}
 	{

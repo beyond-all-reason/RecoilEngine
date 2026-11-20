@@ -234,6 +234,7 @@ void CUnit::PreInit(const UnitLoadParams& params)
 
 
 	localModel.SetModel(model = unitDef->LoadModel());
+	ApplyPolygonPieceVolumes();
 
 	collisionVolume = unitDef->collisionVolume;
 	selectionVolume = unitDef->selectionVolume;
