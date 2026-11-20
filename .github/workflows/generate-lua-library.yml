@@ -18,6 +18,15 @@ jobs:
     name: Regenerate library
     runs-on: ubuntu-latest
     steps:
+      - name: Validate library repository
+        env:
+          LIBRARY_REPOSITORY: ${{ vars.RECOIL_LUA_LIBRARY_RESPOSITORY }}
+        run: |
+          if [ -z "$LIBRARY_REPOSITORY" ]; then
+            echo "::error::Set RECOIL_LUA_LIBRARY_RESPOSITORY to the library repository."
+            exit 1
+          fi
+
       - name: Configure git
         run: |
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
