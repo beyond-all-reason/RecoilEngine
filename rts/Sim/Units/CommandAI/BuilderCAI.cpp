@@ -591,6 +591,11 @@ void CBuilderCAI::FinishCommand()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	buildRetries = 0;
+	// FinishCommand can immediately start the next command, so stop reclaiming
+	// before delegating. Preserve other builder tasks when no reclaim is active.
+	if (ownerBuilder->curReclaim != nullptr)
+		ownerBuilder->StopBuild();
+
 	CMobileCAI::FinishCommand();
 }
 
