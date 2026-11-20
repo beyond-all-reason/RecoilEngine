@@ -136,15 +136,7 @@ void CPreGame::LoadSaveFile(const std::string& save)
 	LOG_L(L_ERROR, "[PreGame::%s] incompatible save-file specified", __func__);
 
 	spring::SafeDelete(saveFileHandler);
-
-	if (CLuaMenuController::ActivateInstance("[PreGame] incompatible save-file")) {
-		assert(pregame == this);
-		spring::SafeDelete(pregame);
-		return;
-	}
-
-	spring::exitCode = spring::EXIT_CODE_BADSAVE;
-	gu->globalQuit = true;
+	loadSaveFileFailed = true;
 }
 
 int CPreGame::KeyPressed(int keyCode, int scanCode, bool isRepeat)
@@ -348,6 +340,19 @@ void CPreGame::UpdateClientNet()
 
 	if (HasPendingAsyncTask())
 		return;
+
+	// The async loader cannot destroy the object owning its future.
+	if (loadSaveFileFailed) {
+		if (CLuaMenuController::ActivateInstance("[PreGame] incompatible save-file")) {
+			assert(pregame == this);
+			spring::SafeDelete(pregame);
+			return;
+		}
+
+		spring::exitCode = spring::EXIT_CODE_BADSAVE;
+		gu->globalQuit = true;
+		return;
+	}
 
 	clientNet->Update();
 

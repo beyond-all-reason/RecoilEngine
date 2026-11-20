@@ -86,6 +86,7 @@ private:
 	spring_time connectTimer;
 
 	bool wantDemo;
+	bool loadSaveFileFailed = false;
 };
 
 extern CPreGame* pregame;
