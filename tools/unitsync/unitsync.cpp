@@ -2266,8 +2266,11 @@ const char* GetStr(const std::string& str)
 
 EXPORT(void) SetSpringConfigFile(const char* fileNameAsAbsolutePath)
 {
-	dataDirLocater.UpdateIsolationModeByEnvVar();
-	FileSystemInitializer::PreInitializeConfigHandler(fileNameAsAbsolutePath);
+	try {
+		dataDirLocater.UpdateIsolationModeByEnvVar();
+		FileSystemInitializer::PreInitializeConfigHandler(fileNameAsAbsolutePath);
+	}
+	UNITSYNC_CATCH_BLOCKS;
 }
 
 static void CheckConfigHandler()
