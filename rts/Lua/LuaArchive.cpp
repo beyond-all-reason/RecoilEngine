@@ -9,6 +9,7 @@
 #include "ExternalAI/LuaAIImplHandler.h"
 #include "ExternalAI/AILibraryManager.h"
 #include "ExternalAI/Interface/SSkirmishAILibrary.h"
+#include "System/Exceptions.h"
 #include "System/FileSystem/ArchiveScanner.h"
 #include "System/FileSystem/RapidHandler.h"
 #include "System/FileSystem/VFSHandler.h"
@@ -337,8 +338,15 @@ int LuaArchive::GetAvailableAIs(lua_State* L)
 	// in case either archive is already stashed
 	// (from a previous reload) this will simply
 	// repopulate files
-	if (!gameArchiveName.empty())
-		vfsHandler->AddArchive(gameArchiveName, false);
+	// add the game's dependencies too, as a game load does: a mutator
+	// can get its LuaAI.lua from the game it depends on
+	if (!gameArchiveName.empty()) {
+		try {
+			vfsHandler->AddArchiveWithDeps(gameArchiveName, false);
+		} catch (const content_error& e) {
+			LOG_L(L_WARNING, "[LuaArchive::%s] %s", __func__, e.what());
+		}
+	}
 
 	if (!mapArchiveName.empty())
 		vfsHandler->AddArchive(mapArchiveName, false);
