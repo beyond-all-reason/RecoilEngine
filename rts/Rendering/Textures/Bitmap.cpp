@@ -220,12 +220,7 @@ public:
 			freeList.reserve(32);
 			freeList.emplace_back(0, size);
 
-			const size_t oldSize = Size();
-			memArray = std::span(
-				reinterpret_cast<uint8_t*>(recoil::aligned_realloc(memArray.data(), oldSize, size, 64)),
-				size
-			);
-			std::fill(memArray.begin() + oldSize, memArray.end(), 0);
+			memArray = std::span(reinterpret_cast<uint8_t*>(recoil::aligned_zalloc(64, size)), size);
 		} else {
 			assert(size > Size());
 
