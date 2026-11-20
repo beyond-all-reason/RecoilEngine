@@ -1,5 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+/*** @env synced, unsynced */
+
 #include <string>
 #include <vector>
 #include <cctype>
@@ -39,6 +41,10 @@ static int CustomParamsTable(lua_State* L, const void* data);
 /******************************************************************************/
 /******************************************************************************/
 
+/***
+ * Feature definitions by id, each a table of the def's fields.
+ * @global FeatureDefs table<FeatureDefID, table>
+ */
 bool LuaFeatureDefs::PushEntries(lua_State* L)
 {
 	InitParamMap();

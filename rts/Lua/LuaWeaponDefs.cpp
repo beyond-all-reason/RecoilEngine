@@ -1,5 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+/*** @env synced, unsynced */
+
 #include <string>
 #include <vector>
 #include <cctype>
@@ -54,6 +56,10 @@ static int GuiSoundSetTable(lua_State* L, const void* data);
 /******************************************************************************/
 /******************************************************************************/
 
+/***
+ * Weapon definitions by id, each a table of the def's fields.
+ * @global WeaponDefs table<WeaponDefID, table>
+ */
 bool LuaWeaponDefs::PushEntries(lua_State* L)
 {
 	InitParamMap();

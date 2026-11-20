@@ -1,0 +1,6 @@
+---@meta
+
+---What both Lua handles offer: the view a file that runs in any handle holds.
+---@class Recoil.Shared
+local Spring = {}
+

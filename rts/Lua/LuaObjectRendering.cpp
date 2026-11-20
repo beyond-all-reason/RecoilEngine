@@ -1,5 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+/*** @env unsynced */
+
 
 /***
 Object rendering API — controls LOD, materials, and custom draw for units/features.
