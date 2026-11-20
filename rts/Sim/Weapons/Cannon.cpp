@@ -146,8 +146,10 @@ void CCannon::FireImpl(const bool scriptCall)
 void CCannon::SlowUpdate()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (weaponDef->highTrajectory == 2 && owner->useHighTrajectory != highTrajectory)
+	if (weaponDef->highTrajectory == 2 && owner->useHighTrajectory != highTrajectory) {
 		highTrajectory = owner->useHighTrajectory;
+		lastLaunchDir = CalcWantedDir(lastTargetVec);
+	}
 
 	CWeapon::SlowUpdate();
 }
