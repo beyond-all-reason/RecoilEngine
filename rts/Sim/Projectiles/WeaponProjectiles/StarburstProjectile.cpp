@@ -53,9 +53,10 @@ CR_REG_METADATA(CStarburstProjectile, (
 
 	CR_MEMBER(ignoreError),
 	CR_MEMBER(turnToTarget),
+	CR_MEMBER(leaveSmokeTrail),
 
 	CR_MEMBER(tracerParts),
-	CR_MEMBER(smokeTrail)
+	CR_IGNORED(smokeTrail)
 ))
 
 
