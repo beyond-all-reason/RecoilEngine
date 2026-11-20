@@ -15,6 +15,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <functional>
+#include <system_error>
 #include <nowide/cstdio.hpp>
 
 /******************************************************************************/
@@ -64,12 +65,15 @@ FileConfigSource::FileConfigSource(const string& filename)
 		Read(file);
 		fclose(file);
 	}
+	else if (errno != ENOENT) {
+		LOG_L(L_ERROR, "FileConfigSource: Error: Could not read config file \"%s\" (%s)", filename.c_str(), std::generic_category().message(errno).c_str());
+	}
 	else if ((file = nowide::fopen(filename.c_str(), "a"))) {
-		// TODO: write some initial contents into the config file?
+		LOG_L(L_INFO, "FileConfigSource: file \"%s\" did not exist, creating empty", filename.c_str());
 		fclose(file);
 	}
 	else {
-		LOG_L(L_ERROR, "FileConfigSource: Error: Could not write to config file \"%s\"", filename.c_str());
+		LOG_L(L_ERROR, "FileConfigSource: file \"%s\" did not exist during a read attempt, tried to create a default but failed (%s)", filename.c_str(), std::generic_category().message(errno).c_str());
 	}
 }
 
@@ -107,9 +111,11 @@ void FileConfigSource::ReadModifyWrite(std::function<void ()> modify) {
 		if (!ferror(file))
 			Write(file);
 		else
-			LOG_L(L_ERROR, "FileConfigSource: Error: Could not read config file \"%s\" (%s), not writing it", filename.c_str(), strerror(readErrno));
+			LOG_L(L_ERROR, "FileConfigSource: Error: Could not read config file \"%s\" (%s), not writing it", filename.c_str(), std::generic_category().message(readErrno).c_str());
 	}
 	else {
+		LOG_L(L_ERROR, "FileConfigSource: Error: Could not write config file \"%s\" (%s)", filename.c_str(), std::generic_category().message(errno).c_str());
+		// TODO: consider not losing the config, e.g. at least dump it to infolog so the user can save it manually?
 		modify();
 	}
 
