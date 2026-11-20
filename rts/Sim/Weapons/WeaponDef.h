@@ -3,6 +3,8 @@
 #ifndef _WEAPON_DEF_H
 #define _WEAPON_DEF_H
 
+#include <memory>
+
 #include "Sim/Misc/DamageArray.h"
 #include "Sim/Misc/GuiSoundSet.h"
 #include "Sim/Projectiles/WeaponProjectiles/WeaponProjectileTypes.h"
@@ -10,6 +12,7 @@
 #include "System/UnorderedMap.hpp"
 #include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Misc/Resource.h"
+#include "Sim/Weapons/TrajectoryTable.h"
 
 struct AtlasedTexture;
 class CColorMap;
@@ -156,6 +159,7 @@ public:
 	float wobble;                    ///< how much the missile will wobble around its course
 	float dance;                     ///< how much the missile will dance
 	float trajectoryHeight;          ///< how high trajectory missiles will try to fly in
+	std::unique_ptr<const TrajectoryTable> trajectoryTable; ///< trajectories of trajectoryHeight missiles; null otherwise
 
 	bool largeBeamLaser;             // whether a BeamLaser should spawn LargeBeamLaserProjectile's or regular ones
 	bool laserHardStop;              // whether the shot should fade out or stop and contract at max-range (applies to LaserCannons only)
