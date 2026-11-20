@@ -35,7 +35,7 @@ function socket.bind(host, port, backlog)
     return sock
 end
 
-try = socket.newtry()
+socket.try = socket.newtry()
 
 function socket.choose(table)
     return function(name, opt1, opt2)
@@ -52,12 +52,12 @@ end
 -- Socket sources and sinks, conforming to LTN12
 -----------------------------------------------------------------------------
 -- create namespaces inside LuaSocket namespace
-sourcet = {}
-sinkt = {}
+socket.sourcet = {}
+socket.sinkt = {}
 
-BLOCKSIZE = 2048
+socket.BLOCKSIZE = 2048
 
-sinkt["close-when-done"] = function(sock)
+socket.sinkt["close-when-done"] = function(sock)
     return base.setmetatable({
         getfd = function() return sock:getfd() end,
         dirty = function() return sock:dirty() end
@@ -71,7 +71,7 @@ sinkt["close-when-done"] = function(sock)
     })
 end
 
-sinkt["keep-open"] = function(sock)
+socket.sinkt["keep-open"] = function(sock)
     return base.setmetatable({
         getfd = function() return sock:getfd() end,
         dirty = function() return sock:dirty() end
@@ -83,11 +83,11 @@ sinkt["keep-open"] = function(sock)
     })
 end
 
-sinkt["default"] = sinkt["keep-open"]
+socket.sinkt["default"] = socket.sinkt["keep-open"]
 
-sink = socket.choose(sinkt)
+socket.sink = socket.choose(socket.sinkt)
 
-sourcet["by-length"] = function(sock, length)
+socket.sourcet["by-length"] = function(sock, length)
     return base.setmetatable({
         getfd = function() return sock:getfd() end,
         dirty = function() return sock:dirty() end
@@ -103,7 +103,7 @@ sourcet["by-length"] = function(sock, length)
     })
 end
 
-sourcet["until-closed"] = function(sock)
+socket.sourcet["until-closed"] = function(sock)
     local done
     return base.setmetatable({
         getfd = function() return sock:getfd() end,
@@ -123,8 +123,8 @@ sourcet["until-closed"] = function(sock)
 end
 
 
-sourcet["default"] = sourcet["until-closed"]
+socket.sourcet["default"] = socket.sourcet["until-closed"]
 
-source = socket.choose(sourcet)
+socket.source = socket.choose(socket.sourcet)
 
 
