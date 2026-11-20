@@ -37,7 +37,6 @@ CR_REG_METADATA(AMoveType, (
 	CR_MEMBER(maneuverLeash),
 	CR_MEMBER(waterline),
 
-	CR_MEMBER(useHeading),
 	CR_MEMBER(useWantedSpeed)
 ))
 
