@@ -68,6 +68,14 @@ def read_header(f):
     return {"mode": mode, "arch": arch, "version": version, "count": count}
 
 
+def validate_record_extent(f, header):
+    """Reject files whose record data does not match the header's count."""
+    record_bytes = os.fstat(f.fileno()).st_size - f.tell()
+    expected_bytes = header["count"] * 13
+    if record_bytes != expected_bytes:
+        raise ValueError(f"{f.name}: record data has {record_bytes:,} bytes, expected {expected_bytes:,} for {header['count']:,} records")
+
+
 def read_record(f):
     """Read one binary record. Returns (test_id, prec, result_bits) or None at EOF."""
     data = f.read(13)
@@ -83,6 +91,7 @@ def compute_hash(path):
     """Compute FNV-1a hash of all records in a binary file (matches C++ output)."""
     with open(path, "rb") as f:
         header = read_header(f)
+        validate_record_extent(f, header)
         h = fnv1a_init()
         count = 0
         while True:
@@ -182,6 +191,8 @@ def stream_compare(ref_path, test_path):
     with open(ref_path, "rb") as ref_f, open(test_path, "rb") as test_f:
         ref_header = read_header(ref_f)
         test_header = read_header(test_f)
+        validate_record_extent(ref_f, ref_header)
+        validate_record_extent(test_f, test_header)
 
         print(f"Reference: {ref_header['mode']} on {ref_header['arch']} ({ref_header['count']:,} tests)")
         print(f"Test:      {test_header['mode']} on {test_header['arch']} ({test_header['count']:,} tests)")
@@ -191,11 +202,11 @@ def stream_compare(ref_path, test_path):
         test_count = test_header["count"]
 
         if ref_count != test_count:
-            print(f"WARNING: Different test counts (ref={ref_count:,}, test={test_count:,})")
-            print(f"         Comparing first {min(ref_count, test_count):,} records")
-            print()
+            print(f"ERROR: Different test counts (ref={ref_count:,}, test={test_count:,})")
+            print("       Files must be generated with the same -n parameter")
+            return 1
 
-        compare_count = min(ref_count, test_count)
+        compare_count = ref_count
         large_file = compare_count > 100_000
 
         matching = 0
@@ -216,10 +227,6 @@ def stream_compare(ref_path, test_path):
         for i in range(compare_count):
             ref_rec = read_record(ref_f)
             test_rec = read_record(test_f)
-
-            if ref_rec is None or test_rec is None:
-                print(f"WARNING: Unexpected EOF at record {i:,}")
-                break
 
             ref_id, ref_prec, ref_bits = ref_rec
             test_id, test_prec, test_bits = test_rec
@@ -390,4 +397,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (OSError, ValueError, struct.error) as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        sys.exit(1)
