@@ -83,7 +83,13 @@ public:
 		return dist;
 	}
 
-	static float CalcScriptMoveRate(float speed, float maxSpeed, float nsteps) { return std::clamp(math::floor((speed / maxSpeed) * nsteps), 0.0f, nsteps - 1.0f); }
+	static float CalcScriptMoveRate(float speed, float maxSpeed, float nsteps) {
+		// maxSpeed is 0 for units with UnitDef speed 0; any movement is above it
+		if (maxSpeed <= 0.0f)
+			return ((speed > 0.0f)? nsteps - 1.0f: 0.0f);
+
+		return std::clamp(math::floor((speed / maxSpeed) * nsteps), 0.0f, nsteps - 1.0f);
+	}
 	float CalcStaticTurnRadius() const;
 
 	virtual void SyncWaypoints() {}
