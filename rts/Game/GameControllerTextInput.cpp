@@ -221,6 +221,24 @@ bool GameControllerTextInput::HandleChatCommand(const std::string& command) {
 }
 
 
+static bool IsWordChar(unsigned char c) {
+	return (c >= 0x80 || isalnum(c));
+}
+
+static int PrevWordPos(const std::string& s, int p) {
+	while ((p > 0) && !IsWordChar(s[p - 1])) { p--; }
+	while ((p > 0) &&  IsWordChar(s[p - 1])) { p--; }
+	return p;
+}
+
+static int NextWordPos(const std::string& s, int p) {
+	const int len = s.length();
+	while ((p < len) && !IsWordChar(s[p])) { p++; }
+	while ((p < len) &&  IsWordChar(s[p])) { p++; }
+	return p;
+}
+
+
 // can only be called by CGame (via ConsumePressedKey)
 bool GameControllerTextInput::HandleEditCommand(const std::string& command) {
 	switch (hashString(command.c_str())) {
@@ -303,6 +321,18 @@ bool GameControllerTextInput::HandleEditCommand(const std::string& command) {
 			return true;
 		} break;
 
+		case hashString("edit_backspace_word"): {
+			const int prev = PrevWordPos(userInput, writingPos);
+			userInput.erase(prev, writingPos - prev);
+			writingPos = prev;
+			return true;
+		} break;
+
+		case hashString("edit_delete_word"): {
+			userInput.erase(writingPos, NextWordPos(userInput, writingPos) - writingPos);
+			return true;
+		} break;
+
 
 		case hashString("edit_home"): {
 			writingPos = 0;
@@ -327,24 +357,12 @@ bool GameControllerTextInput::HandleEditCommand(const std::string& command) {
 
 
 		case hashString("edit_prev_word"): {
-			//TODO: does not seem to work correctly with utf-8
-			// prev word
-			const char* s = userInput.c_str();
-			int p = writingPos;
-			while ((p > 0) && !isalnum(s[p - 1])) { p--; }
-			while ((p > 0) &&  isalnum(s[p - 1])) { p--; }
-			writingPos = p;
+			writingPos = PrevWordPos(userInput, writingPos);
 			return true;
 		} break;
 
 		case hashString("edit_next_word"): {
-			// TODO: does not seem to work correctly with utf-8
-			const size_t len = userInput.length();
-			const char* s = userInput.c_str();
-			size_t p = writingPos;
-			while ((p < len) && !isalnum(s[p])) { p++; }
-			while ((p < len) &&  isalnum(s[p])) { p++; }
-			writingPos = p;
+			writingPos = NextWordPos(userInput, writingPos);
 			return true;
 		} break;
 
