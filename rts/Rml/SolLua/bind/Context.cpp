@@ -400,7 +400,7 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 		"CreateDocument", [slp](Rml::Context& self) {
 			auto doc = self.CreateDocument();
 			slp->AddDocumentTracking(doc);
-			return doc;
+			return dynamic_cast<SolLuaDocument*>(doc);
 		},
 		/***
 		 * Attempts to load a document from the RML file found at document_path. If successful, the document will be returned with a reference count of one.
