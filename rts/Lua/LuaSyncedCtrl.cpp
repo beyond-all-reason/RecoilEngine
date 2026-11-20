@@ -112,6 +112,10 @@ namespace Impl {
 		if (lmp->SetPieceSpaceMatrix(mat))
 			lmp->SetDirty();
 
+		// Piece-tree collision rejects rays against this box before testing pieces.
+		// Features have no unit slow-update pass to refresh it later.
+		so->localModel.UpdateBoundingVolume();
+
 		lua_pushboolean(L, lmp->blockScriptAnims);
 		return 1;
 	}
