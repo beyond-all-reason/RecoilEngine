@@ -55,7 +55,7 @@ namespace RmlGui
 	class ElementLuaTexture : public Rml::Element
 	{
 	public:
-		RMLUI_RTTI_DefineWithParent(ElementLuaTexture, Element)
+		RMLUI_RTTI_DeclareWithParent(ElementLuaTexture, Element)
 
 		/// Constructs a new ElementLuaTexture. This should not be called directly; use the Factory instead.
 		/// @param[in] tag The tag the element was declared as in RML.
