@@ -289,11 +289,15 @@ bool CUnitScript::TickAnimFinished()
 	ZoneScoped;
 
 	// Tell listeners to unblock, and remove finished animations from the unit/script.
-	for (const auto& ai : doneAnims)
-		AnimFinished(ai.animType, ai.piece, ai.axis);
+	for (auto& ai : doneAnims) {
+		if (!ai.hasWaiting)
+			continue;
 
-	// don't clear doneAnims for the purpose of capturing them in DumpState
-	//doneAnims.clear();
+		ai.hasWaiting = false;
+		AnimFinished(ai.animType, ai.piece, ai.axis);
+	}
+
+	// Keep consumed completion records for DumpState.
 
 	return HaveAnimations();
 }
