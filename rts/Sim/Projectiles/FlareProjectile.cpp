@@ -119,9 +119,9 @@ void CFlareProjectile::Draw()
 	const     float alpha = std::max(0.0f, 1.0f - (gs->frameNum - activateFrame) * alphaFalloff);
 
 	unsigned char col[4];
-	col[0] = (unsigned char) (alpha * 1.0f) * 255;
-	col[1] = (unsigned char) (alpha * 0.5f) * 255;
-	col[2] = (unsigned char) (alpha * 0.2f) * 255;
+	col[0] = (unsigned char) (alpha * 1.0f * 255);
+	col[1] = (unsigned char) (alpha * 0.5f * 255);
+	col[2] = (unsigned char) (alpha * 0.2f * 255);
 	col[3] = 1;
 
 	//! CAUTION: loop count must match EnlargeArrays above
