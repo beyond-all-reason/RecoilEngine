@@ -2863,8 +2863,8 @@ void CGroundMoveType::HandleUnitCollisions(
 		float separationDist = 0.f;
 		if (!isCollision && collideeMobile) {
 			const bool useCollideeSeparationDistance = !( collidee->moveType->IsPushResistant() && collidee->moveType->IsPushResitanceBlockActive() );
-			const float collideeSeparationDist = (useCollideeSeparationDistance) ? colliderUD->separationDistance : 0.f;
-			separationDist = std::max(colliderSeparationDist, collideeUD->separationDistance);
+			const float collideeSeparationDist = (useCollideeSeparationDistance) ? collideeUD->separationDistance : 0.f;
+			separationDist = std::max(colliderSeparationDist, collideeSeparationDist);
 			const float separation = colliderParams.y + collideeParams.y + separationDist; 
 			const bool isSeparation = static_cast<float3>(separationVect).SqLength2D() <= Square(separation);
 			if (!isSeparation)
