@@ -1724,6 +1724,13 @@ void CUnit::ChangeTeamReset()
 	}
 }
 
+bool CUnit::CanBeFiredAt() const
+{
+	return (!isDead || modInfo.fireAtKilled)
+		&& (!IsCrashing() || modInfo.fireAtCrashing);
+}
+
+
 void CUnit::SetNeutral(bool b) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// only intervene for units *becoming* neutral
@@ -1799,7 +1806,7 @@ bool CUnit::AttackUnit(CUnit* targetUnit, bool isUserTarget, bool wantManualFire
 
 	bool ret = false;
 	for (CWeapon* w: weapons) {
-		ret |= w->Attack(curTarget);
+		ret |= w->CanUseUnitTarget() ? w->Attack(curTarget) : w->TryTarget(curTarget);
 	}
 	return ret;
 }
@@ -1830,7 +1837,7 @@ void CUnit::DropCurrentAttackTarget()
 		DeleteDeathDependence(curTarget.unit, DEPENDENCE_TARGET);
 
 	for (CWeapon* w: weapons) {
-		if (w->GetCurrentTarget() == curTarget)
+		if (w->CanUseUnitTarget() && w->GetCurrentTarget() == curTarget)
 			w->DropCurrentTarget();
 	}
 
