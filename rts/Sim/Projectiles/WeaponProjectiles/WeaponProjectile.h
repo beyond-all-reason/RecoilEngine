@@ -80,6 +80,11 @@ protected:
 	void UpdateInterception();
 	virtual void UpdateGroundBounce();
 
+	// false once a guided projectile has left the area in which its launcher can control it
+	bool TestControlArea() const;
+	bool TestStaticControlArea() const;
+	bool TestDynamicControlArea() const;
+
 protected:
 	const WeaponDef* weaponDef;
 
