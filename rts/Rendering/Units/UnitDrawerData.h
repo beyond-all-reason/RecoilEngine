@@ -179,7 +179,8 @@ public:
 		return (it != liveGhostTransforms.end()) ? it->second.first.GetOffset(false) : TransformsMemStorage::INVALID_INDEX;
 	}
 
-	auto*       GetSavedData()       { return &savedData; }
+	// the caller may replace the ghost lists (savegame loading)
+	auto*       GetSavedData()       { liveGhostsChanged = true; return &savedData; }
 	const auto* GetSavedData() const { return &savedData; }
 protected:
 	void UpdateObjectDrawFlags(CSolidObject* o) const override;
@@ -226,6 +227,9 @@ private:
 	// maps unit -> { RAII-owned world transform slot, last sweep stamp seen }
 	spring::unordered_map<const CUnit*, std::pair<ScopedTransformMemAlloc, int>> liveGhostTransforms;
 	int liveGhostSweepStamp = 0;
+	// set whenever liveGhostBuildings change; with the allyTeam the slots were made for, lets UpdateLiveGhostTransforms skip unchanged frames
+	bool liveGhostsChanged = true;
+	int liveGhostsAllyTeam = -1;
 
 	// icons
 	bool useDistToGroundForIcons;
