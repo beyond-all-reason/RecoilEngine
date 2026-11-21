@@ -31,6 +31,7 @@
 #include "System/creg/DefTypes.h"
 #include "System/Sound/ISoundChannels.h"
 #include "System/Log/ILog.h"
+#include <limits>
 
 #include "System/Misc/TracyDefs.h"
 
@@ -1551,7 +1552,7 @@ float CWeapon::GetAccuratePredictedImpactTime(const float3& targetPos, const flo
 	float predictTime = GetPredictedImpactTime(targetPos);
 	const float gravity = mix(mapInfo->map.gravity, -weaponDef->myGravity, weaponDef->myGravity != 0.0f);
 
-	if (gravity < 0) {
+	if (gravity != 0.0f) {
 		// precise target leading
 		// newton iterations of the raw quartic are too unstable, due to impossible to intercept targets, 
 		// and existence of low and high trajectory solutions
@@ -1640,7 +1641,19 @@ float CWeapon::GetAccuratePredictedImpactTime(const float3& targetPos, const flo
 				break;
 			}
 			//f(t_n)
-			t1 = math::sqrt((-cc + highTrajectorySwitch * math::sqrt(temp2 - temp1)) / (0.5f * gg));
+			const float trajectoryNumerator = -cc + highTrajectorySwitch * math::sqrt(temp2 - temp1);
+      const float trajectoryDenominator = 0.5f * gg;
+
+      if (!(trajectoryNumerator > 0.0f) || !(trajectoryDenominator > 0.0f)) {
+        break;
+      }
+
+      if (trajectoryDenominator < 1.0f &&
+          trajectoryNumerator >= trajectoryDenominator * std::numeric_limits<float>::max()) {
+        break;
+      }
+
+      t1 = math::sqrt(trajectoryNumerator / trajectoryDenominator);
 
 			// secant approximation of df(t_n)
 			dt1 = (t1 - predictTime) / deltatime;

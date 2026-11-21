@@ -1170,7 +1170,7 @@ int LuaSyncedCtrl::GameOver(lua_State* L)
  * taken when the Lua state is initialized.
  *
  * @function Spring.SetMapGravity
- * @param gravity number Finite gravity in elmos per second squared, clamped to at least 0.001.
+ * @param gravity number Finite gravity in elmos per second squared. Positive values pull downward, negative values pull upward, and zero applies no map gravity.
  * @return nil
  */
 int LuaSyncedCtrl::SetMapGravity(lua_State* L)
@@ -1182,7 +1182,7 @@ int LuaSyncedCtrl::SetMapGravity(lua_State* L)
 	}
 
 	float *mapGravity = const_cast<float *>(&mapInfo->map.gravity);
-	*mapGravity = -std::max(0.001f, gravityStrength) / (GAME_SPEED * GAME_SPEED);
+  *mapGravity = -gravityStrength / (GAME_SPEED * GAME_SPEED);
 
 	for (CUnit *unit : unitHandler.GetActiveUnits()) {
 		for (CWeapon *weapon : unit->weapons) {

@@ -1,6 +1,8 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "Cannon.h"
+#include <cmath>
+#include <limits>
 #include "WeaponDef.h"
 #include "Game/TraceRay.h"
 #include "Map/Ground.h"
@@ -53,6 +55,11 @@ void CCannon::UpdateMapGravity()
 void CCannon::UpdateRange(const float val)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+  if (gravity == 0.0f) {
+		range = val;
+		rangeBoostFactor = 1.0f;
+		return;
+	}
 	// clamp so as to not extend range if projectile
 	// speed is too low to reach the *updated* range
 	// note: new range can be zero (!) making range
@@ -129,27 +136,85 @@ void CCannon::FireImpl(const bool scriptCall)
 	launchDir += (gsRNG.NextVector() * SprayAngleExperience() + SalvoErrorExperience());
 	launchDir.SafeNormalize();
 
-	int myTtl = 0;
-	const float sqSpeed2D = launchDir.SqLength2D() * projectileSpeed * projectileSpeed;
-	const int predict = math::ceil((sqSpeed2D == 0.0f) ?
-		(-2.0f * projectileSpeed * launchDir.y / gravity):
-		math::sqrt(targetVec.SqLength2D() / sqSpeed2D));
+	int projectileTimeToLive = ttl;
 
-	if (ttl > 0) {
-		myTtl = ttl;
-	} else if (weaponDef->selfExplode) {
-		myTtl = (predict + gsRNG.NextFloat() * 2.5f - 0.5f);
-	} else if ((weaponDef->groundBounce || weaponDef->waterBounce) && weaponDef->numBounce > 0) {
-		myTtl = (predict * (1 + weaponDef->numBounce * weaponDef->bounceRebound));
-	} else {
-		myTtl = predict * 2;
+	if (projectileTimeToLive <= 0) {
+		const auto getSafePredictionRatio = [](float numerator, float denominator) {
+			if (denominator <= 0.0f)
+				return 0.0f;
+
+			if (denominator < 1.0f &&
+				numerator >= denominator * std::numeric_limits<float>::max()) {
+				return std::numeric_limits<float>::infinity();
+			}
+
+			return numerator / denominator;
+		};
+
+		const float horizontalSpeedSquared = launchDir.SqLength2D() * projectileSpeed * projectileSpeed;
+
+		float flightTimePrediction = 0.0f;
+
+		if (horizontalSpeedSquared > 0.0f) {
+			flightTimePrediction = math::sqrt(
+				getSafePredictionRatio(targetVec.SqLength2D(), horizontalSpeedSquared)
+			);
+		} else if ((gravity < 0.0f && launchDir.y > 0.0f) ||
+			(gravity > 0.0f && launchDir.y < 0.0f)) {
+			flightTimePrediction = getSafePredictionRatio(
+				2.0f * projectileSpeed * math::fabs(launchDir.y),
+				math::fabs(gravity)
+			);
+		} else {
+			flightTimePrediction =
+				getSafePredictionRatio(targetVec.Length(), projectileSpeed);
+		}
+
+		const float predictedFlightFrames = math::ceil(flightTimePrediction);
+
+		float lifetimeMultiplier = 2.0f;
+		float lifetimeExtension = 0.0f;
+		float lifetimeReduction = 0.0f;
+
+		if (weaponDef->selfExplode) {
+			lifetimeMultiplier = 1.0f;
+			lifetimeExtension = gsRNG.NextFloat() * 2.5f;
+			lifetimeReduction = 0.5f;
+		} else if ((weaponDef->groundBounce || weaponDef->waterBounce) &&
+			weaponDef->numBounce > 0) {
+			lifetimeMultiplier =
+				1.0f + weaponDef->numBounce * weaponDef->bounceRebound;
+		}
+
+		const double maximumLifetimeFrames =
+			static_cast<double>(std::numeric_limits<int>::max());
+
+		double automaticLifetimeEstimate = 0.0;
+
+		if (lifetimeMultiplier != 0.0f) {
+			automaticLifetimeEstimate = static_cast<double>(predictedFlightFrames) * lifetimeMultiplier + lifetimeExtension - lifetimeReduction;
+
+			if (automaticLifetimeEstimate > 0.0 &&
+				automaticLifetimeEstimate < maximumLifetimeFrames) {
+				const float roundedAutomaticLifetime = predictedFlightFrames * lifetimeMultiplier + lifetimeExtension - lifetimeReduction;
+
+				automaticLifetimeEstimate = roundedAutomaticLifetime;
+			}
+		}
+
+		if (!(automaticLifetimeEstimate > 0.0))
+			automaticLifetimeEstimate = 1.0;
+
+		projectileTimeToLive = static_cast<int>(
+			std::clamp<double>(automaticLifetimeEstimate, 1.0, maximumLifetimeFrames)
+		);
 	}
 
 	ProjectileParams params = GetProjectileParams();
 	params.pos = weaponMuzzlePos;
 	params.end = currentTargetPos;
 	params.speed = launchDir * projectileSpeed;
-	params.ttl = myTtl;
+	params.ttl = projectileTimeToLive;
 	params.gravity = gravity;
 
 	WeaponProjectileFactory::LoadProjectile(params);
@@ -189,11 +254,16 @@ float3 CCannon::GetWantedDir(const float3& targetVec)
 float3 CCannon::CalcWantedDir(const float3& targetVec) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+  if (gravity == 0.0f) {
+		float3 launchDirection = targetVec;
+		launchDirection.SafeNormalize();
+		return launchDirection;
+	}
 	const float Dsq = targetVec.SqLength();
 	const float DFsq = targetVec.SqLength2D();
-	const float g = gravity;
+  const float g = -math::fabs(gravity);
 	const float v = projectileSpeed;
-	const float dy = targetVec.y;
+  const float dy = (gravity > 0.0f) ? -targetVec.y : targetVec.y;
 	const float dxz = math::sqrt(DFsq);
 
 	float Vxz = 0.0f;
@@ -209,11 +279,23 @@ float3 CCannon::CalcWantedDir(const float3& targetVec) const
 		if (Dsq < 1e12f && math::fabs(dy) < 1e6f) {
 			const float vsq = v * v;
 			const float root1 = vsq * vsq + 2.0f * vsq * g * dy - g * g * DFsq;
-			if (root1 >= 0.0f) {
-				const float root2 = 2.0f * DFsq * Dsq * (vsq + g * dy + (highTrajectory ? -1.0f : 1.0f) * math::sqrt(root1));
-				if (root2 >= 0.0f) {
-					Vxz = math::sqrt(root2) / (2.0f * Dsq);
-					Vy = (dxz == 0.0f || Vxz == 0.0f) ? v : (Vxz * dy / dxz - dxz * g / (2.0f * Vxz));
+      if (root1 >= 0.0f) {
+				const float trajectoryDiscriminantRoot = math::sqrt(root1);
+
+				if (highTrajectory) {
+					const float trajectoryDenominator =	math::sqrt(2.0f * (vsq + g * dy + trajectoryDiscriminantRoot));
+
+					if (trajectoryDenominator > 0.0f) {
+						Vxz = -g * dxz / trajectoryDenominator;
+						Vy = (vsq + trajectoryDiscriminantRoot) / trajectoryDenominator;
+					}
+				} else {
+					const float root2 = 2.0f * DFsq * Dsq * (vsq + g * dy + trajectoryDiscriminantRoot);
+
+					if (root2 >= 0.0f) {
+						Vxz = math::sqrt(root2) / (2.0f * Dsq);
+						Vy = (dxz == 0.0f || Vxz == 0.0f)	? v	: (Vxz * dy / dxz - dxz * g / (2.0f * Vxz));
+					}
 				}
 			}
 		}
@@ -225,9 +307,8 @@ float3 CCannon::CalcWantedDir(const float3& targetVec) const
 	nextWantedDir.SafeNormalize();
 
 	if (Vxz != 0.0f || Vy != 0.0f) {
-
 		nextWantedDir *= Vxz;
-		nextWantedDir.y = Vy;
+    nextWantedDir.y = (gravity > 0.0f) ? -Vy : Vy;
 		nextWantedDir.SafeNormalize();
 	}
 
@@ -237,8 +318,12 @@ float3 CCannon::CalcWantedDir(const float3& targetVec) const
 
 float CCannon::GetStaticRange2D(const float2& baseConsts, const float2& projConsts, const float2& boostFacts) {
 	RECOIL_DETAILED_TRACY_ZONE;
+  if (projConsts.y == 0.0f)
+		return baseConsts.x;
+
 	const auto CalcRange2D = [](const float3& bc, const float2& pc, const float2& bf) {
-		float heightDiff = bc.x;
+    const float gravityMagnitude = math::fabs(pc.y);
+		float heightDiff = (pc.y > 0.0f) ? -bc.x : bc.x;
 
 		const float speedFactor = bc.y; // always sin(pi/4) == cos(pi/4) == sqrt(0.5)
 		const float smoothHeight = bc.z; // always 100 (completely arbitrary)
@@ -255,12 +340,18 @@ float CCannon::GetStaticRange2D(const float2& baseConsts, const float2& projCons
 			heightDiff *= (1.0f + (bf.y - 1.0f) * -heightDiff / smoothHeight);
 		}
 
-		const float root = sqSpeed2D + 2.0f * pc.y * heightDiff;
+    const float root = sqSpeed2D - 2.0f * gravityMagnitude * heightDiff;
 
 		if (root < 0.0f)
 			return 0.0f;
 
-		return (bf.x * (sqSpeed2D + speed2D * math::sqrt(root)) / -pc.y);
+    const float rangeNumerator = bf.x * (sqSpeed2D + speed2D * math::sqrt(root));
+
+		if (gravityMagnitude < 1.0f && rangeNumerator >= gravityMagnitude * std::numeric_limits<float>::max()) {
+			return std::numeric_limits<float>::infinity();
+		}
+
+		return rangeNumerator / gravityMagnitude;
 	};
 
 	// if called from GetRange2D(), the range-boost factor (.x) is already known
@@ -270,6 +361,8 @@ float CCannon::GetStaticRange2D(const float2& baseConsts, const float2& projCons
 
 	// otherwise need to determine it from scratch as though calling UpdateRange
 	const float wdRangeExclBoost = CalcRange2D({0.0f, 0.7071067f, 100.0f}, projConsts, {1.0f, boostFacts.y});
+  if (!std::isfinite(wdRangeExclBoost))
+		return baseConsts.x;
 	const float wdRangeBoostFact = std::clamp(baseConsts.x / wdRangeExclBoost, 0.0f, 1.0f);
 
 	float wdHeightBoostFact = boostFacts.y;
