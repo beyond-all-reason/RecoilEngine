@@ -24,7 +24,8 @@ CR_REG_METADATA(CFeatureHandler, (
 	CR_MEMBER(deletedFeatureIDs),
 	CR_MEMBER(activeFeatureIDs),
 	CR_MEMBER(features),
-	CR_MEMBER(updateFeatures)
+	CR_MEMBER(updateFeatures),
+	CR_MEMBER(stalePrevTransformFeatures)
 ))
 
 /******************************************************************************/
@@ -58,6 +59,7 @@ void CFeatureHandler::Kill() {
 	deletedFeatureIDs.clear();
 	features.clear();
 	updateFeatures.clear();
+	stalePrevTransformFeatures.clear();
 }
 
 
@@ -187,9 +189,13 @@ void CFeatureHandler::UpdatePreFrame()
 {
 	SCOPED_TIMER("Sim::Features::UpdatePreFrame");
 
-	for (auto fid : activeFeatureIDs) {
-		features[fid]->UpdatePrevFrameTransform();
+	// most features never move, so only visit those whose transform changed since the last save
+	for (CFeature* feature : stalePrevTransformFeatures) {
+		feature->UpdatePrevFrameTransform();
+		feature->prevTransformStale = false;
 	}
+
+	stalePrevTransformFeatures.clear();
 }
 
 void CFeatureHandler::Update()
@@ -244,6 +250,9 @@ bool CFeatureHandler::UpdateFeature(CFeature* feature)
 
 		features[feature->id] = nullptr;
 
+		if (feature->prevTransformStale)
+			spring::VectorErase(stalePrevTransformFeatures, feature);
+
 		// ID must match parameter for object commands, just use this
 		CSolidObject::SetDeletingRefID(feature->GetBlockingMapID());
 		// destructor removes feature from update-queue
@@ -272,6 +281,16 @@ void CFeatureHandler::SetFeatureUpdateable(CFeature* feature)
 
 	// always true
 	feature->inUpdateQue = spring::VectorInsertUnique(updateFeatures, feature);
+}
+
+
+void CFeatureHandler::SetFeaturePrevTransformStale(CFeature* feature)
+{
+	if (feature->prevTransformStale)
+		return;
+
+	feature->prevTransformStale = true;
+	stalePrevTransformFeatures.push_back(feature);
 }
 
 

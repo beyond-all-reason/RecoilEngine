@@ -11,7 +11,8 @@ CR_REG_METADATA(LocalModel, (
 
 	CR_MEMBER(boundingVolume),
 	CR_IGNORED(luaMaterialData),
-	CR_MEMBER(needsBoundariesRecalc)
+	CR_MEMBER(needsBoundariesRecalc),
+	CR_MEMBER(prevTransformsStale)
 ))
 
 /** ****************************************************************************************************
@@ -88,6 +89,19 @@ void LocalModel::SetModel(const S3DModel* model, bool initialize)
 	UpdateBoundingVolume();
 
 	assert(pieces.size() == model->numPieces);
+}
+
+void LocalModel::SavePrevModelSpaceTransforms()
+{
+	// transforms only change after a piece is dirtied, otherwise prev == curr already
+	if (!prevTransformsStale)
+		return;
+
+	for (auto& piece : pieces) {
+		piece.SavePrevModelSpaceTransform();
+	}
+
+	prevTransformsStale = false;
 }
 
 LocalModelPiece* LocalModel::CreateLocalModelPieces(const S3DModelPiece* mpParent)
