@@ -619,6 +619,10 @@ void CMobileCAI::ExecuteGuard(Command& c)
 		StopMoveAndFinishCommand();
 		return;
 	}
+	if (guardee == owner) {
+		StopMoveAndFinishCommand();
+		return;
+	}
 	if (UpdateTargetLostTimer(guardee->id) == 0) {
 		StopMoveAndFinishCommand();
 		return;
