@@ -111,6 +111,7 @@ public:
 	static BlockType RangeIsBlockedHashedMt(int xmin, int xmax, int zmin, int zmax, const MoveTypes::CheckCollisionQuery* collider, int magicNumber, int thread = 0);
 
 	static void FloodFillRangeIsBlocked(const MoveDef& moveDef, const CSolidObject* collider, const SRectangle& areaToSample, std::vector<std::uint8_t>& results, int thread);
+	static void FloodFillRangeIsBlocked(const MoveTypes::CheckCollisionQuery& colliderInfo, const SRectangle& areaToSample, std::vector<std::uint8_t>& results, int thread);
 
 	static bool RangeHasExitOnly(int xmin, int xmax, int zmin, int zmax, const ObjectCollisionMapHelper& object);
 
