@@ -876,6 +876,21 @@ inline float3 operator*(float f, const float3& v) {
 	return v * f;
 }
 
+namespace math {
+	// float3::SafeNormalize for four vectors, one register per component; each lane gets the same result
+	inline void i128_safe_normalize(__m128& x, __m128& y, __m128& z) {
+		const __m128 sql = _mm_add_ps(_mm_add_ps(_mm_mul_ps(x, x), _mm_mul_ps(y, y)), _mm_mul_ps(z, z));
+		const __m128 one = _mm_set1_ps(1.0f);
+		const __m128 valid = _mm_cmpgt_ps(sql, _mm_set1_ps(float3::nrm_eps()));
+		// vectors that are too short stay as they are (and out of i128_isqrt)
+		const __m128 scale = i128_select(valid, i128_isqrt(i128_select(valid, sql, one)), one);
+
+		x = _mm_mul_ps(x, scale);
+		y = _mm_mul_ps(y, scale);
+		z = _mm_mul_ps(z, scale);
+	}
+}
+
 /**
  * @brief upwards vector
  *
