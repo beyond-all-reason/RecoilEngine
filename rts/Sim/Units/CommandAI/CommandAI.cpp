@@ -681,11 +681,8 @@ bool CCommandAI::AllowedCommand(const Command& c, bool fromSynced)
 
 
 	const UnitDef* ud = owner->unitDef;
-	// AI's may issue attack-ground orders that are not on the ground
-	const std::vector<uint8_t>& teamAIs = skirmishAIHandler.GetSkirmishAIsInTeam(owner->team);
 
 	const bool npOrder = (c.GetNumParams() == 0); // no-param
-	const bool aiOrder = !teamAIs.empty(); // assume no sharing with AI
 
 	switch (cmdID) {
 		case CMD_MANUALFIRE: {
@@ -707,6 +704,9 @@ bool CCommandAI::AllowedCommand(const Command& c, bool fromSynced)
 							      || c.GetNumParams() == 3;
 				if (isGroundTargeted && !IsCommandInMap(c))
 					return false; // don't allow direct ground attack out of map
+
+				// AI's may issue attack-ground orders that are not on the ground
+				const bool aiOrder = skirmishAIHandler.HasSkirmishAIsInTeam(owner->team); // assume no sharing with AI
 
 				AdjustGroundAttackCommand(c, fromSynced, aiOrder);
 			}

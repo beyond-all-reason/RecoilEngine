@@ -162,6 +162,22 @@ std::vector<uint8_t> CSkirmishAIHandler::GetSkirmishAIsInTeam(const int teamId, 
 	return ids;
 }
 
+bool CSkirmishAIHandler::HasSkirmishAIsInTeam(const int teamId, const int hostPlayerId) const
+{
+	for (const auto& p: skirmishAIDataMap) {
+		const SkirmishAIData& aiData = *(p.second);
+
+		if (aiData.team != teamId)
+			continue;
+		if ((hostPlayerId >= 0) && (aiData.hostPlayer != hostPlayerId))
+			continue;
+
+		return true;
+	}
+
+	return false;
+}
+
 std::vector<uint8_t> CSkirmishAIHandler::GetSkirmishAIsByPlayer(const int hostPlayerId) const
 {
 	std::vector<uint8_t> skirmishAIs;
