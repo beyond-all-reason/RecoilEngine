@@ -50,6 +50,8 @@ class LuaOpenGL {
 		static void ResetCommon(DrawMode);
 		static void DisableCommon(DrawMode);
 
+		static void ApplyMiniMapClipping();
+
 		static void EnableDrawGenesis();
 		static void ResetDrawGenesis();
 		static void DisableDrawGenesis();

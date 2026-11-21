@@ -45,6 +45,7 @@ private:
 	float oldAltHeight;
 
 	float maxHeight;
+	float maxHeightFactor;
 	float minHeight;
 	float tiltSpeed;
 	float angle;

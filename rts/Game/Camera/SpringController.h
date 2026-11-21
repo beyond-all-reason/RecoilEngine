@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _SPRING_CONTROLLER_H
-#define _SPRING_CONTROLLER_H
+#pragma once
 
 #include "CameraController.h"
 #include "Game/UI/MouseHandler.h"
@@ -51,7 +50,7 @@ private:
 	float3 rot;
 
 	float curDist; // current zoom-out distance
-	const float maxDist; // maximum zoom-out distance
+	float maxDist; // maximum zoom-out distance
 	float minDist; // minimum zoom-in distance
 	float oldDist;
 	float fastScaleMove;
@@ -67,5 +66,3 @@ private:
 	bool lockCardinalDirections;
 	int trackMapHeight;
 };
-
-#endif // _SPRING_CONTROLLER_H

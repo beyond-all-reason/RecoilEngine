@@ -4,6 +4,7 @@
 #include <vector>
 #include <array>
 
+#include "Game/ViewRectangle.h"
 #include "Rendering/Common/ModelDrawer.h"
 #include "Rendering/Common/ModelDrawerState.hpp"
 #include "Rendering/Units/UnitDrawerData.h"
@@ -23,6 +24,7 @@ namespace Shader { struct IProgramObject; }
 // own settings and by gl.DrawMiniMapIcons from its arguments. Icons are emitted as
 // quads in map-space elmo coordinates (XZ), transformed by the current GL matrices.
 struct MiniMapIconDrawParams {
+	ViewRectangle viewRectangle;             // unset = whole map, independent of the built-in minimap
 	float iconSizeX = 1.0f;                  // base icon half-size in elmos, scaled per icon
 	float iconSizeY = 1.0f;
 	int rotation = 0;                        // CMiniMap::RotationOptions
