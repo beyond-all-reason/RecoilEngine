@@ -85,6 +85,7 @@
 #include "Sim/Units/UnitDefHandler.h"
 #include "Sim/Units/UnitHandler.h"
 #include "Sim/Weapons/WeaponDefHandler.h"
+#include "Rendering/GL/SceneTarget.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/Log/ILog.h"
 #include "System/Matrix44f.h"
@@ -421,6 +422,7 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	if (FBO::IsSupported())
 		REGISTER_LUA_CFUNC(RenderEnvironmentFace);
 	REGISTER_LUA_CFUNC(PublishTexture);
+	REGISTER_LUA_CFUNC(SceneTargetToneMapMask);
 
 	REGISTER_LUA_CFUNC(ActiveTexture);
 	REGISTER_LUA_CFUNC(TexEnv);
@@ -1264,6 +1266,8 @@ int LuaOpenGL::GetNumber(lua_State* L)
 
 	if (count > 64)
 		return 0;
+
+	luaL_checkstack(L, count, __func__);
 
 	GLfloat values[64];
 	glGetFloatv(pname, values);
@@ -4226,6 +4230,7 @@ int LuaOpenGL::Texture(lua_State* L)
 	// $specular    --  specular cube map
 	// $reflection  --  reflection cube map
 	// $heightmap   --  ground heightmap
+	// $scene_color, $scene_depth, $scene_tonemap_mask  --  the HDR scene target (SceneTarget = hdr)
 	// ...          --  named textures
 	//
 
@@ -4570,6 +4575,7 @@ int LuaOpenGL::CopyToTexture(lua_State* L)
 	const auto target = (GLenum)luaL_optnumber(L, 8, tex->target);
 	const auto level  = (GLenum)luaL_optnumber(L, 9, 0);
 
+	ScopedSceneReadResolve resolve;
 	glCopyTexSubImage2D(target, level, xoff, yoff, x, y, w, h);
 
 	if (tex->target != GL_TEXTURE_2D) {glDisable(tex->target);}
@@ -4728,7 +4734,7 @@ int LuaOpenGL::RenderToTexture(lua_State* L)
 	if ((tex == nullptr) || (tex->fbo == 0))
 		return 0;
 
-	GLint currentFBO = 0;
+	GLint currentFBO = sceneTarget.GetDefaultFBO();
 	if (drawMode == DRAW_WORLD_SHADOW) {
 		glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &currentFBO);
 	}
@@ -4964,6 +4970,24 @@ int LuaOpenGL::PublishTexture(lua_State* L)
 
 	lua_pushsstring(L, error);
 	return 2;
+}
+
+
+/***
+ * With `SceneTarget=hdr` the display pass only tone maps pixels marked in the mask.
+ * While the mask is on, every fragment shader drawn must write output location 1
+ * (`1.0` for scene-linear colour to tone map, `0.0` for display-referred colour); turn it off afterwards.
+ * Does nothing and returns false outside the HDR world phase or while another framebuffer is bound.
+ *
+ * @function gl.SceneTargetToneMapMask
+ * @param enable boolean
+ * @return boolean writing true when the mask is written from now on
+ */
+int LuaOpenGL::SceneTargetToneMapMask(lua_State* L)
+{
+	CheckDrawingEnabled(L, __func__);
+	lua_pushboolean(L, sceneTarget.SetToneMapMaskWrites(luaL_checkboolean(L, 1)));
+	return 1;
 }
 
 
@@ -6880,6 +6904,7 @@ int LuaOpenGL::ReadPixels(lua_State* L)
 
 	CBitmap bmp;
 	bmp.Alloc(w, h, fSize * sizeof(float));
+	ScopedSceneReadResolve resolve;
 	glReadPixels(x, y, w, h, format, GL_FLOAT, reinterpret_cast<float*>(bmp.GetRawMem()));
 
 	const float* data = reinterpret_cast<const float*>(bmp.GetRawMem());
@@ -7005,7 +7030,10 @@ int LuaOpenGL::SaveImage(lua_State* L)
 	CBitmap bitmap;
 	bitmap.Alloc(width, height);
 
-	glReadPixels(x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, bitmap.GetRawMem());
+	{
+		ScopedSceneReadResolve resolve;
+		glReadPixels(x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, bitmap.GetRawMem());
+	}
 
 	if (yflip)
 		bitmap.ReverseYAxis();

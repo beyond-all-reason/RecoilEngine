@@ -403,6 +403,12 @@ public:
 	bool fullScreen;
 	bool borderless;
 
+	/**
+	 * @brief --background-window: no focus on start, behind other windows, never
+	 * minimized, maximized or fullscreen; set once before the window is created
+	 */
+	bool backgroundWindow;
+
 	bool underExternalDebug;
 	
 	/** 

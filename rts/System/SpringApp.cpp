@@ -130,6 +130,7 @@ DEFINE_bool_EX  (gen_fontconfig,     "gen-fontconfig",     false, "Generate font
 DEFINE_bool     (fullscreen,                               false, "Run in fullscreen mode");
 DEFINE_bool     (window,                                   false, "Run in windowed mode");
 DEFINE_bool     (hidden,                                   false, "Start in background (minimised, no taskbar entry)");
+DEFINE_bool_EX  (background_window,  "background-window",  false, "Like headless, but for unattended runs that need rendering: the window opens without focus and behind other windows, and never minimizes, maximizes or goes fullscreen");
 DEFINE_bool     (nocolor,                                  false, "Disables colorized stdout");
 DEFINE_string   (server,                                   "",    "Set listening IP for server");
 DEFINE_bool     (textureatlas,                             false, "Dump each finalized textureatlas in textureatlasN.tga");
@@ -245,6 +246,7 @@ bool SpringApp::Init()
 	LuaMemPool::InitStatic(configHandler->GetBool("UseLuaMemPools"));
 
 	CGlobalRendering::InitStatic();
+	globalRendering->backgroundWindow = FLAGS_background_window;
 	globalRendering->SetFullScreen(FLAGS_window, FLAGS_fullscreen);
 
 	if (!InitPlatformLibs())

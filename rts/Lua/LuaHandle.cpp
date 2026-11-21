@@ -3159,6 +3159,41 @@ void CLuaHandle::DrawScreenPost()
 }
 
 
+/*** Lets the game draw the display pass of the HDR scene target (`SceneTarget=hdr`) instead of the engine.
+ *
+ * Called once per frame at `DisplayBoundary`, with the window framebuffer bound and `$scene_color` and
+ * `$scene_tonemap_mask` readable as single-sample textures. Return true after writing every window pixel;
+ * the engine then skips its own display pass. The engine copies depth and stencil into the window afterwards.
+ *
+ * @function Callins:DrawSceneDisplay
+ * @param winSizeX integer
+ * @param winSizeY integer
+ * @return boolean drawn
+ */
+bool CLuaHandle::DrawSceneDisplay()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L, false);
+	luaL_checkstack(L, 4, __func__);
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return false;
+
+	lua_pushnumber(L, globalRendering->winSizeX);
+	lua_pushnumber(L, globalRendering->winSizeY);
+
+	LuaOpenGL::SetDrawingEnabled(L, true);
+	const bool ran = RunCallIn(L, cmdStr, 2, 1);
+	LuaOpenGL::SetDrawingEnabled(L, false);
+	if (!ran)
+		return false;
+
+	const bool drawn = luaL_optboolean(L, -1, false);
+	lua_pop(L, 1);
+	return drawn;
+}
+
+
 /***
  *
  * @function Callins:DrawInMiniMap

@@ -314,6 +314,7 @@ class CEventHandler
 		bool DrawShield(const CUnit* unit, const CWeapon* weapon);
 		bool DrawProjectile(const CProjectile* projectile);
 		bool DrawMaterial(const LuaMaterial* material);
+		bool DrawSceneDisplay();
 
 		void DrawOpaqueUnitsLua(bool deferredPass, bool drawReflection, bool drawRefraction);
 		void DrawOpaqueFeaturesLua(bool deferredPass, bool drawReflection, bool drawRefraction);

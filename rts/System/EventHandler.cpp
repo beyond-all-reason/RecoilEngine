@@ -759,6 +759,25 @@ DRAW_ENTITY_CALLIN(Shield, (const CUnit* unit, const CWeapon* weapon), (unit, we
 DRAW_ENTITY_CALLIN(Projectile, (const CProjectile* projectile), (projectile))
 DRAW_ENTITY_CALLIN(Material, (const LuaMaterial* material), (material))
 
+bool CEventHandler::DrawSceneDisplay()
+{
+	ZoneScoped;
+	if (listDrawSceneDisplay.empty())
+		return false;
+
+	// the first client that drew the window colour ends the call-in, a second would overwrite it
+	bool drawn = false;
+	LuaOpenGL::EnableDrawScreenEffects();
+	for (size_t i = 0; i < listDrawSceneDisplay.size() && !drawn; ) {
+		CEventClient* ec = listDrawSceneDisplay[i];
+		drawn = ec->DrawSceneDisplay();
+
+		i += (i < listDrawSceneDisplay.size() && ec == listDrawSceneDisplay[i]);
+	}
+	LuaOpenGL::DisableDrawScreenEffects();
+	return drawn;
+}
+
 /******************************************************************************/
 /******************************************************************************/
 

@@ -114,9 +114,12 @@ class LuaUnsyncedRead {
 		static int GetBoxSelectionByEngine(lua_State* L);
 
 		static int IsGUIHidden(lua_State* L);
+		static int IsBackgroundWindow(lua_State* L);
 		static int HaveShadows(lua_State* L);
 		static int HaveAdvShading(lua_State* L);
 		static int GetWaterMode(lua_State* L);
+		static int GetSceneTargetInfo(lua_State* L);
+		static int TestDisplayTransforms(lua_State* L);
 		static int GetMapDrawMode(lua_State* L);
 		static int GetMapSquareTexture(lua_State* L);
 

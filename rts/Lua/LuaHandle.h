@@ -282,6 +282,7 @@ class CLuaHandle : public CEventClient
 		void DrawScreenCommon(const LuaHashString& cmdStr);
 		void DrawScreenEffects() override;
 		void DrawScreenPost()  override;
+		bool DrawSceneDisplay() override;
 		void DrawScreen() override;
 		void DrawInMiniMap() override;
 		void DrawInMiniMapBackground() override;

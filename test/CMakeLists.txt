@@ -505,6 +505,16 @@ endif()
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "${test_flags}")
 
 ################################################################################
+### PointerWarp
+	set(test_name PointerWarp)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/Input/testPointerWarp.cpp"
+			${test_Common_sources}
+		)
+	set(test_libs "")
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG -DNOT_USING_STREFLOP -DBUILDING_AI")
+
+################################################################################
 ### QueuedBuildOverlap
 	set(test_name QueuedBuildOverlap)
 	set(test_src
@@ -676,6 +686,19 @@ endif()
 	if (USE_MIMALLOC)
 		target_compile_definitions(test_${test_name} PRIVATE USE_MIMALLOC)
 	endif()
+
+################################################################################
+### DisplayTransforms
+# CPU curves of the display pass against float64 reference values (generate_display_transform_golden.py).
+	set(test_name DisplayTransforms)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Rendering/Display/testDisplayTransforms.cpp"
+			${test_Common_sources}
+		)
+	set(test_libs
+			""
+		)
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
 
 ################################################################################
 

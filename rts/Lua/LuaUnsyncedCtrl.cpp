@@ -37,6 +37,7 @@
 #include "Game/UI/KeyBindings.h"
 #include "Game/UI/MiniMap.h"
 #include "Game/UI/MouseHandler.h"
+#include "System/Input/PointerWarp.h"
 #include "Game/UI/Groups/Group.h"
 #include "Game/UI/Groups/GroupHandler.h"
 #include "Map/MapInfo.h"
@@ -108,6 +109,7 @@
 #include <SDL_keyboard.h>
 #include <SDL_clipboard.h>
 #include <SDL_mouse.h>
+#include <SDL_video.h>
 
 // MinGW defines this for a WINAPI function
 #undef SendMessage
@@ -3174,7 +3176,12 @@ int LuaUnsyncedCtrl::SetCustomCommandDrawData(lua_State* L)
 ******************************************************************************/
 
 
-/*** @function Spring.WarpMouse
+/***
+ *
+ * Does not move the system pointer while the window has no focus and the pointer is
+ * not over it (the player is in another window); the engine still uses the new position.
+ *
+ * @function Spring.WarpMouse
  * @param x integer
  * @param y integer
  * @return nil
@@ -3183,7 +3190,10 @@ int LuaUnsyncedCtrl::WarpMouse(lua_State* L)
 {
 	const int x = luaL_checkint(L, 1);
 	const int y = globalRendering->viewSizeY - luaL_checkint(L, 2) - 1;
-	mouse->WarpMouse(x, y);
+	// SDL's mouse focus is the window under the pointer, null until the pointer first enters
+	SDL_Window* window = globalRendering->GetWindow();
+	const bool windowFocused = (SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS) != 0;
+	mouse->WarpMouse(x, y, PointerWarp::MovesSystemPointer(windowFocused, SDL_GetMouseFocus() == window));
 	return 0;
 }
 
@@ -3635,9 +3645,7 @@ int LuaUnsyncedCtrl::GiveOrderToUnitMap(lua_State* L)
 		return 1;
 	}
 
-	selectedUnitsHandler.SendCommandsToUnits(unitIDs, {LuaUtils::ParseCommand(L, __func__, 2)});
-
-	lua_pushboolean(L, true);
+	lua_pushboolean(L, selectedUnitsHandler.SendCommandsToUnits(unitIDs, {LuaUtils::ParseCommand(L, __func__, 2)}));
 	return 1;
 }
 
@@ -3669,9 +3677,7 @@ int LuaUnsyncedCtrl::GiveOrderToUnitArray(lua_State* L)
 		return 1;
 	}
 
-	selectedUnitsHandler.SendCommandsToUnits(unitIDs, {LuaUtils::ParseCommand(L, __func__, 2)});
-
-	lua_pushboolean(L, true);
+	lua_pushboolean(L, selectedUnitsHandler.SendCommandsToUnits(unitIDs, {LuaUtils::ParseCommand(L, __func__, 2)}));
 	return 1;
 }
 
@@ -3703,8 +3709,7 @@ int LuaUnsyncedCtrl::GiveOrderArrayToUnit(lua_State* L)
 		return 1;
 	}
 
-	selectedUnitsHandler.SendCommandsToUnits(unitIDs, commands);
-	lua_pushboolean(L, true);
+	lua_pushboolean(L, selectedUnitsHandler.SendCommandsToUnits(unitIDs, commands));
 	return 1;
 }
 
@@ -3736,9 +3741,7 @@ int LuaUnsyncedCtrl::GiveOrderArrayToUnitMap(lua_State* L)
 		return 1;
 	}
 
-	selectedUnitsHandler.SendCommandsToUnits(unitIDs, commands);
-
-	lua_pushboolean(L, true);
+	lua_pushboolean(L, selectedUnitsHandler.SendCommandsToUnits(unitIDs, commands));
 	return 1;
 }
 
@@ -3780,9 +3783,7 @@ int LuaUnsyncedCtrl::GiveOrderArrayToUnitArray(lua_State* L)
 		return 1;
 	}
 
-	selectedUnitsHandler.SendCommandsToUnits(unitIDs, commands, (args >= 3 && lua_toboolean(L, 3)));
-
-	lua_pushboolean(L, true);
+	lua_pushboolean(L, selectedUnitsHandler.SendCommandsToUnits(unitIDs, commands, (args >= 3 && lua_toboolean(L, 3))));
 	return 1;
 }
 
@@ -5436,6 +5437,8 @@ int LuaUnsyncedCtrl::SetWindowGeometry(lua_State* L)
 
 /***
  *
+ * Does nothing and returns false when the engine was started with `--background-window`.
+ *
  * @function Spring.SetWindowMinimized
  * @return boolean minimized
  */
@@ -5446,6 +5449,8 @@ int LuaUnsyncedCtrl::SetWindowMinimized(lua_State* L)
 }
 
 /***
+ *
+ * Does nothing and returns false when the engine was started with `--background-window`.
  *
  * @function Spring.SetWindowMaximized
  * @return boolean maximized
