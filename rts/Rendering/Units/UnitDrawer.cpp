@@ -1044,11 +1044,11 @@ void CUnitDrawerGLSL::DrawObjectsShadow(int modelType) const
 	const auto& mdlRenderer = modelDrawerData->GetModelRenderer(modelType);
 
 	for (uint32_t i = 0, n = mdlRenderer.GetNumObjectBins(); i < n; i++) {
-		if (mdlRenderer.GetObjectBin(i).empty())
+		if (mdlRenderer.GetDrawObjectBin(i).empty())
 			continue;
 
 		CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
-		for (auto* o : mdlRenderer.GetObjectBin(i)) {
+		for (auto* o : mdlRenderer.GetDrawObjectBin(i)) {
 			DrawUnitShadow(o);
 		}
 
@@ -1067,12 +1067,12 @@ void CUnitDrawerGLSL::DrawOpaqueObjects(int modelType, bool drawReflection, bool
 	const auto& mdlRenderer = modelDrawerData->GetModelRenderer(modelType);
 
 	for (uint32_t i = 0, n = mdlRenderer.GetNumObjectBins(); i < n; i++) {
-		if (mdlRenderer.GetObjectBin(i).empty())
+		if (mdlRenderer.GetDrawObjectBin(i).empty())
 			continue;
 
 		CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
 
-		for (auto* o : mdlRenderer.GetObjectBin(i)) {
+		for (auto* o : mdlRenderer.GetDrawObjectBin(i)) {
 			DrawOpaqueUnit(o, thisPassMask);
 		}
 	}
@@ -1089,12 +1089,12 @@ void CUnitDrawerGLSL::DrawAlphaObjects(int modelType, bool drawReflection, bool 
 	const auto& mdlRenderer = modelDrawerData->GetModelRenderer(modelType);
 
 	for (uint32_t i = 0, n = mdlRenderer.GetNumObjectBins(); i < n; i++) {
-		if (mdlRenderer.GetObjectBin(i).empty())
+		if (mdlRenderer.GetDrawObjectBin(i).empty())
 			continue;
 
 		CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
 
-		for (auto* o : mdlRenderer.GetObjectBin(i)) {
+		for (auto* o : mdlRenderer.GetDrawObjectBin(i)) {
 			DrawAlphaUnit(o, thisPassMask);
 		}
 	}
@@ -1910,18 +1910,26 @@ void CUnitDrawerGL4::DrawObjectsShadow(int modelType) const
 	smv.Bind();
 
 	for (uint32_t i = 0, n = mdlRenderer.GetNumObjectBins(); i < n; i++) {
-		if (mdlRenderer.GetObjectBin(i).empty())
+		if (mdlRenderer.GetDrawObjectBin(i).empty())
 			continue;
 
-		CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
-		const auto& bin = mdlRenderer.GetObjectBin(i);
+		const auto& bin = mdlRenderer.GetDrawObjectBin(i);
 
 		static vector<const ObjType*> beingBuilt;
 		beingBuilt.clear();
 
+		// bind the bin's texture lazily; bins without a shadow-visible
+		// object this frame (e.g. everything drawn by Lua) skip the (un)bind
+		bool texBound = false;
+
 		for (auto* o : bin) {
 			if (!ShouldDrawUnitShadow(o))
 				continue;
+
+			if (!texBound) {
+				CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
+				texBound = true;
+			}
 
 			if (o->beingBuilt && o->unitDef->showNanoFrame) {
 				beingBuilt.emplace_back(o);
@@ -1930,6 +1938,9 @@ void CUnitDrawerGL4::DrawObjectsShadow(int modelType) const
 
 			smv.AddToSubmission(o);
 		}
+
+		if (!texBound)
+			continue;
 
 		smv.Submit(GL_TRIANGLES, false);
 
@@ -1960,7 +1971,7 @@ void CUnitDrawerGL4::DrawOpaqueObjects(int modelType, bool drawReflection, bool 
 	smv.Bind();
 
 	for (unsigned int i = 0, n = mdlRenderer.GetNumObjectBins(); i < n; i++) {
-		if (mdlRenderer.GetObjectBin(i).empty())
+		if (mdlRenderer.GetDrawObjectBin(i).empty())
 			continue;
 
 		CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
@@ -1968,7 +1979,7 @@ void CUnitDrawerGL4::DrawOpaqueObjects(int modelType, bool drawReflection, bool 
 		static vector<const ObjType*> beingBuilt;
 		beingBuilt.clear();
 
-		for (auto* o : mdlRenderer.GetObjectBin(i)) {
+		for (auto* o : mdlRenderer.GetDrawObjectBin(i)) {
 			if (!ShouldDrawOpaqueUnit(o, thisPassMask))
 				continue;
 
@@ -2007,12 +2018,12 @@ void CUnitDrawerGL4::DrawAlphaObjects(int modelType, bool drawReflection, bool d
 	modelDrawerState->SetTeamColor(0, IModelDrawerState::alphaValues.x); //teamID doesn't matter here
 	//main cloaked alpha pass
 	for (uint32_t i = 0, n = mdlRenderer.GetNumObjectBins(); i < n; i++) {
-		if (mdlRenderer.GetObjectBin(i).empty())
+		if (mdlRenderer.GetDrawObjectBin(i).empty())
 			continue;
 
 		CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
 
-		const auto& bin = mdlRenderer.GetObjectBin(i);
+		const auto& bin = mdlRenderer.GetDrawObjectBin(i);
 
 		for (auto* o : bin) {
 			if (!ShouldDrawAlphaUnit(o, thisPassMask))
