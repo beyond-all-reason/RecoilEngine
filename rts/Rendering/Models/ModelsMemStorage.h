@@ -167,6 +167,10 @@ public:
 	MyType& GetObjUniformsArray(const CWorldObject* o);
 	void   DelObject(const CWorldObject* o);
 
+	// unlike GetObjUniformsArray, does not flag the element for upload; call SetUpdate after changing it
+	MyType& GetUniformsAt(size_t offset) { return storage[offset]; }
+	void SetUpdate(size_t offset) { updateList.SetUpdate(offset); }
+
 	size_t AddObject(const SolidObjectDef* o) { return INVALID_INDEX; }
 	size_t GetObjOffset(const SolidObjectDef* o) { return INVALID_INDEX; }
 	const MyType& GetObjUniformsArray(const SolidObjectDef* o) const { return dummy; }
