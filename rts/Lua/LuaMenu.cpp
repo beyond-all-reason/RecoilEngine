@@ -100,6 +100,8 @@ CLuaMenu::CLuaMenu()
 
 	RemoveSomeOpenGLFunctions(L);
 
+	InitializeRmlUi();
+
 	lua_settop(L, 0);
 	// note: this also runs the Initialize callin
 	if (!LoadCode(L, std::move(code), file)) {

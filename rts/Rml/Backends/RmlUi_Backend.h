@@ -28,8 +28,7 @@
  *
  */
 
-#ifndef RMLUI_BACKENDS_BACKEND_H
-#define RMLUI_BACKENDS_BACKEND_H
+#pragma once
 
 #include "Rml/Rml_MathTypes_Conversions.h"
 #include <RmlUi/Core.h>
@@ -42,9 +41,11 @@ namespace RmlGui
 {
 	bool Initialize();
 	bool InitializeLua(lua_State* lua_state);
-	bool RemoveLua();
+	bool RemoveLua(lua_State* lua_state);
 
 	void Shutdown();
+	// shuts down unless a Lua state (e.g. LuaMenu) is still using RmlUi
+	void ShutdownIfUnused();
 	void Reload();
 
 	Rml::SystemInterface* GetSystemInterface();
@@ -82,5 +83,3 @@ namespace RmlGui
 	void PresentFrame();
 
 }  // namespace RmlGui
-
-#endif

@@ -7,6 +7,7 @@
 #include "Game/UI/MouseHandler.h"
 #include "Lua/LuaInputReceiver.h"
 #include "Lua/LuaMenu.h"
+#include "Rml/Backends/RmlUi_Backend.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/EventHandler.h"
 #include "System/FileSystem/VFSHandler.h"
@@ -38,6 +39,8 @@ CLuaMenuController::CLuaMenuController(const std::string& menuName)
 CLuaMenuController::~CLuaMenuController()
 {
 	CLuaMenu::FreeHandler();
+	// the menu may have been the one to initialize RmlUi (no game ever ran)
+	RmlGui::Shutdown();
 }
 
 
@@ -101,6 +104,7 @@ bool CLuaMenuController::Update()
 	mouse->Update();
 	mouse->UpdateCursors();
 	eventHandler.Update();
+	RmlGui::Update();
 	// calls IsAbove
 	mouse->GetCurrentTooltip();
 
@@ -122,6 +126,7 @@ bool CLuaMenuController::Draw()
 
 		eventHandler.DrawGenesis();
 		eventHandler.DrawScreen();
+		RmlGui::RenderFrame();
 		mouse->DrawCursor();
 		eventHandler.DrawScreenPost();
 
@@ -136,18 +141,27 @@ bool CLuaMenuController::Draw()
 
 int CLuaMenuController::KeyReleased(int keyCode, int scanCode)
 {
+	if (RmlGui::ProcessKeyReleased(keyCode, scanCode))
+		return 0;
+
 	luaInputReceiver->KeyReleased(keyCode, scanCode);
 	return 0;
 }
 
 int CLuaMenuController::KeyPressed(int keyCode, int scanCode, bool isRepeat)
 {
+	if (RmlGui::ProcessKeyPressed(keyCode, scanCode, isRepeat))
+		return 0;
+
 	luaInputReceiver->KeyPressed(keyCode, scanCode, isRepeat);
 	return 0;
 }
 
 int CLuaMenuController::TextInput(const std::string& utf8Text)
 {
+	if (RmlGui::ProcessTextInput(utf8Text))
+		return 0;
+
 	eventHandler.TextInput(utf8Text);
 	return 0;
 }

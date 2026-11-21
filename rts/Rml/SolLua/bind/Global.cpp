@@ -150,7 +150,7 @@
 			 "CreateContext", [slp](const Rml::String& name) {
 				 // context will be resized right away by other code
 				 // send {0, 0} in to avoid triggering a pointless resize event in the Rml code
-				 auto context = RmlGui::GetOrCreateContext(name);
+				 auto context = RmlGui::GetOrCreateContext(slp->InternalContextName(name, true));
 				 if (context != nullptr) {
 					 slp->AddContextTracking(context);
 				 }
@@ -165,7 +165,7 @@
 			  */
 			 "RemoveContext", sol::overload(
 				 &functions::removeContext,
-				 &functions::removeContextByName
+				 [slp](const Rml::String& name) { functions::removeContextByName(slp->InternalContextName(name, false)); }
 			 ),
 			 /***
 			  * Load a font face.
@@ -193,7 +193,11 @@
 			  * @param name string
 			  * @return RmlUi.Context? nil if failed.
 			  */
-			 "GetContext", sol::resolve<Rml::Context* (const Rml::String&)>(&RmlGui::GetContext),
+			 "GetContext", [slp](const Rml::String& name) -> Rml::Context* {
+				 // only this Lua state's own contexts: other states may use the same name
+				 const auto internalName = slp->InternalContextName(name, false);
+				 return internalName.empty() ? nullptr : RmlGui::GetContext(internalName);
+			 },
 
 			 /***
 			  * @alias RmlUi.EventID
@@ -283,11 +287,20 @@
 			  *
 			  * @param context string | RmlUi.Context
 			  */
-			 "SetDebugContext", sol::overload(&functions::setDebugContext, &functions::setDebugContextByName),
+			 "SetDebugContext", sol::overload(
+				 [slp](Rml::Context* context) {
+					 SolLuaPlugin::ScopedActive active(slp);
+					 functions::setDebugContext(context);
+				 },
+				 [slp](const Rml::String& name) {
+					 SolLuaPlugin::ScopedActive active(slp);
+					 functions::setDebugContextByName(slp->InternalContextName(name, false));
+				 }
+			 ),
 
 			 // G
 			 /*** @field RmlUi.contexts RmlUi.Context[] */
-			 "contexts", sol::readonly_property(&getIndexedTable<Rml::Context, &functions::getContext, &functions::getMaxContexts>),
+			 "contexts", sol::readonly_property([slp]() { return sol::as_table(std::vector<Rml::Context*>(slp->GetContexts())); }),
 			 //--
 			 /*** @field RmlUi.version string RmlUi version */
 			 "version", sol::readonly_property(&Rml::GetVersion)
