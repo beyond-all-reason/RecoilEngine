@@ -1,6 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "UnitDrawer.h"
+#include "Rendering/Models/IModelParser.h"
 
 #include <algorithm>
 #include <cassert>
@@ -80,6 +81,20 @@ CONFIG(bool, AdvUnitShading).deprecated(true);
 
 /***********************************************************************/
 
+// Pure ghosts use the same icon snapshot before and after hidden destruction.
+template<typename Draw>
+static void DrawGhostIcons(const CUnitDrawerData& data, int allyTeam, Draw draw)
+{
+	for (int type = MODELTYPE_3DO; type < MODELTYPE_CNT; ++type) {
+		for (const auto& live : data.GetLiveGhostBuildings(allyTeam, type)) {
+			if (!(live.unit->losStatus[allyTeam] & (LOS_INLOS | LOS_INRADAR)))
+				draw(live.target, live.team);
+		}
+	}
+	for (const auto* dead : data.GetDeadGhostBuildings(allyTeam))
+		draw(dead->target, dead->team);
+}
+
 //don't inherit and leave only static Unit specific helpers
 class CUnitDrawerHelper
 {
@@ -108,20 +123,20 @@ public:
 		}
 	}
 
-	static inline float GetUnitIconScale(const CUnit* unit) {
-		const auto& iconData = icon::iconHandler.GetIconData(unit->currentIconIndex);
+	static inline float GetUnitIconScale(const CUnit* unit, size_t iconIndex, const MiniMapIconDrawParams& params) {
+		const auto& iconData = icon::iconHandler.GetIconData(iconIndex);
 		float scale = iconData.GetSize();
 
-		if (!minimap->UseUnitIcons())
+		if (!params.useIcons)
 			return scale;
 		if (!iconData.GetRadiusAdjust())
 			return scale;
 
-		const unsigned short losStatus = unit->losStatus[gu->myAllyTeam];
+		const unsigned short losStatus = unit->losStatus[params.viewAllyTeam];
 		const unsigned short prevMask = (LOS_PREVLOS | LOS_CONTRADAR);
 		const bool unitVisible = ((losStatus & LOS_INLOS) || ((losStatus & LOS_INRADAR) && ((losStatus & prevMask) == prevMask)));
 
-		if ((unitVisible || gu->spectatingFullView)) {
+		if (unitVisible || params.fullView) {
 			scale *= (unit->radius / iconData.GetRadiusScale());
 		}
 
@@ -557,6 +572,9 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons(const MiniMapIconDrawParams& params) 
 	}
 
 	for (auto* unit : modelDrawerData->GetUnsortedObjects()) {
+		if (!isFullView && !(unit->losStatus[viewAllyTeam] & (LOS_INLOS | LOS_INRADAR)))
+			continue;
+
 		if (unit->noMinimap)
 			continue;
 
@@ -601,18 +619,9 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons(const MiniMapIconDrawParams& params) 
 			else {
 				currentColor = teamHandler.Team(unit->team)->color;
 			}
-
-			if (!isFullView && !(unit->losStatus[viewAllyTeam] & LOS_INRADAR)) {
-				if (ghostIconDimming == 0.0f)
-					continue;
-
-				currentColor.r *= ghostIconDimming;
-				currentColor.g *= ghostIconDimming;
-				currentColor.b *= ghostIconDimming;
-			}
 		}
 
-		const float iconScale = CUnitDrawerHelper::GetUnitIconScale(unit);
+		const float iconScale = CUnitDrawerHelper::GetUnitIconScale(unit, iconIndex, params);
 
 		if (!sortIcons) {
 			DrawUnitMiniMapIcon(rb, iconIndex, iconScale, pos, currentColor, params, quadSin, quadCos);
@@ -623,22 +632,20 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons(const MiniMapIconDrawParams& params) 
 	}
 
 	if (!isFullView && ghostIconDimming > 0.0f) {
-		for (auto* ghost : modelDrawerData->GetDeadGhostBuildings(viewAllyTeam)) {
-			const float3& pos = ghost->midPos;
+		DrawGhostIcons(*modelDrawerData, viewAllyTeam, [&](const GhostTarget& target, int team) {
+			if (!target.minimapIcon || target.iconIndex == icon::INVALID_ICON_INDEX)
+				return;
+			const float3& pos = target.midPos;
 
 			if (pos.x < params.cullMinX || pos.x > params.cullMaxX || pos.z < params.cullMinZ || pos.z > params.cullMaxZ)
-				continue;
+				return;
 
 			if (params.useSimpleColors)
 				currentColor = params.enemyColor;
 			else
-				currentColor = teamHandler.Team(ghost->team)->color;
+				currentColor = teamHandler.Team(team)->color;
 
-			const size_t iconIndex = params.useIcons ? ghost->currentIconIndex : defIconIdx;
-
-			assert(iconIndex != icon::INVALID_ICON_INDEX);
-			if (iconIndex == icon::INVALID_ICON_INDEX)
-				continue;
+			const size_t iconIndex = params.useIcons ? target.iconIndex : defIconIdx;
 
 			const auto& iconData = icon::iconHandler.GetIconData(iconIndex);
 			const float iconScale = iconData.GetSize();
@@ -653,7 +660,7 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons(const MiniMapIconDrawParams& params) 
 				entries.push_back({ iconIndex, iconScale, pos, currentColor });
 				sortRecs.push_back(MakeIconSortRec(iconData.GetDrawOrder(), iconSortDepth(pos), entries.size() - 1));
 			}
-		}
+		});
 	}
 
 	if (sortIcons) {
@@ -923,13 +930,10 @@ void CUnitDrawerGLSL::DrawUnitIconsScreen() const
 		if (!unit->drawIcon)
 			continue;
 
-		// needed?
-		const bool canSee = gu->spectatingFullView || (unit->losStatus[gu->myAllyTeam] && (LOS_INLOS | LOS_CONTRADAR | LOS_PREVLOS) == (LOS_INLOS | LOS_CONTRADAR | LOS_PREVLOS));
-		if (!canSee)
+		if (!isFullView && !(unit->losStatus[myAllyTeam] & (LOS_INLOS | LOS_INRADAR)))
 			continue;
 
 		assert(!unit->IsInVoid());
-
 
 		// drawMidPos is auto-calculated now; can wobble on its own as pieces move
 		const float3 worldPos = (!isFullView) ?
@@ -945,14 +949,6 @@ void CUnitDrawerGLSL::DrawUnitIconsScreen() const
 		}
 		else {
 			currentColor = teamHandler.Team(unit->team)->color;
-			if (!isFullView && !(unit->losStatus[myAllyTeam] & LOS_INRADAR)) {
-				if (ghostIconDimming == 0.0f)
-					continue;
-
-				currentColor.r *= ghostIconDimming;
-				currentColor.g *= ghostIconDimming;
-				currentColor.b *= ghostIconDimming;
-			}
 		}
 
 		if (!sortIcons) {
@@ -967,29 +963,28 @@ void CUnitDrawerGLSL::DrawUnitIconsScreen() const
 	}
 
 	if (!isFullView && ghostIconDimming > 0.0f) {
-		for (auto* ghost : modelDrawerData->GetDeadGhostBuildings(gu->myAllyTeam)) {
-			float3 pos = camera->CalcViewPortCoordinates(ghost->midPos);
+		DrawGhostIcons(*modelDrawerData, gu->myAllyTeam, [&](const GhostTarget& target, int team) {
+			float3 pos = camera->CalcViewPortCoordinates(target.midPos);
 			if (pos.z > 1.0f || pos.z < 0.0f)
-				continue;
+				return;
 
-			const auto& iconIndex = ghost->currentIconIndex;
+			const auto& iconIndex = target.iconIndex;
 
-			assert(iconIndex != icon::INVALID_ICON_INDEX);
 			if (iconIndex == icon::INVALID_ICON_INDEX)
-				continue;
+				return;
 
-			currentColor = teamHandler.Team(ghost->team)->color;
+			currentColor = teamHandler.Team(team)->color;
 			currentColor.r *= ghostIconDimming;
 			currentColor.g *= ghostIconDimming;
 			currentColor.b *= ghostIconDimming;
 
 			if (!sortIcons) {
-				DrawUnitIconScreen(rb, iconIndex, pos, currentColor, ghost->radius, false);
+				DrawUnitIconScreen(rb, iconIndex, pos, currentColor, target.radius, false);
 			} else {
-				entries.push_back({ iconIndex, pos, currentColor, ghost->radius, false });
-				sortRecs.push_back(MakeIconSortRec(icon::iconHandler.GetIconData(iconIndex).GetDrawOrder(), sortDepth ? -camera->GetPos().SqDistance(ghost->midPos) : 0.0f, entries.size() - 1));
+				entries.push_back({ iconIndex, pos, currentColor, target.radius, false });
+				sortRecs.push_back(MakeIconSortRec(icon::iconHandler.GetIconData(iconIndex).GetDrawOrder(), sortDepth ? -camera->GetPos().SqDistance(target.midPos) : 0.0f, entries.size() - 1));
 			}
-		}
+		});
 	}
 
 	if (sortIcons) {
@@ -1143,13 +1138,13 @@ void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 
 	// buildings that died while ghosted
 	for (const GhostSolidObject* dgb : deadGhostedBuildings) {
-		const S3DModel* model = dgb->GetModel();
-		if (!camera->InView(dgb->pos, model->GetDrawRadius()))
+		const S3DModel* model = dgb->target.GetModel();
+		if (!camera->InView(dgb->target.modelTransform.GetPos(), model->GetDrawRadius()))
 			continue;
 
+
 		glPushMatrix();
-		glTranslatef3(dgb->pos);
-		glRotatef(dgb->facing * 90.0f, 0, 1, 0);
+		glMultMatrixf(dgb->target.modelTransform);
 
 		CModelDrawerHelper::BindModelTypeTexture(modelType, model->textureType);
 		SetTeamColor(dgb->team, IModelDrawerState::alphaValues.y);
@@ -1162,15 +1157,12 @@ void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 	for (const auto& lgb : liveGhostedBuildings) {
 		const CUnit* unit = lgb.unit;
 
-		// check for decoy models
-		const UnitDef* decoyDef = unit->unitDef->decoyDef;
-		const S3DModel* model = (decoyDef == nullptr) ? unit->model : decoyDef->LoadModel();
-
-		// FIXME: needs a second pass
-		if (model->type != modelType)
+		const S3DModel* model = lgb.target.GetModel();
+		if (!camera->InView(lgb.target.modelTransform.GetPos(), model->GetDrawRadius()))
 			continue;
 
 		const unsigned short losStatus = unit->losStatus[gu->myAllyTeam];
+
 
 		// ghosted enemy units
 		if (losStatus & LOS_CONTRADAR) {
@@ -1181,8 +1173,7 @@ void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 		}
 
 		glPushMatrix();
-		glTranslatef3(unit->drawPos);
-		glRotatef(unit->buildFacing * 90.0f, 0, 1, 0);
+		glMultMatrixf(lgb.target.modelTransform);
 
 		// the units in liveGhostedBuildings[modelType] are not
 		// sorted by textureType, but we cannot merge them with
@@ -2075,11 +2066,12 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 		clearBuckets(byTex);
 		bool any = false;
 		for (const auto* dgb : deadGhostBuildings) {
-			const S3DModel* model = dgb->GetModel();
-			if (!camera->InView(dgb->pos, model->GetDrawRadius()))
+			const S3DModel* model = dgb->target.GetModel();
+			if (!camera->InView(dgb->target.modelTransform.GetPos(), model->GetDrawRadius()))
 				continue;
 			if (!dgb->worldTransformAlloc.Valid())
 				continue;
+
 
 			byTex[model->textureType].push_back({ model, static_cast<uint32_t>(dgb->worldTransformAlloc.GetOffset()), dgb->paletteIndex });
 			any = true;
@@ -2105,23 +2097,17 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 
 		for (const auto& lgb : liveGhostedBuildings) {
 			const CUnit* u = lgb.unit;
-			if (!camera->InView(u->pos, u->model->GetDrawRadius()))
+			const S3DModel* model = lgb.target.GetModel();
+			if (!camera->InView(lgb.target.modelTransform.GetPos(), model->GetDrawRadius()))
 				continue;
 
-			// check for decoy models
-			const UnitDef* decoyDef = u->unitDef->decoyDef;
-			const S3DModel* model = (decoyDef == nullptr) ? u->model : decoyDef->LoadModel();
-
-			// FIXME: needs a second pass
-			if (model->type != modelType)
-				continue;
-
-			const size_t xfOffset = modelDrawerData->GetLiveGhostTransform(u);
+			const size_t xfOffset = modelDrawerData->GetLiveGhostTransform(lgb.target.sightingKey);
 			if (xfOffset == TransformsMemStorage::INVALID_INDEX)
 				continue;
 
 			const unsigned short losStatus = u->losStatus[gu->myAllyTeam];
 			const bool contradar = (losStatus & LOS_CONTRADAR);
+
 			// bucket with the palette the unit was last seen under, not the live unit's current one
 			(contradar ? byTexContradar : byTexNormal)[model->textureType]
 				.push_back({ model, static_cast<uint32_t>(xfOffset), lgb.paletteIndex });

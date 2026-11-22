@@ -3,6 +3,7 @@
 #include "System/RangesCompat.h"
 #include "UnitDef.h"
 #include "Unit.h"
+#include "Sim/Units/GhostSightings.h"
 #include "UnitHandler.h"
 #include "UnitDefHandler.h"
 #include "UnitLoader.h"
@@ -557,8 +558,17 @@ void CUnit::SetLeavesGhost(bool newLeavesGhost, bool leaveDeadGhost)
 	bool prevValue = leavesGhost;
 	leavesGhost = newLeavesGhost;
 
-	if (prevValue != newLeavesGhost)
-		unitDrawer->UnitLeavesGhostChanged(this, leaveDeadGhost);
+	if (prevValue == newLeavesGhost)
+		return;
+	if (newLeavesGhost) {
+		for (int at = 0; at < teamHandler.ActiveAllyTeams(); ++at) {
+			if (!(losStatus[at] & (LOS_INLOS | LOS_CONTRADAR)))
+				losStatus[at] &= ~LOS_PREVLOS;
+		}
+	} else {
+		ghostSightings.RemoveUnit(*this, leaveDeadGhost);
+		unitDrawer->UnitLeavesGhostChanged(this);
+	}
 }
 
 
@@ -945,11 +955,15 @@ void CUnit::SetLosStatus(int at, unsigned short newStatus)
 		if (diffBits & LOS_INLOS) {
 			if (newStatus & LOS_INLOS) {
 				eventHandler.UnitEnteredLos(this, at);
+				if (leavesGhost)
+					ghostSightings.EnterLos(at, id);
 				eoh->UnitEnteredLos(*this, at);
 			} else {
 				// clear before sending the event
 				losStatus[at] &= ~LOS_INLOS;
 
+				if (leavesGhost)
+					ghostSightings.LeaveLos(at, *this);
 				eventHandler.UnitLeftLos(this, at);
 				eoh->UnitLeftLos(*this, at);
 			}

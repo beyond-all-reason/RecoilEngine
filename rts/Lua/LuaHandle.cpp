@@ -1,6 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "LuaHandle.h"
+#include "Sim/Units/GhostSightings.h"
 #include "lua_privileges.h"
 
 #include "LuaGaia.h"
@@ -1645,8 +1646,15 @@ void CLuaHandle::LosCallIn(const LuaHashString& hs,
 		lua_pushnumber(L, unit->unitDef->id);
 	}
 
-	// call the routine
-	RunCallIn(L, hs, GetHandleFullRead(L) ? 4 : 2, 0);
+	int args = GetHandleFullRead(L) ? 4 : 2;
+	if (GetHandleFullRead(L) && unit->leavesGhost) {
+		const auto id = ghostSightings.LiveKey(allyTeam, unit->id);
+		if (id != 0) {
+			lua_pushnumber(L, id);
+			++args;
+		}
+	}
+	RunCallIn(L, hs, args, 0);
 }
 
 
@@ -1660,6 +1668,7 @@ void CLuaHandle::LosCallIn(const LuaHashString& hs,
  * @param unitTeam TeamID
  * @param allyTeam AllyTeamID
  * @param unitDefID UnitDefID
+ * @param ghostID integer? Observer's sighting, when available to full-read handles.
  */
 void CLuaHandle::UnitEnteredRadar(const CUnit* unit, int allyTeam)
 {
@@ -1679,6 +1688,7 @@ void CLuaHandle::UnitEnteredRadar(const CUnit* unit, int allyTeam)
  * @param unitTeam TeamID
  * @param allyTeam AllyTeamID who's LOS the unit entered.
  * @param unitDefID UnitDefID
+ * @param ghostID integer? Observer's sighting, when available to full-read handles.
  */
 void CLuaHandle::UnitEnteredLos(const CUnit* unit, int allyTeam)
 {
@@ -1699,6 +1709,7 @@ void CLuaHandle::UnitEnteredLos(const CUnit* unit, int allyTeam)
  * @param unitTeam TeamID
  * @param allyTeam AllyTeamID
  * @param unitDefID UnitDefID
+ * @param ghostID integer? Observer's sighting, when available to full-read handles.
  */
 void CLuaHandle::UnitLeftRadar(const CUnit* unit, int allyTeam)
 {
@@ -1718,6 +1729,7 @@ void CLuaHandle::UnitLeftRadar(const CUnit* unit, int allyTeam)
  * @param unitTeam TeamID
  * @param allyTeam AllyTeamID
  * @param unitDefID UnitDefID
+ * @param ghostID integer? Observer's sighting, when available to full-read handles.
  */
 void CLuaHandle::UnitLeftLos(const CUnit* unit, int allyTeam)
 {

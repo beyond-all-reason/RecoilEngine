@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_SYNCED_READ_H
-#define LUA_SYNCED_READ_H
+#pragma once
 
 struct lua_State;
 
@@ -87,6 +86,8 @@ class LuaSyncedRead {
 		static int GetUnitsInBox(lua_State* L);
 		static int GetUnitsInPlanes(lua_State* L);
 		static int GetUnitsInSphere(lua_State* L);
+		static int GetGhostPosition(lua_State* L);
+		static int GetGhostsInCylinder(lua_State* L);
 		static int GetUnitsInCylinder(lua_State* L);
 
 		static int GetUnitArrayCentroid(lua_State* L);
@@ -309,5 +310,3 @@ class LuaSyncedRead {
 		static int TraceRayGroundBetweenPositions(lua_State* L);
 		static int TraceRayGroundInDirection(lua_State* L);
 };
-
-#endif /* LUA_SYNCED_READ_H */

@@ -22,6 +22,7 @@
 #include "Rendering/Env/Decals/GroundDecalHandler.h"
 #include "Sim/Ecs/Helper.h"
 #include "Sim/Features/FeatureHandler.h"
+#include "Sim/Units/GhostSightings.h"
 #include "Sim/Units/UnitHandler.h"
 #include "Sim/Misc/BuildingMaskMap.h"
 #include "Sim/Misc/GroundBlockingObjectMap.h"
@@ -86,6 +87,7 @@ void CGameStateCollector::Serialize(creg::ISerializer* s)
 	s->SerializeObjectInstance(readMap, readMap->GetClass());
 	s->SerializeObjectInstance(&quadField, quadField.GetClass());
 	s->SerializeObjectInstance(&unitHandler, unitHandler.GetClass());
+	s->SerializeObjectInstance(&ghostSightings, ghostSightings.GetClass());
 	s->SerializeObjectInstance(&globalUnitParams, globalUnitParams.GetClass());
 	s->SerializeObjectInstance(cobEngine, cobEngine->GetClass());
 	s->SerializeObjectInstance(unitScriptEngine, unitScriptEngine->GetClass());

@@ -2,6 +2,7 @@
 
 #include <cassert>
 
+#include "Sim/Units/GhostSightings.h"
 #include "UnitHandler.h"
 #include "Unit.h"
 #include "UnitDefHandler.h"
@@ -94,6 +95,7 @@ CUnit* CUnitHandler::NewUnit(const UnitDef* ud)
 
 void CUnitHandler::Init() {
 	RECOIL_DETAILED_TRACY_ZONE;
+	ghostSightings.Init(teamHandler.ActiveAllyTeams());
 	GroundMoveSystem::Init();
 	GeneralMoveSystem::Init();
 	UnitTrapCheckSystem::Init();
@@ -287,6 +289,9 @@ void CUnitHandler::DeleteUnit(CUnit* delUnit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(delUnit->isDead);
+
+	if (delUnit->leavesGhost)
+		ghostSightings.RemoveUnit(*delUnit, true);
 
 	// we want to call RenderUnitDestroyed while the unit is still valid
 	eventHandler.RenderUnitDestroyed(delUnit);
