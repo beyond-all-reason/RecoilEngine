@@ -159,6 +159,7 @@ def main():
             assert "LUA_ERRRUN" not in content, "Lua error; see engine.log"
             assert "[Shader] Error:" not in content, "shader error; see engine.log"
             if args.lua_render:
+                assert "GHOST_TEST PASS radar icon leaves ghost highlight off" in content
                 for marker in ("live", "radar", "dead", "fallback"):
                     assert f"GHOST_TEST PASS Lua ghost renderer {marker}" in content, marker
             expected = 200
@@ -171,6 +172,8 @@ def main():
                     assert "GHOST_TEST PASS unsynced gadget DrawGhost" in content
                 assert "GHOST_TEST empty_sites true" in content
                 assert "GHOST_TEST synced_observers true" in content
+                for ally_team in (0, 2):
+                    assert f"GHOST_TEST late_unit_orders_allyteam_{ally_team} true" in content
                 assert "GHOST_TEST separate_sightings true" in content
                 assert "GHOST_TEST orders_recontact true" in content
                 if args.observer == 2 and not args.headless:
@@ -179,6 +182,11 @@ def main():
                 if args.observer == 0 and not args.headless:
                     for phase in ("continuous", "reacquired"):
                         assert f"GHOST_TEST PASS remembered radar minimap {phase}" in content, phase
+                        assert f"GHOST_TEST PASS radar model returns its unit {phase}" in content, phase
+                        assert f"GHOST_TEST PASS two trace results {phase}" in content, phase
+                    for event in ("radar_model_click_attack_unit", "radar_model_click_set_unit",
+                                  "radar_model_click_attack_ghost", "radar_model_click_set_ghost"):
+                        assert f"GHOST_TEST {event} true" in content, event
                     for case in ("inserted", "set-target"):
                         assert f"GHOST_TEST PASS LuaUI {case} height clamped" in content
                     for event in ("click_attack_y", "click_settarget_y"):

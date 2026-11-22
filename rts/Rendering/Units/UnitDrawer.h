@@ -54,7 +54,7 @@ public:
 	//static void UpdateStatic(); //use base
 public:
 	// Interface with CUnitDrawerData
-	static bool TraceGhost(const float3& start, const float3& dir, float length, float& ghostID, int& unitID, const CUnit* excludeUnit) { return modelDrawerData->TraceGhost(start, dir, length, ghostID, unitID, excludeUnit); }
+	static float TraceGhost(const float3& start, const float3& dir, float length, const CUnit* excludeUnit) { return modelDrawerData->TraceGhost(start, dir, length, excludeUnit); }
 	static void UpdateGhostedBuildings() { modelDrawerData->UpdateGhostedBuildings(); }
 
 	static uint32_t GetUnitDefImage(const UnitDef* ud) { return modelDrawerData->GetUnitDefImage(ud); }

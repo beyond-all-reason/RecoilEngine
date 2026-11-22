@@ -28,8 +28,9 @@ cannot be undone if a callback subsequently returns false or errors.
 
 Ordinary GL4 ghosts still use the existing batches. Custom draws use the legacy
 static geometry interface on both backends, suitable for a small hover set.
-To highlight one sighting, compare the picked ghost ID with `info.ghostID` and
-draw it in the desired color. Return false for the other sightings.
+For a `"ghost"` hit, match a sighting ID against `info.ghostID`. For a radar unit
+ID, match it against the fourth result of `Spring.GetGhostPosition(info.ghostID)`.
+Return false for other models.
 
 ## Querying remembered aimpoints
 
@@ -49,10 +50,10 @@ loss of LOS and the observer's current sensor coverage. Hidden ownership changes
 preserve the sighting and its remembered icon. Several sightings of the same
 unit can coexist after detachment.
 
-With ghost picking enabled, `Spring.TraceScreenRay` returns `"ghost", ghostID`
-for a remembered model. With radar contact a model hit returns
-`"unit", unitID, ghostID`. A plain unit or radar icon hit returns
-`"unit", unitID`. Full-read LOS and radar call-ins receive the sighting ID
+With ghost picking enabled, a remembered model hit returns `"ghost", targetID`.
+On radar this is the unit ID (below `Game.maxUnits`), otherwise it is the
+observer's sighting ID. A visible unit or its radar icon returns `"unit", unitID`.
+Full-read LOS and radar call-ins receive the sighting ID
 as an optional fifth argument. The ID remains valid during `UnitEnteredLos`
 and expires after that callback.
 

@@ -126,6 +126,72 @@ local function checkObserverRay(frame)
 	end
 end
 
+local function clickModel(x, y, attackUnit, setTargetUnit)
+	local command
+	local w = {}
+	local spring = setmetatable({
+		GetActiveCommand = function()
+			return 1, command
+		end,
+		GetMouseState = function()
+			return math.floor(x), math.floor(y), false
+		end,
+		IsAboveMiniMap = function()
+			return false
+		end,
+	}, { __index = Spring })
+	local tables = setmetatable({
+		copy = function(t)
+			local copy = {}
+			for k, v in pairs(t) do
+				copy[k] = v
+			end
+			return copy
+		end,
+	}, { __index = table })
+	local env = setmetatable(
+		{
+			widget = w,
+			Spring = spring,
+			table = tables,
+			GameCMD = {
+				GHOST_ATTACK = Spring.GetGameRulesParam("ghost_test_attack_cmd"),
+				GHOST_SET_TARGET = Spring.GetGameRulesParam("ghost_test_set_cmd"),
+				UNIT_SET_TARGET = Spring.GetGameRulesParam("ghost_test_command"),
+				UNIT_SET_TARGET_NO_GROUND = Spring.GetGameRulesParam("ghost_test_command_no_ground"),
+			},
+			WG = {},
+			UnitDefs = {},
+			widgetHandler = {
+				RegisterGlobal = function() end,
+				CommandNotify = function()
+					return false
+				end,
+			},
+		},
+		{ __index = _G }
+	)
+	local ignoreSelf = {}
+	env.widget = ignoreSelf
+	VFS.Include("luaui/Widgets/cmd_no_self_selection.lua", env)
+	ignoreSelf:Initialize()
+	env.widget = w
+	VFS.Include("luaui/Widgets/cmd_ghost_target.lua", env)
+	for _, pair in ipairs({
+		{ CMD.ATTACK, attackUnit },
+		{ env.GameCMD.UNIT_SET_TARGET, setTargetUnit },
+	}) do
+		command = pair[1]
+		Spring.SelectUnitArray({ pair[2] })
+		w:MousePress(math.floor(x), math.floor(y), 1)
+		check(w:CommandNotify(command, { 2048, 200, 2048 }, { coded = 0 }), "widget resolves click " .. command)
+	end
+end
+
+local function withArity(...)
+	return select("#", ...), ...
+end
+
 function Update()
 	local frame = math.floor(Spring.GetGameFrame() / 6)
 	if Spring.GetMyAllyTeamID() == 2 then
@@ -174,34 +240,47 @@ function Update()
 	if candidate and radarPhase and not seen[radarPhase] then
 		seen[radarPhase] = true
 		local cx, cy = Spring.WorldToScreenCoords(2048, 240, 2048)
-		local modelHit, iconHit, iconConsistent = false, false, true
+		local modelHit, iconConsistent = false, true
+		local iconX, iconY
 		local counts = {}
 		local sighting = Spring.GetGhostsInCylinder(2060, 2056, 1)[1]
+		local targetID = Spring.GetGameRulesParam("ghost_test_target")
+		local _, _, _, contact = Spring.GetGhostPosition(sighting)
+		local exactArity = true
 		for dx = -60, 60, 3 do
 			for dy = -60, 60, 3 do
 				local x, y = math.floor(cx + dx), math.floor(cy + dy)
 				local ordinary, ordinaryID = Spring.TraceScreenRay(x, y)
-				local kind, result, ghostID = Spring.TraceScreenRay(x, y, false, false, false, false, 0, true)
+				local n, kind, result = withArity(Spring.TraceScreenRay(x, y, false, false, false, false, 0, true))
+				if kind == "unit" or kind == "ghost" then exactArity = exactArity and n == 2 end
 				counts[tostring(ordinary) .. "/" .. tostring(kind)] = (counts[tostring(ordinary) .. "/" .. tostring(kind)] or 0) + 1
-				if ordinary == "unit" and ordinaryID == Spring.GetGameRulesParam("ghost_test_target") then
-					iconHit = true
+				if ordinary == "unit" and ordinaryID == targetID then
+					iconX, iconY = x, y
 					iconConsistent = iconConsistent and kind == "unit" and result == ordinaryID
 				end
-				if kind == "unit" and result == Spring.GetGameRulesParam("ghost_test_target") and ghostID then
-					if ghostID == sighting then
-						modelHit = true
-						radarX, radarY = x, y
-					end
+				if kind == "ghost" and result == targetID and contact == targetID then
+					modelHit = true
+					radarX, radarY = x, y
 				end
 			end
 		end
 		for kinds, count in pairs(counts) do Spring.Echo("GHOST_TEST radar_rays " .. kinds .. " " .. count) end
 		-- The injected reacquired-radar state does not populate the terrain radar map.
 		if radarPhase == "continuous" then
-			check(iconHit, "radar icon remains selectable")
+			check(iconX ~= nil, "radar icon remains selectable")
+			if luaRender and iconX then
+				hoverPhase, hoverX, hoverY = "radar", iconX, iconY
+				ghostRenderer:Update()
+				check(not hoverDrawActive, "radar icon leaves ghost highlight off")
+				hoverPhase = nil
+			end
 		end
 		check(iconConsistent, "radar icon keeps unit target")
-		check(modelHit, "remembered model resolves to the same radar unit target")
+		check(modelHit, "radar model returns its unit " .. radarPhase)
+		check(exactArity, "two trace results " .. radarPhase)
+		if radarPhase == "continuous" and modelHit then
+			clickModel(radarX, radarY, Spring.GetGameRulesParam("ghost_test_radar_attack"), Spring.GetGameRulesParam("ghost_test_radar_priority"))
+		end
 	end
 	if frame > 15 and not seen.camera then
 		Spring.SetCameraState({ name = "fps", px = 2048, py = 600, pz = 2648, rx = 2.1112, ry = 0, rz = 0 }, 0)
@@ -230,65 +309,7 @@ function Update()
 			check(kind == "ground", "baseline " .. phase .. " click hits ground")
 		end
 		if phase == "ghost" and candidate then
-			local command
-			local w = {}
-			local spring = setmetatable({
-				GetActiveCommand = function()
-					return 1, command
-				end,
-				GetMouseState = function()
-					return math.floor(x), math.floor(y), false
-				end,
-				IsAboveMiniMap = function()
-					return false
-				end,
-			}, { __index = Spring })
-			local tables = setmetatable({
-				copy = function(t)
-					local copy = {}
-					for k, v in pairs(t) do
-						copy[k] = v
-					end
-					return copy
-				end,
-			}, { __index = table })
-			local env = setmetatable(
-				{
-					widget = w,
-					Spring = spring,
-					table = tables,
-					GameCMD = {
-						GHOST_ATTACK = Spring.GetGameRulesParam("ghost_test_attack_cmd"),
-						GHOST_SET_TARGET = Spring.GetGameRulesParam("ghost_test_set_cmd"),
-						UNIT_SET_TARGET = Spring.GetGameRulesParam("ghost_test_command"),
-						UNIT_SET_TARGET_NO_GROUND = Spring.GetGameRulesParam("ghost_test_command_no_ground"),
-					},
-					WG = {},
-					UnitDefs = {},
-					widgetHandler = {
-						RegisterGlobal = function() end,
-						CommandNotify = function()
-							return false
-						end,
-					},
-				},
-				{ __index = _G }
-			)
-			local ignoreSelf = {}
-			env.widget = ignoreSelf
-			VFS.Include("luaui/Widgets/cmd_no_self_selection.lua", env)
-			ignoreSelf:Initialize()
-			env.widget = w
-			VFS.Include("luaui/Widgets/cmd_ghost_target.lua", env)
-			for _, pair in ipairs({
-				{ CMD.ATTACK, Spring.GetGameRulesParam("ghost_test_attack") },
-				{ env.GameCMD.UNIT_SET_TARGET, Spring.GetGameRulesParam("ghost_test_priority") },
-			}) do
-				command = pair[1]
-				Spring.SelectUnitArray({ pair[2] })
-				w:MousePress(math.floor(x), math.floor(y), 1)
-				check(w:CommandNotify(command, { 2048, 200, 2048 }, { coded = 0 }), "widget resolves click " .. command)
-			end
+			clickModel(x, y, Spring.GetGameRulesParam("ghost_test_attack"), Spring.GetGameRulesParam("ghost_test_priority"))
 		end
 		local ordinary = Spring.TraceScreenRay(math.floor(x), math.floor(y))
 		check(ordinary ~= "ghost", "ordinary trace unchanged " .. phase)

@@ -80,7 +80,7 @@ public:
 
 	bool UpdateUnitGhosts(const CUnit* unit);
 	void UnitLeavesGhostChanged(const CUnit* unit);
-	bool TraceGhost(const float3& start, const float3& dir, float length, float& ghostID, int& unitID, const CUnit* excludeUnit) const;
+	float TraceGhost(const float3& start, const float3& dir, float length, const CUnit* excludeUnit) const;
 public:
 	class TempDrawUnit {
 		CR_DECLARE_STRUCT(TempDrawUnit)

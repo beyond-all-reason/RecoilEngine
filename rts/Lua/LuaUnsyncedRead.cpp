@@ -3360,10 +3360,9 @@ int LuaUnsyncedRead::WorldToScreenCoords(lua_State* L)
  * @param includeSky boolean? (Default: `false`)
  * @param ignoreWater boolean? (Default: `false`)
  * @param heightOffset number? (Default: `0`)
- * @param includeGhosts boolean? Opt in to remembered model hits in the world view. A pure ghost returns its sighting ID; a radar model also returns its sighting ID after the unit ID.
+ * @param includeGhosts boolean? Opt in to remembered model hits in the world view. A model hit returns "ghost" and its radar unit ID or, without contact, its sighting ID. Radar icon hits return "unit" and the unit ID.
  * @return ("unit"|"feature"|"ground"|"sky"|"ghost")? description Type of the traced object or position.
- * @return UnitID|FeatureID|xyz|nil result Unit or feature ID, world coordinates, or the ghost sighting ID.
- * @return integer? ghostID Sighting ID when a remembered model resolves to a radar unit.
+ * @return UnitID|FeatureID|integer|xyz|nil result Unit, feature or ghost sighting ID, or world coordinates.
  */
 int LuaUnsyncedRead::TraceScreenRay(lua_State* L)
 {
@@ -3429,22 +3428,11 @@ int LuaUnsyncedRead::TraceScreenRay(lua_State* L)
 	const float planeDist = CGround::LinePlaneCol(camPos, pxlDir, rawRange, luaL_optnumber(L, newArgIdx, 0.0f));
 
 	if (!onlyCoords && optArgIdx == 3 && luaL_optboolean(L, 8, false)) {
-		float ghostID = 0;
-		int radarUnitID = -1;
-		bool ghostHit = CUnitDrawer::TraceGhost(camPos, pxlDir, traceDist >= 0.0f ? traceDist : rawRange, ghostID, radarUnitID, unit);
-		if (!ghostHit && unit != nullptr && gu->myAllyTeam >= 0 && (unit->losStatus[gu->myAllyTeam] & (LOS_INLOS | LOS_INRADAR)) == LOS_INRADAR) {
-			ghostHit = CUnitDrawer::TraceGhost(camPos, pxlDir, rawRange, ghostID, radarUnitID, nullptr) && radarUnitID == unit->id;
-		}
-		if (ghostHit) {
-			if (radarUnitID < 0) {
-				lua_pushliteral(L, "ghost");
-				lua_pushnumber(L, ghostID);
-				return 2;
-			}
-			lua_pushliteral(L, "unit");
-			lua_pushnumber(L, radarUnitID);
-			lua_pushnumber(L, ghostID);
-			return 3;
+		const float targetID = CUnitDrawer::TraceGhost(camPos, pxlDir, traceDist >= 0.0f ? traceDist : rawRange, unit);
+		if (targetID >= 0) {
+			lua_pushliteral(L, "ghost");
+			lua_pushnumber(L, targetID);
+			return 2;
 		}
 	}
 

@@ -771,13 +771,13 @@ void CUnitDrawerData::RemoveDeadGhost(GhostSolidObject* gso, std::vector<GhostSo
 	dgb.pop_back();
 }
 
-bool CUnitDrawerData::TraceGhost(const float3& start, const float3& dir, float length, float& ghostID, int& unitID, const CUnit* excludeUnit) const
+float CUnitDrawerData::TraceGhost(const float3& start, const float3& dir, float length, const CUnit* excludeUnit) const
 {
 	if (!gameSetup->ghostedBuildings || gu->spectatingFullView || gu->myAllyTeam < 0)
-		return false;
+		return -1;
 
-	bool hit = false;
-	const auto trace = [&](const GhostTarget& target, int radarUnitID) {
+	float targetID = -1;
+	const auto trace = [&](const GhostTarget& target, const CUnit* radarContact) {
 		if (!target.selectable)
 			return;
 		CollisionQuery query;
@@ -790,18 +790,16 @@ bool CUnitDrawerData::TraceGhost(const float3& start, const float3& dir, float l
 		if (sighting == nullptr)
 			return;
 		length = distance;
-		ghostID = target.sightingKey;
-		unitID = radarUnitID;
-		hit = true;
+		targetID = (radarContact != nullptr && sighting->unitID == radarContact->id) ? radarContact->id : target.sightingKey;
 	};
 
 	for (int type = MODELTYPE_3DO; type < MODELTYPE_CNT; ++type) {
 		for (const auto& live : savedData.liveGhostBuildings[gu->myAllyTeam][type]) {
 			if (live.unit != excludeUnit && (live.unit->losStatus[gu->myAllyTeam] & LOS_INLOS) == 0)
-				trace(live.target, (live.unit->losStatus[gu->myAllyTeam] & LOS_INRADAR) != 0 ? live.unit->id : -1);
+				trace(live.target, (live.unit->losStatus[gu->myAllyTeam] & LOS_INRADAR) ? live.unit : nullptr);
 		}
 		for (const auto* dead : savedData.deadGhostBuildings[gu->myAllyTeam][type])
-			trace(dead->target, -1);
+			trace(dead->target, nullptr);
 	}
-	return hit;
+	return targetID;
 }

@@ -15,7 +15,7 @@ python3 test/validation/ghost_target/run.py \
 
 Pass `--baseline` with an unmodified engine to reproduce the original ground-height
 behavior. Both builds clamp a raw positional attack to Y=200, including a supplied height flag.
-Only a validated ghost request on the candidate yields an attack at Y=280.
+BAR resolves validated sightings to their saved aim height, including Y=280.
 The nuclear weapon exception stays at Y=200. The candidate also exercises BAR's widget through its click/command callins and the real Ignore Self ray wrapper.
 
 The graphical checks cover ordinary unit selection, live ghosts, hidden aimpoint changes,
@@ -28,8 +28,11 @@ Set Target-click with a direct-fire unit. Check the command endpoint and fire ab
 walls. Repeat with Shift and queue insertion, and confirm area drags and empty-ground
 clicks keep their prior behavior. Minimap clicks keep their existing handling.
 
-Radar coverage checks that the icon remains a unit target while the remembered model
-resolves to that same unit target and supplies the sighting ID as its third result.
+Radar coverage checks the two results for both picks: the icon returns `"unit", unitID`
+and the remembered model returns `"ghost", unitID` on radar. Both clicks issue a
+unit-targeted order. After radar loss, fresh Attack, inserted Attack and Set
+Target orders addressed to that unit ID must use each allyteam's frozen XYZ.
+The fixture checks the inserted command's queue position and options.
 
 ## Lua hover and engine fallback
 

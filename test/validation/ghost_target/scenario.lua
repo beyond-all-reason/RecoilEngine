@@ -24,6 +24,7 @@ if not gadgetHandler:IsSyncedCode() then
 	return
 end
 local target, attack, priority, nuke
+local radarAttack, radarPriority, lateTarget
 local firstGhost
 local vetoAttack
 function gadget:Initialize()
@@ -143,6 +144,41 @@ local function checkOrders(probe, foreignID)
 	report("orders_recontact", true)
 end
 
+-- All three recipients get their first targeting order after this observer lost radar.
+local function checkLateOrders(target, allyTeam, x, y, z)
+	local function shooter(offset)
+		local id = assert(Spring.CreateUnit("armrock", 2250 + offset, 200, 2000 - 50 * allyTeam, 0, allyTeam))
+		Spring.SetUnitSensorRadius(id, "los", 0)
+		Spring.SetUnitSensorRadius(id, "airLos", 0)
+		return id
+	end
+	local direct, inserted, setter = shooter(0), shooter(50), shooter(100)
+	local ghostID = assert(Spring.GetGhostsInCylinder(x, z, 1, allyTeam)[1])
+	assert(not select(4, Spring.GetGhostPosition(ghostID, allyTeam)))
+	Spring.GiveOrderToUnit(direct, CMD.ATTACK, {target}, 0)
+	Spring.GiveOrderToUnit(inserted, CMD.MOVE, {1700, 200, 1600}, 0)
+	local anchor = Spring.GetUnitCommands(inserted, 1)[1].tag
+	Spring.GiveOrderToUnit(inserted, CMD.INSERT, {anchor, CMD.ATTACK, CMD.OPT_SHIFT, target}, 0)
+	Spring.GiveOrderToUnit(setter, GameCMD.UNIT_SET_TARGET, {target}, 0)
+	local function atSighting(p)
+		return p and #p == 3 and p[1] == x and p[2] == y and p[3] == z
+	end
+	local cmd = Spring.GetUnitCommands(direct, 1)[1]
+	assert(cmd and cmd.id == CMD.ATTACK and cmd.options.keepheight and atSighting(cmd.params), "late attack")
+	local queue = Spring.GetUnitCommands(inserted, -1)
+	assert(#queue == 2 and queue[2].tag == anchor and queue[1].id == CMD.ATTACK
+		and queue[1].options.shift and queue[1].options.keepheight and atSighting(queue[1].params), "late insert")
+	local entry = assert(GG.GetUnitTargetList(setter))[1]
+	assert(entry.ghostID == ghostID and atSighting(entry.target), "late Set Target")
+	Spring.SetUnitLosState(target, allyTeam, 6)
+	local directCmd = Spring.GetUnitCommands(direct, 1)[1]
+	queue = Spring.GetUnitCommands(inserted, -1)
+	assert(#directCmd.params == 1 and directCmd.params[1] == target, "late attack on recontact")
+	assert(#queue == 2 and queue[2].tag == anchor and #queue[1].params == 1 and queue[1].params[1] == target, "late insert on recontact")
+	assert(GG.GetUnitTargetList(setter)[1].target == target, "late Set Target on recontact")
+	report("late_unit_orders_allyteam_" .. allyTeam, true)
+end
+
 -- Both observable sites are empty. Their sightings must expire together, regardless of hidden survival.
 local probes, probeGhosts, sites = {}, {}, {}
 local function checkEmptySites(frame)
@@ -198,7 +234,11 @@ function gadget:GameFrame(frame)
 		target = assert(Spring.CreateUnit("cordoom", 2048, 200, 2048, 0, 1))
 		attack = assert(Spring.CreateUnit("armrock", 2048, 200, 1750, 0, 0))
 		priority = assert(Spring.CreateUnit("armrock", 2100, 200, 1750, 0, 0))
-		for _, id in ipairs({ attack, priority }) do
+		radarAttack = assert(Spring.CreateUnit("armrock", 1930, 200, 1750, 0, 0))
+		radarPriority = assert(Spring.CreateUnit("armrock", 1980, 200, 1750, 0, 0))
+		Spring.SetGameRulesParam("ghost_test_radar_attack", radarAttack)
+		Spring.SetGameRulesParam("ghost_test_radar_priority", radarPriority)
+		for _, id in ipairs({ attack, priority, radarAttack, radarPriority }) do
 			Spring.GiveOrderToUnit(id, CMD.FIRE_STATE, { 0 }, 0)
 			Spring.GiveOrderToUnit(id, CMD.MOVE_STATE, { 0 }, 0)
 			Spring.SetUnitSensorRadius(id, "los", 0)
@@ -290,6 +330,17 @@ function gadget:GameFrame(frame)
 		end
 	elseif frame == 170 then
 		Spring.SetUnitLosState(target, 0, 6)
+	elseif (frame == 174 or frame == 177) and firstGhost then
+		local cmd = Spring.GetUnitCommands(radarAttack, 1)[1]
+		local list = GG.GetUnitTargetList(radarPriority)
+		local entry = list and list[1]
+		if frame == 174 then
+			report("radar_model_click_attack_unit", cmd and cmd.id == CMD.ATTACK and #cmd.params == 1 and cmd.params[1] == target)
+			report("radar_model_click_set_unit", entry and entry.target == target)
+		else
+			report("radar_model_click_attack_ghost", cmd and cmd.id == CMD.ATTACK and cmd.options.keepheight and cmd.params[2] == 280)
+			report("radar_model_click_set_ghost", entry and entry.ghostID == firstGhost)
+		end
 	elseif frame == 175 then
 		Spring.SetUnitLosState(target, 0, 4)
 	elseif frame == 180 then
@@ -323,6 +374,21 @@ function gadget:GameFrame(frame)
 		checkSighting(2, 2020, 300, 2050, true)
 		report("separate_sightings", true)
 		checkOrders(probe, Spring.GetGameRulesParam("ghost_test_foreign_id"))
+	elseif frame == 282 and Spring.GetGhostPosition then
+		Spring.SetGlobalLos(0, false)
+		lateTarget = assert(Spring.CreateUnit("cordoom", 2400, 200, 2256, 0, 1))
+		for _, allyTeam in ipairs({0, 2}) do
+			Spring.SetUnitLosMask(lateTarget, allyTeam, 15)
+			Spring.SetUnitLosState(lateTarget, allyTeam, 15)
+			Spring.SetUnitMidAndAimPos(lateTarget, 2400, 240, 2256, 2412, 280 + 60 * allyTeam, 2264)
+			Spring.SetUnitLosState(lateTarget, allyTeam, 14)
+		end
+	elseif frame == 284 and lateTarget then
+		Spring.SetUnitLosState(lateTarget, 0, 4)
+		Spring.SetUnitLosState(lateTarget, 2, 4)
+	elseif frame == 286 and lateTarget then
+		checkLateOrders(lateTarget, 0, 2412, 280, 2264)
+		checkLateOrders(lateTarget, 2, 2412, 400, 2264)
 	elseif frame == 300 then
 		report("synced_done", true)
 		SendToUnsynced("ghost_test_finish")
