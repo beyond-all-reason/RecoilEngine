@@ -137,7 +137,7 @@ void LuaObjectRenderingImpl::PushFunction(lua_State* L, int (*fnPntr)(lua_State*
  *
  * @function ObjectRenderingTable.GetLODCount
  * @param objectID ObjectID
- * @return integer lodCount
+ * @return integer? lodCount
  * @return integer currentLOD
  */
 int LuaObjectRenderingImpl::GetLODCount(lua_State* L)
@@ -234,7 +234,7 @@ int LuaObjectRenderingImpl::SetLODDistance(lua_State* L)
  * @param objectID ObjectID
  * @param lodLevel integer
  * @param piece integer
- * @param ... any
+ * @param displayList integer? Without it, the piece uses the default display list again.
  * @return nil
  */
 int LuaObjectRenderingImpl::SetPieceList(lua_State* L)
@@ -383,12 +383,11 @@ static LuaMatRef ParseMaterial(lua_State* L, int index, LuaMatType matType) {
 /******************************************************************************/
 /******************************************************************************/
 
-/*** Get a material reference for a LOD level.
+/*** Make a material reference from a material table, for use with `SetMaterial`.
  *
  * @function ObjectRenderingTable.GetMaterial
- * @param objectID ObjectID
- * @param lodLevel integer
- * @param materialName string
+ * @param materialType string `"alpha"`, `"opaque"`, `"alpha_reflect"`, `"opaque_reflect"` or `"shadow"`
+ * @param material table
  * @return userdata matRef
  */
 int LuaObjectRenderingImpl::GetMaterial(lua_State* L)
@@ -419,7 +418,7 @@ int LuaObjectRenderingImpl::GetMaterial(lua_State* L)
  * @param objectID ObjectID
  * @param lodLevel integer
  * @param materialName string
- * @param materialTable table
+ * @param material table|userdata A material table, or a material reference from `GetMaterial`.
  * @return nil
  */
 int LuaObjectRenderingImpl::SetMaterial(lua_State* L)
@@ -490,7 +489,8 @@ int LuaObjectRenderingImpl::SetMaterialLastLOD(lua_State* L)
  * @param objectID ObjectID
  * @param lodLevel integer
  * @param materialName string
- * @param displayListTable table
+ * @param preDisplayList integer?
+ * @param postDisplayList integer?
  * @return nil
  */
 int LuaObjectRenderingImpl::SetMaterialDisplayLists(lua_State* L)
@@ -583,14 +583,22 @@ static int SetMaterialUniform(lua_State* L, LuaObjType objType, LuaMatShader::Pa
 
 /*** @function ObjectRenderingTable.SetDeferredMaterialUniform
  * @param objectID ObjectID
- * @param ... any uniform values
- * @return nil
+ * @param materialName string
+ * @param lodLevel integer
+ * @param uniformName string
+ * @param uniformType integer OpenGL type of the data: int, ivec2 to ivec4, float, vec2 to vec4, mat3 or mat4 (for example `GL.FLOAT_VEC4`).
+ * @param uniformData number[]
+ * @return boolean? success
  */
 int LuaObjectRenderingImpl::SetDeferredMaterialUniform(lua_State* L) { return (SetMaterialUniform(L, GetObjectType(), LuaMatShader::LUASHADER_PASS_DFR)); }
 /*** @function ObjectRenderingTable.SetForwardMaterialUniform
  * @param objectID ObjectID
- * @param ... any uniform values
- * @return nil
+ * @param materialName string
+ * @param lodLevel integer
+ * @param uniformName string
+ * @param uniformType integer OpenGL type of the data: int, ivec2 to ivec4, float, vec2 to vec4, mat3 or mat4 (for example `GL.FLOAT_VEC4`).
+ * @param uniformData number[]
+ * @return boolean? success
  */
 int LuaObjectRenderingImpl::SetForwardMaterialUniform(lua_State* L) { return (SetMaterialUniform(L, GetObjectType(), LuaMatShader::LUASHADER_PASS_FWD)); }
 
@@ -632,14 +640,18 @@ static int ClearMaterialUniform(lua_State* L, LuaObjType objType, LuaMatShader::
 
 /*** @function ObjectRenderingTable.ClearDeferredMaterialUniform
  * @param objectID ObjectID
- * @param ... any uniform indices
- * @return nil
+ * @param materialName string
+ * @param lodLevel integer
+ * @param uniformName string `"$obj"` clears all uniforms of this object, `"$all"` clears them for all objects.
+ * @return boolean? success
  */
 int LuaObjectRenderingImpl::ClearDeferredMaterialUniform(lua_State* L) { return (ClearMaterialUniform(L, GetObjectType(), LuaMatShader::LUASHADER_PASS_FWD)); }
 /*** @function ObjectRenderingTable.ClearForwardMaterialUniform
  * @param objectID ObjectID
- * @param ... any uniform indices
- * @return nil
+ * @param materialName string
+ * @param lodLevel integer
+ * @param uniformName string `"$obj"` clears all uniforms of this object, `"$all"` clears them for all objects.
+ * @return boolean? success
  */
 int LuaObjectRenderingImpl::ClearForwardMaterialUniform(lua_State* L) { return (ClearMaterialUniform(L, GetObjectType(), LuaMatShader::LUASHADER_PASS_DFR)); }
 
@@ -729,7 +741,7 @@ static void PrintObjectLOD(const CSolidObject* obj, int lod)
 /*** Print debug info about the object's material data.
  *
  * @function ObjectRenderingTable.Debug
- * @param objectID ObjectID
+ * @param objectID ObjectID? Without it, prints all material bins.
  * @return nil
  */
 int LuaObjectRenderingImpl::Debug(lua_State* L)
