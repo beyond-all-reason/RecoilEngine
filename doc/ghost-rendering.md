@@ -62,6 +62,8 @@ and expires after that callback.
 Attack and Manual Fire. The basecontent LuaRules gadget
 `LuaRules/Gadgets/cmd_keep_height_compat.lua` clears this bit on direct orders
 and on the embedded options of `CMD.INSERT`. Unflagged orders pass through.
+The gadget reissues flagged orders through synced Lua. Command listeners see
+that issuer on the replacement. A custom Lua order timeout is lost on reissue.
 Games that validate explicit heights themselves can override this file with
 `return false`. Custom handlers that load only game archives must include
 the base gadget explicitly if they want the legacy policy.
