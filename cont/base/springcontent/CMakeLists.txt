@@ -98,6 +98,7 @@ list(APPEND FILES
 	bitmaps/icons/frame_slate_hilite_128x96.png
 	bitmaps/minimapbuttons.png
 	bitmaps/testsky.dds
+	LuaRules/Gadgets/cmd_keep_height_compat.lua
 	LuaGadgets/callins.lua
 	LuaGadgets/Gadgets/share_levels.lua
 	LuaGadgets/Gadgets/cmd_nocost.lua
