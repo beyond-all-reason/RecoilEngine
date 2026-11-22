@@ -1,6 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "UnitDrawer.h"
+#include "GhostDrawInfo.h"
 #include "Rendering/Models/IModelParser.h"
 
 #include <algorithm>
@@ -93,6 +94,51 @@ static void DrawGhostIcons(const CUnitDrawerData& data, int allyTeam, Draw draw)
 	}
 	for (const auto* dead : data.GetDeadGhostBuildings(allyTeam))
 		draw(dead->target, dead->team);
+}
+
+// Keep the Lua ABI identical in GL4 and GLSL. Ordinary GL4 ghosts remain batched.
+static bool DrawLuaGhost(const GhostTarget& target, const S3DModel* model)
+{
+#ifdef HEADLESS
+	return false;
+#else
+	if (!eventHandler.HasDrawGhost())
+		return false;
+	GhostDrawInfo info;
+	info.model = model;
+	info.transform = target.modelTransform;
+	info.teamColor = target.teamColor;
+	info.ghostID = target.sightingKey;
+	info.allyTeam = gu->myAllyTeam;
+
+	GLint program, vao, arrayBuffer, matrixMode;
+	glGetIntegerv(GL_CURRENT_PROGRAM, &program);
+	glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vao);
+	glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &arrayBuffer);
+	glGetIntegerv(GL_MATRIX_MODE, &matrixMode);
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glBindVertexArray(0);
+	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+	glMatrixMode(GL_PROJECTION);
+	glPushMatrix();
+	glLoadMatrixf(camera->GetProjectionMatrix());
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+	glLoadMatrixf(camera->GetViewMatrix());
+	glUseProgram(0);
+	const bool handled = eventHandler.DrawGhost(info);
+	glMatrixMode(GL_MODELVIEW);
+	glPopMatrix();
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+	glMatrixMode(matrixMode);
+	glPopClientAttrib();
+	glBindVertexArray(vao);
+	glBindBuffer(GL_ARRAY_BUFFER, arrayBuffer);
+	glUseProgram(program);
+	glPopAttrib();
+	return handled;
+#endif
 }
 
 //don't inherit and leave only static Unit specific helpers
@@ -1142,6 +1188,8 @@ void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 		if (!camera->InView(dgb->target.modelTransform.GetPos(), model->GetDrawRadius()))
 			continue;
 
+		if (DrawLuaGhost(dgb->target, model))
+			continue;
 
 		glPushMatrix();
 		glMultMatrixf(dgb->target.modelTransform);
@@ -1163,6 +1211,8 @@ void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 
 		const unsigned short losStatus = unit->losStatus[gu->myAllyTeam];
 
+		if (DrawLuaGhost(lgb.target, model))
+			continue;
 
 		// ghosted enemy units
 		if (losStatus & LOS_CONTRADAR) {
@@ -2072,6 +2122,8 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 			if (!dgb->worldTransformAlloc.Valid())
 				continue;
 
+			if (DrawLuaGhost(dgb->target, model))
+				continue;
 
 			byTex[model->textureType].push_back({ model, static_cast<uint32_t>(dgb->worldTransformAlloc.GetOffset()), dgb->paletteIndex });
 			any = true;
@@ -2107,6 +2159,8 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 
 			const unsigned short losStatus = u->losStatus[gu->myAllyTeam];
 			const bool contradar = (losStatus & LOS_CONTRADAR);
+			if (DrawLuaGhost(lgb.target, model))
+				continue;
 
 			// bucket with the palette the unit was last seen under, not the live unit's current one
 			(contradar ? byTexContradar : byTexNormal)[model->textureType]

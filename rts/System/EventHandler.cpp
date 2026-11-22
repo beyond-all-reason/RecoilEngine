@@ -753,6 +753,17 @@ DRAW_CALLIN(InMiniMapBackground)
   }
 
 
+bool CEventHandler::DrawGhost(const GhostDrawInfo& info)
+{
+	for (size_t i = 0; i < listDrawGhost.size(); ) {
+		CEventClient* ec = listDrawGhost[i];
+		if (ec->DrawGhost(info))
+			return true;
+		i += (i < listDrawGhost.size() && ec == listDrawGhost[i]);
+	}
+	return false;
+}
+
 DRAW_ENTITY_CALLIN(Unit, (const CUnit* unit), (unit))
 DRAW_ENTITY_CALLIN(Feature, (const CFeature* feature), (feature))
 DRAW_ENTITY_CALLIN(Shield, (const CUnit* unit, const CWeapon* weapon), (unit, weapon))

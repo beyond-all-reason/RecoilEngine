@@ -1045,6 +1045,15 @@ function gadgetHandler:DrawUnit(unitID, drawMode)
   return false
 end
 
+function gadgetHandler:DrawGhost(info)
+  for _,g in r_ipairs(self.DrawGhostList) do
+    if g:DrawGhost(info) then
+      return true
+    end
+  end
+  return false
+end
+
 function gadgetHandler:DrawFeature(featureID, drawMode)
   for _,g in r_ipairs(self.DrawFeatureList) do
     if (g:DrawFeature(featureID, drawMode)) then

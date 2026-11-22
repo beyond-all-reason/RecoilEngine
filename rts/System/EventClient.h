@@ -23,6 +23,7 @@ using std::vector;
 
 struct CExplosionParams;
 class CSolidObject;
+struct GhostDrawInfo;
 class CUnit;
 class CWeapon;
 class CFeature;
@@ -370,6 +371,7 @@ class CEventClient
 		virtual void DrawInMiniMap() {}
 		virtual void DrawInMiniMapBackground() {}
 
+		virtual bool DrawGhost(const GhostDrawInfo& info) { return false; }
 		virtual bool DrawUnit(const CUnit* unit) { return false; }
 		virtual bool DrawFeature(const CFeature* feature) { return false; }
 		virtual bool DrawShield(const CUnit* unit, const CWeapon* weapon) { return false; }
