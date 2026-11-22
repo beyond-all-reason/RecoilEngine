@@ -152,7 +152,7 @@ class CEventHandler
 		                      const CWeapon* weapon, int oldCount);
 
 		bool CommandFallback(const CUnit* unit, const Command& cmd);
-		bool AllowCommand(const CUnit* unit, const Command& cmd, int playerNum, bool fromSynced, bool fromLua);
+		bool AllowCommand(const CUnit* unit, const Command& cmd, int playerNum, bool fromSynced, bool fromLua, bool& clearKeepHeight);
 
 		std::pair <bool, bool> AllowUnitCreation(const UnitDef* unitDef, const CUnit* builder, const BuildInfo* buildInfo);
 		bool AllowUnitTransfer(const CUnit* unit, int newTeam, bool capture);

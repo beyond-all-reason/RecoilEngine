@@ -62,8 +62,12 @@ and expires after that callback.
 Attack and Manual Fire. The basecontent LuaRules gadget
 `LuaRules/Gadgets/cmd_keep_height_compat.lua` clears this bit on direct orders
 and on the embedded options of `CMD.INSERT`. Unflagged orders pass through.
-The gadget reissues flagged orders through synced Lua. Command listeners see
-that issuer on the replacement. A custom Lua order timeout is lost on reissue.
+In synced `AllowCommand`, the gadget sets `cmdOptions.clearKeepHeight = true`
+and allows the order. The engine clears the bit for this recipient before
+`UnitCommand`. Both call-ins receive the original player ID and source flags.
+Custom gadget handlers using this feature pass through the original options
+table. An explicit timeout on `CMD.INSERT` becomes the queued command’s
+absolute timeout frame, as for a direct order.
 Games that validate explicit heights themselves can override this file with
 `return false`. Custom handlers that load only game archives must include
 the base gadget explicitly if they want the legacy policy.

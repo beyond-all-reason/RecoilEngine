@@ -216,7 +216,7 @@ class CEventClient
 
 
 		virtual bool CommandFallback(const CUnit* unit, const Command& cmd) { return false; }
-		virtual bool AllowCommand(const CUnit* unit, const Command& cmd, int playerNum, bool fromSynced, bool fromLua) { return true; }
+		virtual bool AllowCommand(const CUnit* unit, const Command& cmd, int playerNum, bool fromSynced, bool fromLua, bool& clearKeepHeight) { return true; }
 
 		virtual std::pair <bool, bool> AllowUnitCreation(const UnitDef* unitDef, const CUnit* builder, const BuildInfo* buildInfo) { return {true, true}; }
 		virtual bool AllowUnitTransfer(const CUnit* unit, int newTeam, bool capture) { return true; }

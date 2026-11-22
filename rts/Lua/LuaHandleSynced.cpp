@@ -41,6 +41,7 @@
 #include "Sim/Features/FeatureDef.h"
 #include "Sim/Features/FeatureDefHandler.h"
 #include "Sim/Units/BuildInfo.h"
+#include "Sim/Units/CommandAI/Command.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitDefHandler.h"
 #include "Sim/Units/Scripts/CobInstance.h"
@@ -616,35 +617,52 @@ bool CSyncedLuaHandle::CommandFallback(const CUnit* unit, const Command& cmd)
  * @param unitTeam TeamID
  * @param cmdID integer
  * @param cmdParams number[]
- * @param cmdOptions CommandOptions
+ * @param cmdOptions CommandOptions Set `clearKeepHeight` to true to clear the height bit on the accepted command and its inserted command, if any.
  * @param cmdTag integer
- * @param synced boolean
+ * @param playerID integer
+ * @param fromSynced boolean
  * @param fromLua boolean
  * @return boolean allowCmd whether it should be let into the queue.
  */
-bool CSyncedLuaHandle::AllowCommand(const CUnit* unit, const Command& cmd, int playerNum, bool fromSynced, bool fromLua)
+bool CSyncedLuaHandle::AllowCommand(const CUnit* unit, const Command& cmd, int playerNum, bool fromSynced, bool fromLua, bool& clearKeepHeight)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
-	luaL_checkstack(L, 7 + 3, __func__);
+	luaL_checkstack(L, 7 + 3 + 2, __func__);
 
 	static const LuaHashString cmdStr(__func__);
 	if (!cmdStr.GetGlobalFunc(L))
 		return true; // the call is not defined
 
+	const int func = lua_gettop(L);
 	const int argc = LuaUtils::PushUnitAndCommand(L, unit, cmd);
+	const bool readOptions = (cmd.GetOpts() & KEEP_TARGET_HEIGHT) || cmd.GetID() == CMD_INSERT;
+	if (readOptions) {
+		// Keep the options table below the call frame, including through nested orders.
+		lua_pushvalue(L, -2); // command options, just below the tag
+		lua_insert(L, func);
+	}
 
 	lua_pushnumber(L, playerNum);
 	lua_pushboolean(L, fromSynced);
 	lua_pushboolean(L, fromLua);
 
 	// call the function
-	if (!RunCallIn(L, cmdStr, argc + 3, 1))
+	if (!RunCallIn(L, cmdStr, argc + 3, 1)) {
+		if (readOptions)
+			lua_pop(L, 1);
 		return true;
+	}
 
 	// get the results
 	const bool allow = luaL_optboolean(L, -1, true);
 	lua_pop(L, 1);
+	if (readOptions) {
+		lua_pushliteral(L, "clearKeepHeight");
+		lua_rawget(L, -2);
+		clearKeepHeight |= lua_isboolean(L, -1) && lua_toboolean(L, -1);
+		lua_pop(L, 2);
+	}
 	return allow;
 }
 

@@ -250,10 +250,10 @@ bool CEventHandler::CommandFallback(const CUnit* unit, const Command& cmd)
 }
 
 
-bool CEventHandler::AllowCommand(const CUnit* unit, const Command& cmd, int playerNum, bool fromSynced, bool fromLua)
+bool CEventHandler::AllowCommand(const CUnit* unit, const Command& cmd, int playerNum, bool fromSynced, bool fromLua, bool& clearKeepHeight)
 {
 	ZoneScoped;
-	return ControlIterateDefTrue(listAllowCommand, &CEventClient::AllowCommand, unit, cmd, playerNum, fromSynced, fromLua);
+	return ControlIterateDefTrue(listAllowCommand, &CEventClient::AllowCommand, unit, cmd, playerNum, fromSynced, fromLua, clearKeepHeight);
 }
 
 

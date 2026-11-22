@@ -35,6 +35,7 @@
 #include "System/creg/STL_Set.h"
 #include "System/creg/STL_Deque.h"
 #include <assert.h>
+#include <optional>
 
 #include "System/Misc/TracyDefs.h"
 
@@ -823,11 +824,22 @@ void CCommandAI::GiveCommand(const Command& c, bool fromSynced)
 void CCommandAI::GiveCommand(const Command& c, int playerNum, bool fromSynced, bool fromLua)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!eventHandler.AllowCommand(owner, c, playerNum, fromSynced, fromLua))
+	bool clearKeepHeight = false;
+	if (!eventHandler.AllowCommand(owner, c, playerNum, fromSynced, fromLua, clearKeepHeight))
 		return;
 
-	eventHandler.UnitCommand(owner, c, playerNum, fromSynced, fromLua);
-	GiveCommandReal(c, fromSynced); // send to the sub-classes
+	// A selection may share c among several units. Filter only this recipient.
+	std::optional<Command> filtered;
+	if (clearKeepHeight) {
+		filtered.emplace(c);
+		filtered->SetOpts(c.GetOpts() & ~KEEP_TARGET_HEIGHT);
+		if (c.GetID() == CMD_INSERT && c.GetNumParams() >= 3)
+			filtered->SetParam(2, static_cast<unsigned char>(c.GetParam(2)) & ~KEEP_TARGET_HEIGHT);
+	}
+
+	const Command& accepted = filtered ? *filtered : c;
+	eventHandler.UnitCommand(owner, accepted, playerNum, fromSynced, fromLua);
+	GiveCommandReal(accepted, fromSynced);
 }
 
 
