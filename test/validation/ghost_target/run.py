@@ -62,19 +62,21 @@ def setup_height_policy(overlay, bar, fixture, policy):
     rules = overlay / "luarules"
     (overlay / "gamedata").mkdir()
     (overlay / "gamedata/defs.lua").write_text("""
-return {
-    unitdefs = { probe = { name = "Probe", objectname = "fir_tree_large.s3o",
+local probe = { name = "Probe", objectname = "fir_tree_large.s3o",
         canattack = true, canmanualfire = true, explodeas = "laser", selfdestructas = "laser",
-        weapons = {{name = "laser"}} } },
+        weapons = {{name = "laser"}} }
+local mobile = {}
+for k, v in pairs(probe) do mobile[k] = v end
+mobile.canfly, mobile.hoverattack, mobile.canmove, mobile.speed = true, true, true, 2
+return {
+    unitdefs = {probe = probe, mobileprobe = mobile},
     weapondefs = { laser = { weapontype = "LaserCannon", range = 500, damage = {default = 1} } },
     featuredefs = {}, armordefs = {}, movedefs = {},
 }
 """)
     (overlay / "modinfo.lua").write_text('return {name="Ghost Target Validation",version="1",modtype=1}')
     (rules / "main.lua").write_text('VFS.Include("LuaGadgets/gadgets.lua", nil, VFS.BASE)')
-    (rules / "draw.lua").write_text(
-        'function RecvFromSynced(tag) if tag == "height_done" then Spring.SendCommands("quitforce") end end'
-    )
+    shutil.copyfile(fixture / "height_player.lua", rules / "draw.lua")
     shutil.copyfile(fixture / "height_policy.lua", rules / "gadgets/test_height.lua")
     if policy == "override":
         shutil.copyfile(bar / "luarules/gadgets/cmd_keep_height_compat.lua", rules / "gadgets/cmd_keep_height_compat.lua")

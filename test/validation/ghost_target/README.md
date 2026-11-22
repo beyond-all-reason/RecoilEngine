@@ -81,5 +81,9 @@ Use the headless command with `--height-policy default` to exercise the stock
 LuaRules handler and the compatibility gadget from the built base archive.
 Repeat with `--height-policy override` to load BAR's file override in the same
 fixture. Both runs inspect queued Attack and Manual Fire orders, insert by
-position and by tag, and check that the other option bits survive. The ordinary
+position and by tag, and check that the other option bits survive. The fixture
+then sends direct and inserted attacks from player 0 via the local server. It
+checks the single validation and acceptance of each order, the issuer and source
+flags, and observes the mobile units dropping their targets after the two distinct
+absolute timeouts. The ordinary
 BAR scenario above covers its own synced height validation and ghost targeting.
