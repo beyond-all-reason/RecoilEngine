@@ -954,14 +954,8 @@ bool CLosHandler::InRadar(const float3 pos, int allyTeam) const
 bool CLosHandler::InRadar(const CUnit* unit, int allyTeam) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// first attempt to discover with sonar:
-	// unit is discoverable by sonar only if not sonarStealth or not sonarJammed
-	if (unit->IsInWater()) {
-		if ((!unit->sonarStealth || unit->beingBuilt) &&
-		    sonar.InSight(unit->pos, allyTeam) &&
-		    !InSonarJammer(unit, allyTeam))
-			return true;
-	}
+	if (unit->CanBeDetectedBySonar() && InSonar(unit->pos, allyTeam, unit->allyteam))
+		return true;
 
 	// unit is InWater and UnderWater, but was not previously caught by sonar, skip it
 	if (unit->IsUnderWater())
@@ -1004,14 +998,8 @@ bool CLosHandler::InSonarJammer(const float3 pos, int allyTeam) const
 	return sonarJammer.InSight(pos, jammerAlly);
 }
 
-bool CLosHandler::InSonarJammer(const CUnit* unit, int allyTeam) const
+bool CLosHandler::InSonar(const float3 pos, int allyTeam, int targetAllyTeam) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (allyTeam == unit->allyteam)
-		return false;
-	
-	//TODO handle ingame alliances
-	const int jammerAlly = modInfo.separateJammers ? unit->allyteam : 0;
-
-	return sonarJammer.InSight(unit->pos, jammerAlly);
+	return sonar.InSight(pos, allyTeam) && (allyTeam == targetAllyTeam || !InSonarJammer(pos, targetAllyTeam));
 }
