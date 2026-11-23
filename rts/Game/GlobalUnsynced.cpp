@@ -7,8 +7,10 @@
 
 #include "GlobalUnsynced.h"
 
+#include "Game/Game.h"
 #include "Game/Players/Player.h"
 #include "Game/Players/PlayerHandler.h"
+#include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/Exceptions.h"
@@ -118,6 +120,11 @@ void CGlobalUnsynced::SetMyPlayer(const int myNumber)
 
 	myPlayingTeam = myTeam;
 	myPlayingAllyTeam = myAllyTeam;
+}
+
+bool CGlobalUnsynced::CanSpectateAllTeams() const
+{
+	return spectating && (!modInfo.restrictSpectatorsToAllyTeam || myPlayingAllyTeam < 0 || (game != nullptr && game->IsGameOver()));
 }
 
 CPlayer* CGlobalUnsynced::GetMyPlayer() {

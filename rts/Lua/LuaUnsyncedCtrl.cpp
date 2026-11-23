@@ -692,7 +692,7 @@ int LuaUnsyncedCtrl::SendMessage(lua_State* L)
  */
 int LuaUnsyncedCtrl::SendMessageToSpectators(lua_State* L)
 {
-	if (gu->spectating)
+	if (gu->CanSpectateAllTeams())
 		PrintMessage(L, luaL_checksstring(L, 1));
 
 	return 0;

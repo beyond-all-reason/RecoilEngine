@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _GLOBAL_UNSYNCED_H
-#define _GLOBAL_UNSYNCED_H
+#pragma once
 
 #include <atomic>
 
@@ -28,6 +27,7 @@ public:
 
 	void SetMyPlayer(const int myNumber);
 	CPlayer* GetMyPlayer();
+	bool CanSpectateAllTeams() const;
 
 public:
 	/**
@@ -173,5 +173,3 @@ public:
 
 extern CGlobalUnsynced* gu;
 extern CGlobalUnsyncedRNG guRNG;
-
-#endif /* _GLOBAL_UNSYNCED_H */

@@ -57,7 +57,7 @@ HAPFSPathDrawer::HAPFSPathDrawer(): IPathDrawer()
 
 void HAPFSPathDrawer::DrawAll() const {
 	// CPathManager is not thread-safe
-	if (enabled && (gs->cheatEnabled || gu->spectating)) {
+	if (enabled && (gs->cheatEnabled || gu->CanSpectateAllTeams())) {
 		glPushAttrib(GL_ENABLE_BIT);
 
 		Draw(); // draw paths and goals
@@ -158,7 +158,7 @@ void HAPFSPathDrawer::UpdateExtraTexture(int extraTex, int starty, int endy, int
 				const MoveDef* md = GetSelectedMoveDef();
 
 				if (md != nullptr) {
-					const bool los = (gs->cheatEnabled || gu->spectating);
+					const bool los = (gs->cheatEnabled || gu->CanSpectateAllTeams());
 
 					int thread = ThreadPool::GetThreadNum();
 

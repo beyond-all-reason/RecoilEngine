@@ -1148,11 +1148,15 @@ public:
 		if (parseFailure || !teamHandler.IsValidTeam(teamId))
 			return false;
 
+		const int allyTeamId = teamHandler.AllyTeam(teamId);
+		if (!gu->CanSpectateAllTeams() && allyTeamId != gu->myPlayingAllyTeam)
+			return false;
+
 		if (gu->myTeam == teamId)
 			return true;
 
 		gu->myTeam = teamId;
-		gu->myAllyTeam = teamHandler.AllyTeam(teamId);
+		gu->myAllyTeam = allyTeamId;
 
 		CLuaUI::UpdateTeams();
 
@@ -1163,7 +1167,7 @@ public:
 			(gu->spectatingFullView   ? 1 : 0) +
 			(gu->spectatingFullSelect ? 2 : 0);
 
-		if (specFVMode == 0 || specFVMode == 2)
+		if ((specFVMode == 0 || specFVMode == 2) && gu->CanSpectateAllTeams())
 			readMap->CopySyncedToUnsynced();
 
 		LOG("[SpecTeamAction] local client %d now spectating team %d and allyteam %d", gu->myPlayerNum, gu->myTeam, gu->myAllyTeam);
@@ -1190,7 +1194,7 @@ public:
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
-		if (!gu->spectating)
+		if (!gu->CanSpectateAllTeams())
 			return false;
 
 		const int oldMode =
