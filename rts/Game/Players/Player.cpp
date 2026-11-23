@@ -104,6 +104,7 @@ void CPlayer::StartSpectating()
 
 	if (gu->myPlayerNum == this->playerNum) {
 		// HACK: unsynced code should just listen for the PlayerChanged event
+		gu->optedIntoFullView    = false;
 		gu->spectating           = true;
 		gu->spectatingFullView   = gu->CanSpectateAllTeams();
 		gu->spectatingFullSelect = gu->spectatingFullView;

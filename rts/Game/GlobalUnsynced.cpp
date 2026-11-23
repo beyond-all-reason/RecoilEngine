@@ -53,6 +53,7 @@ CR_REG_METADATA(CGlobalUnsynced, (
 	CR_MEMBER(spectating),
 	CR_MEMBER(spectatingFullView),
 	CR_MEMBER(spectatingFullSelect),
+	CR_MEMBER(optedIntoFullView),
 	CR_IGNORED(fpsMode),
 	CR_IGNORED(globalQuit),
 	CR_IGNORED(globalReload)
@@ -80,6 +81,7 @@ void CGlobalUnsynced::ResetState()
 	spectating           = false;
 	spectatingFullView   = false;
 	spectatingFullSelect = false;
+	optedIntoFullView    = false;
 
 	fpsMode = false;
 	globalQuit = false;
@@ -124,7 +126,19 @@ void CGlobalUnsynced::SetMyPlayer(const int myNumber)
 
 bool CGlobalUnsynced::CanSpectateAllTeams() const
 {
-	return spectating && (!modInfo.restrictSpectatorsToAllyTeam || myPlayingAllyTeam < 0 || (game != nullptr && game->IsGameOver()));
+	if (!spectating)
+		return false;
+	if (myPlayingAllyTeam < 0 || (game != nullptr && game->IsGameOver()))
+		return true;
+	return !modInfo.restrictSpectatorsToAllyTeam && (!modInfo.spectatorFullViewOptIn || optedIntoFullView);
+}
+
+bool CGlobalUnsynced::TryOptIntoFullView()
+{
+	if (CanSpectateAllTeams() || !spectating || modInfo.restrictSpectatorsToAllyTeam || !modInfo.spectatorFullViewOptIn)
+		return false;
+	optedIntoFullView = true;
+	return true;
 }
 
 CPlayer* CGlobalUnsynced::GetMyPlayer() {

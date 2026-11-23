@@ -28,6 +28,7 @@ public:
 	void SetMyPlayer(const int myNumber);
 	CPlayer* GetMyPlayer();
 	bool CanSpectateAllTeams() const;
+	bool TryOptIntoFullView();
 
 public:
 	/**
@@ -152,6 +153,7 @@ public:
 	 * Can all units be selected when spectating?
 	 */
 	bool spectatingFullSelect = false;
+	bool optedIntoFullView = false;
 
 	/**
 	 * @brief fpsMode

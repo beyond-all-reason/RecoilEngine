@@ -1189,12 +1189,14 @@ public:
 			{"1", "Fullview, Not Fullselect"},
 			{"2", "Not Fullview, Fullselect"},
 			{"3", "Fullview, Fullselect (default)"},
+			{"optin", "Accept full spectator access when the game offers it"},
 		}
 	) {
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
-		if (!gu->CanSpectateAllTeams())
+		const bool optIn = (action.GetArgs() == "optin");
+		if (optIn ? !gu->TryOptIntoFullView() : !gu->CanSpectateAllTeams())
 			return false;
 
 		const int oldMode =
@@ -1202,7 +1204,7 @@ public:
 			(gu->spectatingFullSelect ? 2 : 0);
 
 		if (!action.GetArgs().empty()) {
-			const int mode = StringToInt(action.GetArgs());
+			const int mode = optIn ? 3 : StringToInt(action.GetArgs());
 			gu->spectatingFullView   = !!(mode & 1);
 			gu->spectatingFullSelect = !!(mode & 2);
 		} else {

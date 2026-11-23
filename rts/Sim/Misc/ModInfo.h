@@ -253,6 +253,7 @@ public:
 	bool nativeExcessSharing;
 	bool allowTake;
 	bool restrictSpectatorsToAllyTeam;
+	bool spectatorFullViewOptIn;
 	bool allowEnginePlayerlist;
 
 	// how often to report wind speed/direction to wind gens
