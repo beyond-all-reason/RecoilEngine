@@ -27,7 +27,9 @@ public:
 
 	void SetMyPlayer(const int myNumber);
 	CPlayer* GetMyPlayer();
+	void StartSpectating();
 	bool CanSpectateAllTeams() const;
+	bool CanOptIntoFullView() const;
 	bool TryOptIntoFullView();
 
 public:
@@ -153,7 +155,6 @@ public:
 	 * Can all units be selected when spectating?
 	 */
 	bool spectatingFullSelect = false;
-	bool optedIntoFullView = false;
 
 	/**
 	 * @brief fpsMode
@@ -170,6 +171,12 @@ public:
 	*/
 	std::atomic<bool> globalQuit = {false};
 	std::atomic<bool> globalReload = {false};
+
+private:
+	enum class SpectatorVision { Allied = 1, OptIn, Full };
+	SpectatorVision GetEliminatedSpectatorVision() const;
+	SpectatorVision personalSpectatorVision = SpectatorVision::Full;
+	bool optedIntoFullView = false;
 };
 
 

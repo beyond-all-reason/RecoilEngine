@@ -105,6 +105,7 @@ class LuaUnsyncedRead {
 		static int GetLocalTeamID(lua_State* L);
 		static int GetLocalAllyTeamID(lua_State* L);
 		static int CanSpectateAllTeams(lua_State* L);
+		static int CanOptIntoFullView(lua_State* L);
 		static int GetSpectatingState(lua_State* L);
 
 		static int GetSelectedUnits(lua_State* L);

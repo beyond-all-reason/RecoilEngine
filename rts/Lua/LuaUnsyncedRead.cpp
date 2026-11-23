@@ -202,6 +202,7 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_NAMED_LUA_CFUNC("GetMyAllyTeamID", GetLocalAllyTeamID);
 
 	REGISTER_LUA_CFUNC(CanSpectateAllTeams);
+	REGISTER_LUA_CFUNC(CanOptIntoFullView);
 	REGISTER_LUA_CFUNC(GetSpectatingState);
 
 	REGISTER_LUA_CFUNC(GetSelectedUnits);
@@ -2767,6 +2768,16 @@ int LuaUnsyncedRead::GetLocalAllyTeamID(lua_State* L)
 	return 1;
 }
 
+
+/*** Whether the local spectator can currently use `specfullview optin`.
+ * @function Spring.CanOptIntoFullView
+ * @return boolean
+ */
+int LuaUnsyncedRead::CanOptIntoFullView(lua_State* L)
+{
+	lua_pushboolean(L, gu->CanOptIntoFullView());
+	return 1;
+}
 
 /*** Whether the local spectator may switch to any team or enable full view.
  * @function Spring.CanSpectateAllTeams

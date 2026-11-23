@@ -18,10 +18,14 @@
 #include "System/creg/creg_cond.h"
 #include "System/Misc/SpringTime.h"
 
+#include <algorithm>
 #include <ctime>
 
 #include "System/Misc/TracyDefs.h"
 
+
+CONFIG(int, EliminatedSpectatorVision).defaultValue(3).minimumValue(1).maximumValue(3)
+	.description("Personal vision limit when you resign or are eliminated: 1 = locked allied vision, 2 = allied vision until explicit opt-in, 3 = follow the game rules.");
 
 /**
  * @brief global unsynced
@@ -53,6 +57,7 @@ CR_REG_METADATA(CGlobalUnsynced, (
 	CR_MEMBER(spectating),
 	CR_MEMBER(spectatingFullView),
 	CR_MEMBER(spectatingFullSelect),
+	CR_MEMBER(personalSpectatorVision),
 	CR_MEMBER(optedIntoFullView),
 	CR_IGNORED(fpsMode),
 	CR_IGNORED(globalQuit),
@@ -82,6 +87,7 @@ void CGlobalUnsynced::ResetState()
 	spectatingFullView   = false;
 	spectatingFullSelect = false;
 	optedIntoFullView    = false;
+	personalSpectatorVision = SpectatorVision::Full;
 
 	fpsMode = false;
 	globalQuit = false;
@@ -124,18 +130,42 @@ void CGlobalUnsynced::SetMyPlayer(const int myNumber)
 	myPlayingAllyTeam = myAllyTeam;
 }
 
+void CGlobalUnsynced::StartSpectating()
+{
+	personalSpectatorVision = static_cast<SpectatorVision>(configHandler->GetInt("EliminatedSpectatorVision"));
+	optedIntoFullView = false;
+	spectating = true;
+	spectatingFullView = CanSpectateAllTeams();
+	spectatingFullSelect = spectatingFullView;
+}
+
+CGlobalUnsynced::SpectatorVision CGlobalUnsynced::GetEliminatedSpectatorVision() const
+{
+	if (modInfo.restrictSpectatorsToAllyTeam)
+		return SpectatorVision::Allied;
+	if (modInfo.spectatorFullViewOptIn)
+		return std::min(personalSpectatorVision, SpectatorVision::OptIn);
+	return personalSpectatorVision;
+}
+
 bool CGlobalUnsynced::CanSpectateAllTeams() const
 {
 	if (!spectating)
 		return false;
 	if (myPlayingAllyTeam < 0 || (game != nullptr && game->IsGameOver()))
 		return true;
-	return !modInfo.restrictSpectatorsToAllyTeam && (!modInfo.spectatorFullViewOptIn || optedIntoFullView);
+	const auto vision = GetEliminatedSpectatorVision();
+	return vision == SpectatorVision::Full || (vision == SpectatorVision::OptIn && optedIntoFullView);
+}
+
+bool CGlobalUnsynced::CanOptIntoFullView() const
+{
+	return spectating && !CanSpectateAllTeams() && GetEliminatedSpectatorVision() == SpectatorVision::OptIn;
 }
 
 bool CGlobalUnsynced::TryOptIntoFullView()
 {
-	if (CanSpectateAllTeams() || !spectating || modInfo.restrictSpectatorsToAllyTeam || !modInfo.spectatorFullViewOptIn)
+	if (!CanOptIntoFullView())
 		return false;
 	optedIntoFullView = true;
 	return true;
