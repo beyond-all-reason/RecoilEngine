@@ -161,6 +161,7 @@ class LuaUnsyncedCtrl {
 
 		static int SetMouseCursor(lua_State* L);
 		static int SetClipboard(lua_State* L);
+		static int OpenLocalURL(lua_State* L);
 
 		static int SetCameraOffset(lua_State* L);
 

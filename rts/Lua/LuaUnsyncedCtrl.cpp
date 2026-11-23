@@ -108,6 +108,7 @@
 
 #include <SDL_keyboard.h>
 #include <SDL_clipboard.h>
+#include <SDL_misc.h>
 #include <SDL_mouse.h>
 #include <SDL_video.h>
 
@@ -269,6 +270,7 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(WarpMouse);
 
 	REGISTER_LUA_CFUNC(SetClipboard);
+	REGISTER_LUA_CFUNC(OpenLocalURL);
 
 	REGISTER_LUA_CFUNC(SetCameraOffset);
 
@@ -5593,6 +5595,33 @@ int LuaUnsyncedCtrl::SetClipboard(lua_State* L)
 {
 	SDL_SetClipboardText(luaL_checkstring(L, 1));
 	return 0;
+}
+
+
+/*** Opens a page served from this machine in the system web browser.
+ *
+ * Only `http://127.0.0.1:<port>[/path]` URLs are accepted, and only while cheating is enabled.
+ *
+ * @function Spring.OpenLocalURL
+ * @param url string
+ * @return boolean opened `false` if the URL was refused or the browser could not be started
+ */
+int LuaUnsyncedCtrl::OpenLocalURL(lua_State* L)
+{
+	const std::string url = luaL_checkstring(L, 1);
+	constexpr std::string_view prefix = "http://127.0.0.1:";
+
+	bool allowed = gs->cheatEnabled && url.compare(0, prefix.size(), prefix) == 0;
+
+	if (allowed) {
+		// digits, then the end or a path/query; a "@" or a second host cannot slip in
+		const size_t portEnd = url.find_first_not_of("0123456789", prefix.size());
+		allowed = (portEnd != prefix.size()) && (portEnd == std::string::npos || url[portEnd] == '/' || url[portEnd] == '?');
+		allowed = allowed && std::none_of(url.begin(), url.end(), [](unsigned char c) { return c <= ' ' || c == 0x7f; });
+	}
+
+	lua_pushboolean(L, allowed && SDL_OpenURL(url.c_str()) == 0);
+	return 1;
 }
 
 
