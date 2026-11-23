@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <cstdint>
+#include <deque>
 #include <string>
 #include <vector>
 
@@ -75,8 +77,8 @@ class CEventHandler
 		void UnitConstructionDecayed(const CUnit* unit, float timeSinceLastBuild, float iterationPeriod, float part);
 		void UnitFromFactory(const CUnit* unit, const CUnit* factory, bool userOrders);
 		void UnitDestroyed(const CUnit* unit, const CUnit* attacker, int weaponDefID);
-		void UnitPreDelete(int unitID, int unitDefID, int unitTeam);
-		std::vector<int> UnitAttackTargetRemoved(int unitID, int unitDefID, int unitTeam, int targetID);
+		void QueueUnitAttackTargetChange(const CUnit& unit, const SWeaponTarget& oldTarget, const SWeaponTarget& newTarget, bool neutralized);
+		void DispatchUnitAttackTargetChanges();
 		void UnitTaken(const CUnit* unit, int oldTeam, int newTeam);
 		void UnitGiven(const CUnit* unit, int oldTeam, int newTeam);
 
@@ -378,6 +380,18 @@ class CEventHandler
 
 	private:
 		EventMap eventMap;
+
+		struct AttackTargetChange {
+			int unitID;
+			int unitDefID;
+			int unitTeam;
+			entt::entity unitEntity;
+			UnitAttackTarget oldTarget;
+			UnitAttackTarget newTarget;
+			entt::entity neutralizedTarget;
+		};
+		std::deque<AttackTargetChange> attackTargetChanges;
+		std::uint64_t deliveredTargetChanges = 0;
 
 		EventClientList handles;
 

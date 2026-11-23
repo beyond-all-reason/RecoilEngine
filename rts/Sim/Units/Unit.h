@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef UNIT_H
-#define UNIT_H
+#pragma once
 
 #include <optional>
 #include <vector>
@@ -273,6 +272,7 @@ public:
 		return std::max(0.0f, 1.0f - (limExperience * experienceWeight));
 	}
 private:
+	void SetAttackTarget(const SWeaponTarget& target, bool neutralized = false);
 	void UpdateRenderParams();
 public:
 	const UnitDef* unitDef = nullptr;
@@ -567,5 +567,3 @@ struct GlobalUnitParams {
 };
 
 extern GlobalUnitParams globalUnitParams;
-
-#endif // UNIT_H

@@ -20,6 +20,7 @@
 using std::string;
 using std::vector;
 
+struct UnitAttackTarget;
 struct CExplosionParams;
 class CSolidObject;
 class CUnit;
@@ -137,8 +138,7 @@ class CEventClient
 		virtual void UnitConstructionDecayed(const CUnit* unit, float timeSinceLastBuild, float iterationPeriod, float part) {}
 		virtual void UnitFromFactory(const CUnit* unit, const CUnit* factory, bool userOrders) {}
 		virtual void UnitDestroyed(const CUnit* unit, const CUnit* attacker, int weaponDefID) {}
-		virtual void UnitPreDelete(int unitID, int unitDefID, int unitTeam) {}
-		virtual std::vector<int> UnitAttackTargetRemoved(int unitID, int unitDefID, int unitTeam, int targetID) { return {}; }
+		virtual std::vector<int> UnitAttackTargetChanged(int unitID, int unitDefID, int unitTeam, const UnitAttackTarget& oldTarget, const UnitAttackTarget& newTarget, bool neutralized) { return {}; }
 		virtual void UnitTaken(const CUnit* unit, int oldTeam, int newTeam) {}
 		virtual void UnitGiven(const CUnit* unit, int oldTeam, int newTeam) {}
 

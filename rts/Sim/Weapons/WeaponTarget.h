@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef WEAPONTARGET_H
-#define WEAPONTARGET_H
+#pragma once
 
 #include "System/float3.h"
 #include "System/creg/creg_cond.h"
@@ -48,4 +47,12 @@ public:
 	float3 groundPos;             // if targettype=ground: the ground position
 };
 
-#endif // WEAPONTARGET_H
+// A unit's attack order targets a unit, a position, or nothing. Keep values for
+// Lua notification even if the target is destroyed before the callback.
+struct UnitAttackTarget {
+	TargetType type;
+	float3 groundPos;
+	int unitID;
+	bool isUserTarget;
+	bool isManualFire;
+};

@@ -1439,16 +1439,10 @@ function gadgetHandler:UnitDestroyed(
 end
 
 
-function gadgetHandler:UnitPreDelete(unitID, unitDefID, unitTeam)
-  for _,g in r_ipairs(self.UnitPreDeleteList) do
-    g:UnitPreDelete(unitID, unitDefID, unitTeam)
-  end
-end
-
-function gadgetHandler:UnitAttackTargetRemoved(unitID, unitDefID, unitTeam, targetID)
+function gadgetHandler:UnitAttackTargetChanged(unitID, unitDefID, unitTeam, oldTarget, newTarget, reason)
   local tags
-  for _, g in r_ipairs(self.UnitAttackTargetRemovedList) do
-    local removed = g:UnitAttackTargetRemoved(unitID, unitDefID, unitTeam, targetID)
+  for _, g in r_ipairs(self.UnitAttackTargetChangedList) do
+    local removed = g:UnitAttackTargetChanged(unitID, unitDefID, unitTeam, oldTarget, newTarget, reason)
     if type(removed) == "table" then
       tags = tags or {}
       for _, tag in ipairs(removed) do

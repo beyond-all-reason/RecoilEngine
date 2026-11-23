@@ -278,7 +278,7 @@ void CUnitHandler::DeleteUnits()
 {
 	ZoneScopedC(tracy::Color::Goldenrod);
 	while (!unitsToBeRemoved.empty()) {
-		// DeleteUnit may run synced Lua (UnitPreDelete) which is allowed to
+		// DeleteUnit may run synced Lua which is allowed to
 		// trigger another immediate deletion, so do not leave this entry
 		// in the queue while the callin is active
 		CUnit* delUnit = unitsToBeRemoved.back();
@@ -293,14 +293,11 @@ void CUnitHandler::DeleteUnit(CUnit* delUnit)
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(delUnit->isDead);
 
-	// we want to call RenderUnitDestroyed while the unit is still valid
-	eventHandler.RenderUnitDestroyed(delUnit);
-
 	const int previousDeletingRefID = CSolidObject::GetDeletingRefID();
 	// Lua may prune virtual references while the complete unit is still readable.
 	// Do not notify native dependants here: they must run after native teardown.
 	delUnit->SetPreDeleting(true);
-	eventHandler.UnitPreDelete(delUnit->id, delUnit->unitDef->id, delUnit->team);
+	eventHandler.RenderUnitDestroyed(delUnit);
 
 	const auto it = std::find(activeUnits.begin(), activeUnits.end(), delUnit);
 
