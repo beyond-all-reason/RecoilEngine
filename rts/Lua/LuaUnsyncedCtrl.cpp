@@ -142,7 +142,7 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(LoadSoundDef);
 	REGISTER_LUA_CFUNC(PlaySoundFile);
-	REGISTER_LUA_CFUNC(StopSoundFile);
+	REGISTER_LUA_CFUNC(StopSoundByFilename);
 	REGISTER_LUA_CFUNC(PlaySoundStream);
 	REGISTER_LUA_CFUNC(StopSoundStream);
 	REGISTER_LUA_CFUNC(PauseSoundStream);
@@ -791,17 +791,13 @@ int LuaUnsyncedCtrl::LoadSoundDef(lua_State* L)
 
 /***
  * @alias SoundChannel
- * | "general" # 0
- * | "battle" # Same as `"sfx" | 1`
- * | "sfx" # Same as `"battle" | 1`
- * | "unitreply" # Same as `"voice" | 2`
- * | "voice" # Same as `"unitreply" | 2`
- * | "userinterface" # Same as "ui" | 3`
- * | "ui" # Same as "userinterface" | 3`
- * | 0 # General
- * | 1 # SFX
- * | 2 # Voice
- * | 3 # User interface
+ * | "general"
+ * | "battle" # Same as `"sfx"`
+ * | "sfx" # Same as `"battle"`
+ * | "unitreply" # Same as `"voice"`
+ * | "voice" # Same as `"unitreply"`
+ * | "userinterface" # Same as `"ui"`
+ * | "ui" # Same as `"userinterface"`
  */
 
 /// nullptr for anything that is not a SoundChannel
@@ -816,14 +812,6 @@ static IAudioChannel* ParseSoundChannel(lua_State* L, int index)
 			case hashStringLower("voice"        ): return Channels::UnitReply;
 			case hashStringLower("userinterface"):
 			case hashStringLower("ui"           ): return Channels::UserInterface;
-			default: break;
-		}
-	} else if (lua_isnumber(L, index)) {
-		switch (lua_toint(L, index)) {
-			case 0: return Channels::General;
-			case 1: return Channels::Battle;
-			case 2: return Channels::UnitReply;
-			case 3: return Channels::UserInterface;
 			default: break;
 		}
 	}
@@ -896,12 +884,12 @@ int LuaUnsyncedCtrl::PlaySoundFile(lua_State* L)
 
 /*** Stops every playing instance of a sound started with `Spring.PlaySoundFile`.
  *
- * @function Spring.StopSoundFile
+ * @function Spring.StopSoundByFilename
  * @param soundfile string the name passed to `Spring.PlaySoundFile`
  * @param channel SoundChannel? (Default: all channels)
  * @return boolean stopped (always false in synced)
  */
-int LuaUnsyncedCtrl::StopSoundFile(lua_State* L)
+int LuaUnsyncedCtrl::StopSoundByFilename(lua_State* L)
 {
 	const IAudioChannel* channel = ParseSoundChannel(L, 2);
 
