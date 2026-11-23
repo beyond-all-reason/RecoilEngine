@@ -1380,7 +1380,7 @@ void CUnit::DoDamage(
 	const bool isParalyzer = (damages.paralyzeDamageTime != 0);
 
 	if (!isCollision && baseDamage > 0.0f) {
-		if (attacker != nullptr) {
+		if (attacker != nullptr && attacker != this) {
 			SetLastAttacker(attacker);
 
 			// FIXME -- not the impulse direction?
