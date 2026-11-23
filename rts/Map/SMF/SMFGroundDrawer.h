@@ -105,6 +105,8 @@ protected:
 
 	Shader::IProgramObject* borderShader = nullptr;
 	Shader::IProgramObject* shadowShader = nullptr;
+	// wraps the Lua shadow program, invalid while none is set
+	Shader::IProgramObject* luaShadowShader = nullptr;
 	Shader::IProgramObject* compositeShader = nullptr;
 };
 

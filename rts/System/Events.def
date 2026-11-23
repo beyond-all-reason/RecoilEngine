@@ -161,6 +161,7 @@
 	SETUP_EVENT(DrawGroundPreDeferred,     MANAGED_BIT | UNSYNCED_BIT)
 	SETUP_EVENT(DrawGroundDeferred,        MANAGED_BIT | UNSYNCED_BIT)
 	SETUP_EVENT(DrawGroundPostDeferred,    MANAGED_BIT | UNSYNCED_BIT)
+	SETUP_EVENT(DrawGroundPreShadow,       MANAGED_BIT | UNSYNCED_BIT)
 	SETUP_EVENT(DrawUnitsPostDeferred,     MANAGED_BIT | UNSYNCED_BIT)
 	SETUP_EVENT(DrawFeaturesPostDeferred,  MANAGED_BIT | UNSYNCED_BIT)
 	SETUP_EVENT(DrawScreenEffects,         MANAGED_BIT | UNSYNCED_BIT)

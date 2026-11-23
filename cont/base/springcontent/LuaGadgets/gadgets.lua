@@ -2046,6 +2046,13 @@ function gadgetHandler:DrawGroundPostDeferred()
 end
 
 
+function gadgetHandler:DrawGroundPreShadow()
+  for _,g in r_ipairs(self.DrawGroundPreShadowList) do
+    g:DrawGroundPreShadow()
+  end
+end
+
+
 function gadgetHandler:DrawUnitsPostDeferred()
   for _,g in r_ipairs(self.DrawUnitsPostDeferredList) do
     g:DrawUnitsPostDeferred()

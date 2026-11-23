@@ -58,7 +58,7 @@ CONFIG(int, ROAM)
 
 CONFIG(bool, AlwaysSendDrawGroundEvents)
 	.defaultValue(false)
-	.description("Always send DrawGround{Pre,Post}{Forward,Deferred} events");
+	.description("Always send DrawGround{Pre,Post}{Forward,Deferred} and DrawGroundPreShadow events");
 
 namespace Shader {
 	struct IProgramObject;
@@ -100,6 +100,10 @@ CSMFGroundDrawer::CSMFGroundDrawer(CSMFReadMap* rm)
 	borderShader->Disable();
 
 	borderShader->Validate();
+
+	luaShadowShader = shaderHandler->CreateProgramObject("[SMFGroundDrawer]", "Shadow-Lua");
+	// drop the program made by GLSLProgramObject's ctor; Lua supplies the one to wrap
+	luaShadowShader->Release();
 
 	if (combinedAllowed) {
 		compositeShader = shaderHandler->CreateProgramObject("[SMFGroundDrawer]", "Composite");
@@ -150,6 +154,10 @@ CSMFGroundDrawer::~CSMFGroundDrawer()
 	smfRenderStates = { nullptr };
 
 	shaderHandler->ReleaseProgramObject("[SMFGroundDrawer]", "Border");
+
+	// only the wrapper goes; the program is managed by LuaShaders
+	luaShadowShader->LoadFromID(0);
+	shaderHandler->ReleaseProgramObject("[SMFGroundDrawer]", "Shadow-Lua");
 
 	if (compositeShader != nullptr)
 		shaderHandler->ReleaseProgramObject("[SMFGroundDrawer]", "Composite");
@@ -488,7 +496,9 @@ void CSMFGroundDrawer::DrawShadowPass()
 	if (readMap->HasOnlyVoidWater())
 		return;
 
-	shadowShader = shadowHandler.GetShadowGenProg(CShadowHandler::SHADOWGEN_PROGRAM_MAP);
+	const bool luaShadow = luaShadowShader->IsValid();
+
+	shadowShader = luaShadow ? luaShadowShader : shadowHandler.GetShadowGenProg(CShadowHandler::SHADOWGEN_PROGRAM_MAP);
 	assert(shadowShader);
 	glEnable(GL_POLYGON_OFFSET_FILL);
 
@@ -498,13 +508,33 @@ void CSMFGroundDrawer::DrawShadowPass()
 	glPolygonOffset(spPolygonOffsetScale, spPolygonOffsetUnits); // dz*s + r*u
 
 	glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, smfMap->GetHeightMapTexture());
-	shadowShader->Enable();
+
+	if (luaShadow) {
+		// use raw, GLSLProgramObject::Enable also calls RecompileIfNeeded
+		shadowShader->EnableRaw();
+		// the engine's program gets this once from ShadowHandler
+		shadowShader->SetUniform("mapSize",
+			static_cast<float>(mapDims.mapx * SQUARE_SIZE), static_cast<float>(mapDims.mapy * SQUARE_SIZE),
+			           1.0f / (mapDims.mapx * SQUARE_SIZE),            1.0f / (mapDims.mapy * SQUARE_SIZE)
+		);
+	} else {
+		shadowShader->Enable();
+	}
+
 	shadowShader->SetUniform("borderMinHeight", std::min(readMap->GetInitMinHeight(), -500.0f));
+
+	if (alwaysDispatchEvents || luaShadow) {
+		glActiveTexture(GL_TEXTURE0);
+		eventHandler.DrawGroundPreShadow();
+	}
+
 		meshDrawer->DrawMesh(DrawPass::Shadow);
 		// also render the border geometry to prevent light-visible backfaces
 		meshDrawer->DrawBorderMesh(DrawPass::Shadow);
 	shadowShader->Disable();
-	glBindTexture(GL_TEXTURE_2D, 0);
+
+	// Lua may have left another unit active
+	glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, 0);
 	glActiveTexture(GL_TEXTURE0);
 
 	glDisable(GL_POLYGON_OFFSET_FILL);
@@ -517,6 +547,7 @@ void CSMFGroundDrawer::SetLuaShader(const LuaMapShaderData* luaMapShaderData)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	smfRenderStates[RENDER_STATE_LUA]->Update(this, luaMapShaderData);
+	luaShadowShader->LoadFromID(luaMapShaderData->shaderIDs[2]);
 }
 
 void CSMFGroundDrawer::SetupBigSquare(const DrawPass::e& drawPass, const int bigSquareX, const int bigSquareY)

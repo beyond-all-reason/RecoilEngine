@@ -277,6 +277,7 @@ class CLuaHandle : public CEventClient
 		void DrawGroundPreDeferred() override;
 		void DrawGroundDeferred() override;
 		void DrawGroundPostDeferred() override;
+		void DrawGroundPreShadow() override;
 		void DrawUnitsPostDeferred() override;
 		void DrawFeaturesPostDeferred() override;
 		void DrawScreenCommon(const LuaHashString& cmdStr);

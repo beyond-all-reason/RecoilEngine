@@ -19,7 +19,8 @@ namespace GL {
 struct LuaMapShaderData {
 	// [0] := standard program from gl.CreateShader
 	// [1] := deferred program from gl.CreateShader
-	unsigned int shaderIDs[2];
+	// [2] := shadow program from gl.CreateShader
+	unsigned int shaderIDs[3] = {0, 0, 0};
 
 	// if true, [1] also writes the lit forward color (see AllowCombinedMapRendering)
 	bool combinedShader = false;

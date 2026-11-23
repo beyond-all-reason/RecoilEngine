@@ -158,6 +158,7 @@ CALLIN_LIST = {
 	"DrawGroundPreDeferred",
 	"DrawGroundDeferred",
 	"DrawGroundPostDeferred",
+	"DrawGroundPreShadow",
 	"DrawUnitsPostDeferred",
 	"DrawFeaturesPostDeferred",
 	"DrawScreenEffects",

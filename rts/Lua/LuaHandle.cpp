@@ -2999,6 +2999,12 @@ DRAW_CALLIN(DrawGroundDeferred)
  */
 DRAW_CALLIN(DrawGroundPostDeferred)
 
+/*** Runs before the ground is drawn into the shadow map when a shadow program has been assigned via `Spring.SetMapShader` (convenient for setting uniforms and binding textures). The program is bound and has to stay bound.
+ *
+ * @function Callins:DrawGroundPreShadow
+ */
+DRAW_CALLIN(DrawGroundPreShadow)
+
 /*** Runs at the end of the unit deferred pass.
  *
  * @function Callins:DrawUnitsPostDeferred
