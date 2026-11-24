@@ -153,6 +153,7 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 
 	if (!CLuaHandle::GetHandleSynced(L)) {
 		REGISTER_LUA_CFUNC(SetSpectatorTeam);
+		REGISTER_LUA_CFUNC(SetSpectatorFullCommunications);
 		REGISTER_LUA_CFUNC(SetSpectatorFullView);
 		REGISTER_LUA_CFUNC(SetSpectatorFullSelect);
 	}
@@ -699,7 +700,7 @@ int LuaUnsyncedCtrl::SendMessage(lua_State* L)
  */
 int LuaUnsyncedCtrl::SendMessageToSpectators(lua_State* L)
 {
-	if (gu->spectating)
+	if (gu->spectatingFullCommunications)
 		PrintMessage(L, luaL_checksstring(L, 1));
 
 	return 0;
@@ -1199,6 +1200,20 @@ int LuaUnsyncedCtrl::DrawUnitCommands(lua_State* L)
  * @section spectating
  *****************************************************************************/
 
+/*** Sets whether the local spectator receives other teams' chat, spectator messages and map marks.
+ * With full communications disabled, ally chat and marks follow the spectated allyteam.
+ * @function Spring.SetSpectatorFullCommunications
+ * @param enabled boolean
+ * @return nil
+ */
+int LuaUnsyncedCtrl::SetSpectatorFullCommunications(lua_State* L)
+{
+	const bool enabled = luaL_checkboolean(L, 1);
+	if (gu->spectating)
+		gu->spectatingFullCommunications = enabled;
+	return 0;
+}
+
 /*** Changes the team followed by the local spectator, preserving full view and full selection.
  * @function Spring.SetSpectatorTeam
  * @param teamID TeamID
@@ -1215,7 +1230,7 @@ int LuaUnsyncedCtrl::SetSpectatorTeam(lua_State* L)
 		gu->myAllyTeam = teamHandler.AllyTeam(gu->myTeam);
 		CLuaUI::UpdateTeams();
 		if (!gu->spectatingFullView && readMap != nullptr)
-			readMap->CopySyncedToUnsynced();
+			readMap->BecomeSpectator();
 
 		eventHandler.PlayerChanged(gu->myPlayerNum);
 		LOG("[SetSpectatorTeam] local client %d now spectating team %d and allyteam %d", gu->myPlayerNum, gu->myTeam, gu->myAllyTeam);

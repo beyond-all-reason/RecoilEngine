@@ -50,7 +50,7 @@ bool CInMapDrawModel::MapDrawPrimitive::IsVisibleToPlayer(bool drawAllMarks) con
 	const bool alliedAB = teamHandler.Ally(allyTeam, gu->myAllyTeam);
 	const bool alliedBA = teamHandler.Ally(gu->myAllyTeam, allyTeam);
 
-	return (gu->spectating || drawAllMarks || (!spectator && alliedAB && alliedBA));
+	return (gu->spectatingFullCommunications || (!gu->spectating && drawAllMarks) || (!spectator && alliedAB && alliedBA));
 }
 
 
@@ -66,7 +66,7 @@ bool CInMapDrawModel::AllowedMsg(const CPlayer* sender) const
 	// if we are playing and the guy sending the message is
 	// a spectator (or not an ally), we can not just ignore
 	// it due to drawAllMarks mode considerations
-	return (gu->spectating || (!sender->spectator && alliedMsg));
+	return (gu->spectatingFullCommunications || (!sender->spectator && alliedMsg));
 }
 
 

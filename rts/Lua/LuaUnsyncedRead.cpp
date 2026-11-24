@@ -202,6 +202,7 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_NAMED_LUA_CFUNC("GetMyAllyTeamID", GetLocalAllyTeamID);
 
 	REGISTER_LUA_CFUNC(GetSpectatingState);
+	REGISTER_LUA_CFUNC(GetSpectatorFullCommunications);
 
 	REGISTER_LUA_CFUNC(GetSelectedUnits);
 	REGISTER_LUA_CFUNC(GetSelectedUnitsSorted);
@@ -2766,6 +2767,16 @@ int LuaUnsyncedRead::GetLocalAllyTeamID(lua_State* L)
 	return 1;
 }
 
+
+/*** Reports whether the local spectator has full chat and map mark access.
+ * @function Spring.GetSpectatorFullCommunications
+ * @return boolean enabled
+ */
+int LuaUnsyncedRead::GetSpectatorFullCommunications(lua_State* L)
+{
+	lua_pushboolean(L, gu->spectatingFullCommunications);
+	return 1;
+}
 
 /*** Players who resign or are eliminated start spectating with their team's vision and selection.
  * Initial spectators start with full view and full selection. Games can change both from unsynced Lua.

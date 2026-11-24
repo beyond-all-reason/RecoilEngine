@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_UNSYNCED_INFO_H
-#define LUA_UNSYNCED_INFO_H
+#pragma once
 
 struct lua_State;
 
@@ -105,6 +104,7 @@ class LuaUnsyncedRead {
 		static int GetLocalPlayerID(lua_State* L);
 		static int GetLocalTeamID(lua_State* L);
 		static int GetLocalAllyTeamID(lua_State* L);
+		static int GetSpectatorFullCommunications(lua_State* L);
 		static int GetSpectatingState(lua_State* L);
 
 		static int GetSelectedUnits(lua_State* L);
@@ -245,6 +245,3 @@ class LuaUnsyncedRead {
 
 		static int SolveNURBSCurve(lua_State* L);
 };
-
-
-#endif /* LUA_UNSYNCED_INFO_H */

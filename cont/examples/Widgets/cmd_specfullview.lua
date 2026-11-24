@@ -51,9 +51,10 @@ function widget:PlayerChanged(playerID)
 		return
 	end
 
-	-- Both setters can trigger PlayerChanged again.
+	-- View and selection changes can trigger PlayerChanged again.
 	wasSpectating = spectating
 	if spectating then
+		Spring.SetSpectatorFullCommunications(true)
 		Spring.SetSpectatorFullView(true)
 		Spring.SetSpectatorFullSelect(true)
 	end

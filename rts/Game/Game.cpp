@@ -2012,7 +2012,7 @@ void CGame::HandleChatMsg(const ChatMessage& msg)
 		}
 
 		/*
-		- If you're spectating you always see all chat messages.
+		- Spectators with full communications receive all ally and spectator chat.
 		- If you're playing you see:
 		- TO_ALLIES-messages sent by allied players,
 		- TO_SPECTATORS-messages sent by yourself,
@@ -2024,20 +2024,20 @@ void CGame::HandleChatMsg(const ChatMessage& msg)
 		if (msg.destination == ChatMessage::TO_ALLIES && player) {
 			const int msgAllyTeam = teamHandler.AllyTeam(player->team);
 			const bool allied = teamHandler.Ally(msgAllyTeam, gu->myAllyTeam);
-			if (gu->spectating || (allied && !player->spectator)) {
+			if (gu->spectatingFullCommunications || (allied && !player->spectator)) {
 				LOG("%sAllies: %s", label.c_str(), s.c_str());
 				Channels::UserInterface->PlaySample(chatSound, 5);
 			}
 		}
 		else if (msg.destination == ChatMessage::TO_SPECTATORS) {
-			if (gu->spectating || myMsg) {
+			if (gu->spectatingFullCommunications || myMsg) {
 				LOG("%sSpectators: %s", label.c_str(), s.c_str());
 				Channels::UserInterface->PlaySample(chatSound, 5);
 			}
 		}
 		else if (msg.destination == ChatMessage::TO_EVERYONE) {
 			const bool specsOnly = noSpectatorChat && (player && player->spectator);
-			if (gu->spectating || !specsOnly) {
+			if (gu->spectatingFullCommunications || !specsOnly) {
 				if (specsOnly) {
 					LOG("%sSpectators: %s", label.c_str(), s.c_str());
 				} else {
@@ -2052,7 +2052,7 @@ void CGame::HandleChatMsg(const ChatMessage& msg)
 			// all replay whispers can be read when watching it
 			if (player->isFromDemo) {
 				LOG("%s whispered %s: %s", label.c_str(), playerHandler.Player(msg.destination)->name.c_str(), s.c_str());
-			} else if (msg.destination == gu->myPlayerNum && player->spectator == gu->spectating) {
+			} else if (msg.destination == gu->myPlayerNum && player->spectator == gu->spectating && (!player->spectator || gu->spectatingFullCommunications)) {
 				LOG("%sPrivate: %s", label.c_str(), s.c_str());
 				Channels::UserInterface->PlaySample(chatSound, 5);
 			}

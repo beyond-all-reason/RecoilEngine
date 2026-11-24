@@ -107,6 +107,7 @@ void CPlayer::StartSpectating()
 		gu->spectating           = true;
 		gu->spectatingFullView   = false;
 		gu->spectatingFullSelect = false;
+		gu->spectatingFullCommunications = false;
 
 		//FIXME use eventHandler?
 		CLuaUI::UpdateTeams();
@@ -135,6 +136,7 @@ void CPlayer::JoinTeam(int newTeam)
 		gu->spectating           = false;
 		gu->spectatingFullView   = false;
 		gu->spectatingFullSelect = false;
+		gu->spectatingFullCommunications = false;
 
 		CLuaUI::UpdateTeams();
 		selectedUnitsHandler.ClearSelected();
