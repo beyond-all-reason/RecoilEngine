@@ -1062,8 +1062,7 @@ int LuaSyncedRead::GetPlayerRulesParams(lua_State* L)
 		losMask = LuaRulesParams::RULESPARAMLOS_PRIVATE_MASK;
 
 	} else if (playerID == gu->myPlayerNum || CLuaHandle::GetHandleFullRead(L) || game->IsGameOver()) {
-		/* The FullRead check is not redundant, for example
-		 * `/specfullview 1` is not synced but has full read. */
+		/* Unsynced spectator handles can have full read. */
 		losMask = LuaRulesParams::RULESPARAMLOS_PRIVATE_MASK;
 
 	} else {

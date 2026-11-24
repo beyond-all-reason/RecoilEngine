@@ -30,8 +30,6 @@
  * @field deadTeamsKeepUnitLimit boolean Whether engine redistributes dead team unitlimit to allies (false) or keeps it as-is (true)
  * @field reliableLuaMapShaders boolean Whether forward-only Lua map shaders activate without a deferred draw and Spring.SetMapShader program swaps refresh cached uniform locations
  * @field nanoParticleUpdateCallin boolean Whether LuaUI receives batched `NanoParticleUpdate` lifecycle events
- * @field spectatorFullViewOptIn boolean Whether former players can opt into full spectator access with `specfullview optin`
- * @field restrictSpectatorsToAllyTeam boolean Whether the system modrule can limit former players to allied vision
  * @field nanoParticlesGL4 boolean Whether the engine has the standalone shader-based nano particle effect (the `NanoParticles*` springsettings)
  * @field modelVertexColor boolean Whether glTF `COLOR_0` is loaded into the models VBO (`color`, attribute 15; opaque white when absent)
  * @field liveConfigChanges integer Version of the set of springsettings that apply without a restart, bumped when more are added (1: those listed in the 2026.09 changelog)
@@ -93,8 +91,6 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 		LuaPushNamedBool(L, "deadTeamsKeepUnitLimit", false);
 		LuaPushNamedBool(L, "reliableLuaMapShaders", true);
 		LuaPushNamedBool(L, "nanoParticleUpdateCallin", true);
-		LuaPushNamedBool(L, "restrictSpectatorsToAllyTeam", true);
-		LuaPushNamedBool(L, "spectatorFullViewOptIn", true);
 		LuaPushNamedBool(L, "nanoParticlesGL4", true);
 		LuaPushNamedBool(L, "modelVertexColor", true);
 		LuaPushNamedNumber(L, "liveConfigChanges", 1);

@@ -11,6 +11,7 @@
 #include "LuaOpenGLUtils.h"
 #include "LuaParser.h"
 #include "LuaTextures.h"
+#include "LuaUI.h"
 #include "LuaUtils.h"
 
 #include "ExternalAI/EngineOutHandler.h"
@@ -149,6 +150,11 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(PauseSoundStream);
 	REGISTER_LUA_CFUNC(SetSoundStreamVolume);
 	REGISTER_LUA_CFUNC(SetSoundEffectParams);
+
+	if (!CLuaHandle::GetHandleSynced(L)) {
+		REGISTER_LUA_CFUNC(SetSpectatorFullView);
+		REGISTER_LUA_CFUNC(SetSpectatorFullSelect);
+	}
 
 	REGISTER_LUA_CFUNC(SetCameraState);
 	REGISTER_LUA_CFUNC(SetCameraTarget);
@@ -692,7 +698,7 @@ int LuaUnsyncedCtrl::SendMessage(lua_State* L)
  */
 int LuaUnsyncedCtrl::SendMessageToSpectators(lua_State* L)
 {
-	if (gu->CanSpectateAllTeams())
+	if (gu->spectating)
 		PrintMessage(L, luaL_checksstring(L, 1));
 
 	return 0;
@@ -1183,6 +1189,53 @@ int LuaUnsyncedCtrl::DrawUnitCommands(lua_State* L)
 		}
 	}
 
+	return 0;
+}
+
+
+/******************************************************************************
+ * Spectating
+ * @section spectating
+ *****************************************************************************/
+
+/*** Sets whether the local spectator can see beyond the followed allyteam's LOS.
+ * Has no effect while playing. Leaves full selection unchanged.
+ * @function Spring.SetSpectatorFullView
+ * @param fullView boolean
+ * @return nil
+ * @see Spring.GetSpectatingState
+ */
+int LuaUnsyncedCtrl::SetSpectatorFullView(lua_State* L)
+{
+	const bool fullView = luaL_checkboolean(L, 1);
+	if (!gu->spectating || gu->spectatingFullView == fullView)
+		return 0;
+
+	gu->spectatingFullView = fullView;
+	CLuaUI::UpdateTeams();
+	if (fullView && readMap != nullptr)
+		readMap->CopySyncedToUnsynced();
+
+	eventHandler.PlayerChanged(gu->myPlayerNum);
+	return 0;
+}
+
+/*** Sets whether the local spectator can select units from every team.
+ * Has no effect while playing. Leaves full view unchanged.
+ * @function Spring.SetSpectatorFullSelect
+ * @param fullSelect boolean
+ * @return nil
+ * @see Spring.GetSpectatingState
+ */
+int LuaUnsyncedCtrl::SetSpectatorFullSelect(lua_State* L)
+{
+	const bool fullSelect = luaL_checkboolean(L, 1);
+	if (!gu->spectating || gu->spectatingFullSelect == fullSelect)
+		return 0;
+
+	gu->spectatingFullSelect = fullSelect;
+	CLuaUI::UpdateTeams();
+	eventHandler.PlayerChanged(gu->myPlayerNum);
 	return 0;
 }
 

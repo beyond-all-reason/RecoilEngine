@@ -2528,7 +2528,7 @@ void CLuaHandle::HandleLuaMsg(int playerID, int script, int mode, const std::vec
 
 				switch (mode) {
 					case 0: { sendMsg = true; } break;
-					case 's': { sendMsg = gu->CanSpectateAllTeams(); } break;
+					case 's': { sendMsg = gu->spectating; } break;
 					case 'a': {
 						const CPlayer* player = playerHandler.Player(playerID);
 
@@ -2538,7 +2538,7 @@ void CLuaHandle::HandleLuaMsg(int playerID, int script, int mode, const std::vec
 						if (gu->spectatingFullView) {
 							sendMsg = true;
 						} else if (player->spectator) {
-							sendMsg = gu->CanSpectateAllTeams();
+							sendMsg = gu->spectating;
 						} else {
 							const int msgAllyTeam = teamHandler.AllyTeam(player->team);
 							sendMsg = teamHandler.Ally(msgAllyTeam, gu->myAllyTeam);

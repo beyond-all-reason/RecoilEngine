@@ -1,6 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#pragma once
+#ifndef _GLOBAL_UNSYNCED_H
+#define _GLOBAL_UNSYNCED_H
 
 #include <atomic>
 
@@ -27,10 +28,6 @@ public:
 
 	void SetMyPlayer(const int myNumber);
 	CPlayer* GetMyPlayer();
-	void StartSpectating();
-	bool CanSpectateAllTeams() const;
-	bool CanOptIntoFullView() const;
-	bool TryOptIntoFullView();
 
 public:
 	/**
@@ -171,14 +168,10 @@ public:
 	*/
 	std::atomic<bool> globalQuit = {false};
 	std::atomic<bool> globalReload = {false};
-
-private:
-	enum class SpectatorVision { Allied = 1, OptIn, Full };
-	SpectatorVision GetEliminatedSpectatorVision() const;
-	SpectatorVision personalSpectatorVision = SpectatorVision::Full;
-	bool optedIntoFullView = false;
 };
 
 
 extern CGlobalUnsynced* gu;
 extern CGlobalUnsyncedRNG guRNG;
+
+#endif /* _GLOBAL_UNSYNCED_H */

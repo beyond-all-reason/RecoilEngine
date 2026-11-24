@@ -1912,15 +1912,7 @@ void CGame::GameEnd(const std::vector<unsigned char>& winningAllyTeams, bool tim
 	}
 
 
-	const bool releaseSpectatorView = gu->spectating && !gu->CanSpectateAllTeams();
 	gameOver = true;
-	if (releaseSpectatorView) {
-		gu->spectatingFullView = true;
-		gu->spectatingFullSelect = true;
-		CLuaUI::UpdateTeams();
-		readMap->BecomeSpectator();
-		eventHandler.PlayerChanged(gu->myPlayerNum);
-	}
 	eventHandler.GameOver(winningAllyTeams);
 
 	CEndGameBox::Create(winningAllyTeams);
@@ -2020,7 +2012,7 @@ void CGame::HandleChatMsg(const ChatMessage& msg)
 		}
 
 		/*
-		- Unrestricted spectators can see both teams' ally chat.
+		- If you're spectating you always see all chat messages.
 		- If you're playing you see:
 		- TO_ALLIES-messages sent by allied players,
 		- TO_SPECTATORS-messages sent by yourself,
@@ -2032,20 +2024,20 @@ void CGame::HandleChatMsg(const ChatMessage& msg)
 		if (msg.destination == ChatMessage::TO_ALLIES && player) {
 			const int msgAllyTeam = teamHandler.AllyTeam(player->team);
 			const bool allied = teamHandler.Ally(msgAllyTeam, gu->myAllyTeam);
-			if (gu->CanSpectateAllTeams() || (allied && !player->spectator)) {
+			if (gu->spectating || (allied && !player->spectator)) {
 				LOG("%sAllies: %s", label.c_str(), s.c_str());
 				Channels::UserInterface->PlaySample(chatSound, 5);
 			}
 		}
 		else if (msg.destination == ChatMessage::TO_SPECTATORS) {
-			if (gu->CanSpectateAllTeams() || myMsg) {
+			if (gu->spectating || myMsg) {
 				LOG("%sSpectators: %s", label.c_str(), s.c_str());
 				Channels::UserInterface->PlaySample(chatSound, 5);
 			}
 		}
 		else if (msg.destination == ChatMessage::TO_EVERYONE) {
 			const bool specsOnly = noSpectatorChat && (player && player->spectator);
-			if (gu->CanSpectateAllTeams() || !specsOnly) {
+			if (gu->spectating || !specsOnly) {
 				if (specsOnly) {
 					LOG("%sSpectators: %s", label.c_str(), s.c_str());
 				} else {

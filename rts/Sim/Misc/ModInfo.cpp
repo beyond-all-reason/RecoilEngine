@@ -148,8 +148,6 @@ void CModInfo::ResetState()
 
 		nativeExcessSharing = true;
 		allowTake = true;
-		restrictSpectatorsToAllyTeam = false;
-		spectatorFullViewOptIn = false;
 
 		allowEnginePlayerlist = true;
 
@@ -214,8 +212,6 @@ void CModInfo::Init(const std::string& modFileName)
 		SLuaAllocLimit::MAX_ALLOC_BYTES = static_cast<decltype(SLuaAllocLimit::MAX_ALLOC_BYTES)>(system.GetInt("LuaAllocLimit", SLuaAllocLimit::MAX_ALLOC_BYTES >> 20u)) << 20u;
 
 		nativeExcessSharing = system.GetBool("nativeExcessSharing", nativeExcessSharing);
-		restrictSpectatorsToAllyTeam = system.GetBool("restrictSpectatorsToAllyTeam", restrictSpectatorsToAllyTeam);
-		spectatorFullViewOptIn = system.GetBool("spectatorFullViewOptIn", spectatorFullViewOptIn);
 		allowTake = system.GetBool("allowTake", allowTake);
 		allowEnginePlayerlist = system.GetBool("allowEnginePlayerlist", allowEnginePlayerlist);
 

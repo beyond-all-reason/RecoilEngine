@@ -1,6 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#pragma once
+#ifndef MOD_INFO_H
+#define MOD_INFO_H
 
 #include <optional>
 #include <string>
@@ -252,8 +253,6 @@ public:
 
 	bool nativeExcessSharing;
 	bool allowTake;
-	bool restrictSpectatorsToAllyTeam;
-	bool spectatorFullViewOptIn;
 	bool allowEnginePlayerlist;
 
 	// how often to report wind speed/direction to wind gens
@@ -264,3 +263,5 @@ public:
 };
 
 extern CModInfo modInfo;
+
+#endif // MOD_INFO_H

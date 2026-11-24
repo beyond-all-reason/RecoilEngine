@@ -1148,15 +1148,11 @@ public:
 		if (parseFailure || !teamHandler.IsValidTeam(teamId))
 			return false;
 
-		const int allyTeamId = teamHandler.AllyTeam(teamId);
-		if (!gu->CanSpectateAllTeams() && allyTeamId != gu->myPlayingAllyTeam)
-			return false;
-
 		if (gu->myTeam == teamId)
 			return true;
 
 		gu->myTeam = teamId;
-		gu->myAllyTeam = allyTeamId;
+		gu->myAllyTeam = teamHandler.AllyTeam(teamId);
 
 		CLuaUI::UpdateTeams();
 
@@ -1167,65 +1163,10 @@ public:
 			(gu->spectatingFullView   ? 1 : 0) +
 			(gu->spectatingFullSelect ? 2 : 0);
 
-		if ((specFVMode == 0 || specFVMode == 2) && gu->CanSpectateAllTeams())
+		if (specFVMode == 0 || specFVMode == 2)
 			readMap->CopySyncedToUnsynced();
 
 		LOG("[SpecTeamAction] local client %d now spectating team %d and allyteam %d", gu->myPlayerNum, gu->myTeam, gu->myAllyTeam);
-		return true;
-	}
-};
-
-
-
-class SpecFullViewActionExecutor : public IUnsyncedActionExecutor {
-public:
-	SpecFullViewActionExecutor() : IUnsyncedActionExecutor(
-		"SpecFullView",
-		"Sets or toggles LOS settings if the local user is a spectator. Fullview: See everything, otherwise visibility is determined by the current team. Fullselect: Whether all units can be selected",
-		false,
-		{
-			{"", "Toggles both Fullview and Fullselect from current values"},
-			{"0", "Not Fullview, Not Fullselect"},
-			{"1", "Fullview, Not Fullselect"},
-			{"2", "Not Fullview, Fullselect"},
-			{"3", "Fullview, Fullselect (default)"},
-			{"optin", "Accept full spectator access when the game offers it"},
-		}
-	) {
-	}
-
-	bool Execute(const UnsyncedAction& action) const final {
-		const bool optIn = (action.GetArgs() == "optin");
-		if (optIn ? !gu->TryOptIntoFullView() : !gu->CanSpectateAllTeams())
-			return false;
-
-		const int oldMode =
-			(gu->spectatingFullView   ? 1 : 0) +
-			(gu->spectatingFullSelect ? 2 : 0);
-
-		if (!action.GetArgs().empty()) {
-			const int mode = optIn ? 3 : StringToInt(action.GetArgs());
-			gu->spectatingFullView   = !!(mode & 1);
-			gu->spectatingFullSelect = !!(mode & 2);
-		} else {
-			gu->spectatingFullView = !gu->spectatingFullView;
-			gu->spectatingFullSelect = gu->spectatingFullView;
-		}
-
-		const int newMode =
-			(gu->spectatingFullView   ? 1 : 0) +
-			(gu->spectatingFullSelect ? 2 : 0);
-
-		CLuaUI::UpdateTeams();
-
-		// NOTE: unsynced event
-		eventHandler.PlayerChanged(gu->myPlayerNum);
-		/*
-		from "View Chosen Player" (0) and "Select Any Unit"(2) to "View All"(1) and "View All & Select Any"(3)
-		if we are going from global view (for example "View All") there should be no need for such update
-		*/
-		if ((oldMode == 0 || oldMode == 2) && (newMode == 1 || newMode == 3))
-			readMap->CopySyncedToUnsynced();
 		return true;
 	}
 };
@@ -4118,7 +4059,6 @@ void UnsyncedGameCommands::AddDefaultActionExecutors()
 	AddActionExecutor(AllocActionExecutor<TeamActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<SpectatorActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<SpecTeamActionExecutor>());
-	AddActionExecutor(AllocActionExecutor<SpecFullViewActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<AllyActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<GroupActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<GroupIDActionExecutor>(0));
