@@ -292,6 +292,7 @@ void CUnitDrawerData::UpdateUnitIconsByUnitDef(const UnitDef* ud)
 	RECOIL_DETAILED_TRACY_ZONE;
 	for (int teamNum = 0; teamNum < teamHandler.ActiveTeams(); teamNum++) {
 		for (auto* unit : unitHandler.GetUnitsByTeamAndDef(teamNum, ud->id)) {
+			unit->definedIconName = ud->iconName;
 			UpdateCurrentUnitIcon(unit);
 		}
 	}
