@@ -29,6 +29,7 @@ namespace icon {
 			, distSqr{ 1.0f }
 			, drawOrder{ 0.0f }
 			, radiusAdjust{ false }
+			, atlasIndex{ 0 }
 			, srcTexCoords{}
 			, texCoords{}
 		{}
@@ -40,6 +41,7 @@ namespace icon {
 			, distSqr{ distance_ * distance_ }
 			, drawOrder{ drawOrder_ }
 			, radiusAdjust{ radiusAdjust_ }
+			, atlasIndex{ atlasIndex_ }
 			, srcTexCoords{ srcTexCoords_ }
 			, texCoords{ 0.0f, 0.0f, 1.0f, 1.0f, atlasIndex_ }
 		{}
@@ -52,7 +54,7 @@ namespace icon {
 		const auto& GetRadiusAdjust() const { return radiusAdjust; }
 		const auto& GetSrcTexCoords() const { return srcTexCoords; }
 		const auto& GetTexCoords() const { return texCoords; }
-		const auto& GetAtlasIndex() const { return texCoords.pageNum; }
+		const auto& GetAtlasIndex() const { return atlasIndex; }
 		const auto& GetFileName() const { return fileName; }
 
 		static constexpr auto GetRadiusScale() { return 30.0f; }
@@ -68,6 +70,7 @@ namespace icon {
 		float drawOrder;
 
 		bool radiusAdjust;
+		uint32_t atlasIndex;
 		float4 srcTexCoords;
 		AtlasedTexture texCoords;
 	};

@@ -98,7 +98,7 @@ bool CIconHandler::UpdateAtlasData(size_t atlasIdx)
 		for (const auto& [iconName, uniqSubTexName] : atlas->GetNameToUniqueSubTexMap()) {
 			auto it = uniqueSubTexMap.find(uniqSubTexName);
 			auto& item = iconsData[*iconsMap.try_get(iconName)];
-			item.SetTexCoords(AtlasedTexture{ it->second.subTexCoords, 0 });
+			item.SetTexCoords(AtlasedTexture{ it->second.subTexCoords, static_cast<uint32_t>(atlasIdx) });
 		}
 	}
 
@@ -115,7 +115,9 @@ bool CIconHandler::UpdateAtlasData(size_t atlasIdx)
 
 	for (const auto& [iconName, _] : atlas->GetNameToUniqueSubTexMap()) {
 		auto& item = iconsData[*iconsMap.try_get(iconName)];
-		item.SetTexCoords(atlas->GetTexture(iconName));
+		auto tc = atlas->GetTexture(iconName);
+		tc.pageNum = static_cast<uint32_t>(atlasIdx); // the draw picks $icons0 or $icons1 by pageNum
+		item.SetTexCoords(tc);
 	}
 
 	const auto& defTC = iconsData[defaultIconIdx].GetTexCoords();
