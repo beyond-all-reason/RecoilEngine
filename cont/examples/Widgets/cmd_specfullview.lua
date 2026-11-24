@@ -2,8 +2,8 @@
 
 function widget:GetInfo()
 	return {
-		name = "Spectator Full View",
-		desc = "Provides /specfullview [0-3] for spectators",
+		name = "Spectator Commands",
+		desc = "Provides /specfullview [0-3] and /specteam <teamID> for spectators",
 		layer = 0,
 		enabled = true,
 	}
@@ -28,10 +28,17 @@ local function specFullView(_, _, words)
 	return true
 end
 
+local function specTeam(_, _, words)
+	local teamID = words[1] and tonumber(words[1]:match("^[+-]?%d+"))
+	return teamID ~= nil and Spring.SetSpectatorTeam(teamID)
+end
+
 function widget:Initialize()
+	widgetHandler:AddAction("specteam", specTeam, nil, "tp")
 	widgetHandler:AddAction("specfullview", specFullView, nil, "tp")
 end
 
 function widget:Shutdown()
+	widgetHandler:RemoveAction("specteam")
 	widgetHandler:RemoveAction("specfullview")
 end

@@ -38,6 +38,7 @@ class LuaUnsyncedCtrl {
 		static int PauseSoundStream(lua_State* L);
 		static int SetSoundStreamVolume(lua_State* L);
 
+		static int SetSpectatorTeam(lua_State* L);
 		static int SetSpectatorFullView(lua_State* L);
 		static int SetSpectatorFullSelect(lua_State* L);
 

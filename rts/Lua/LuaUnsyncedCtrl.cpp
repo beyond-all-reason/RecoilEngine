@@ -152,6 +152,7 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetSoundEffectParams);
 
 	if (!CLuaHandle::GetHandleSynced(L)) {
+		REGISTER_LUA_CFUNC(SetSpectatorTeam);
 		REGISTER_LUA_CFUNC(SetSpectatorFullView);
 		REGISTER_LUA_CFUNC(SetSpectatorFullSelect);
 	}
@@ -1197,6 +1198,32 @@ int LuaUnsyncedCtrl::DrawUnitCommands(lua_State* L)
  * Spectating
  * @section spectating
  *****************************************************************************/
+
+/*** Changes the team followed by the local spectator, preserving full view and full selection.
+ * @function Spring.SetSpectatorTeam
+ * @param teamID TeamID
+ * @return boolean accepted Whether the local client is spectating and the team ID is valid.
+ * @see Spring.GetMyTeamID
+ */
+int LuaUnsyncedCtrl::SetSpectatorTeam(lua_State* L)
+{
+	const lua_Number team = luaL_checknumber(L, 1);
+	const bool accepted = gu->spectating && team >= 0 && team < teamHandler.ActiveTeams() && team == static_cast<int>(team);
+
+	if (accepted && gu->myTeam != team) {
+		gu->myTeam = static_cast<int>(team);
+		gu->myAllyTeam = teamHandler.AllyTeam(gu->myTeam);
+		CLuaUI::UpdateTeams();
+		if (!gu->spectatingFullView && readMap != nullptr)
+			readMap->CopySyncedToUnsynced();
+
+		eventHandler.PlayerChanged(gu->myPlayerNum);
+		LOG("[SetSpectatorTeam] local client %d now spectating team %d and allyteam %d", gu->myPlayerNum, gu->myTeam, gu->myAllyTeam);
+	}
+
+	lua_pushboolean(L, accepted);
+	return 1;
+}
 
 /*** Sets whether the local spectator can see beyond the followed allyteam's LOS.
  * Has no effect while playing. Leaves full selection unchanged.
