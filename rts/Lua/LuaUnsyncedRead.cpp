@@ -2767,8 +2767,11 @@ int LuaUnsyncedRead::GetLocalAllyTeamID(lua_State* L)
 }
 
 
-/***
+/*** Players who resign or are eliminated start spectating with their team's vision and selection.
+ * Initial spectators start with full view and full selection. Games can change both from unsynced Lua.
  *
+ * @see Spring.SetSpectatorFullView
+ * @see Spring.SetSpectatorFullSelect
  * @function Spring.GetSpectatingState
  * @return boolean spectating
  * @return boolean spectatingFullView

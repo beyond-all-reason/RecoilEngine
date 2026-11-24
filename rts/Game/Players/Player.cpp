@@ -105,8 +105,8 @@ void CPlayer::StartSpectating()
 	if (gu->myPlayerNum == this->playerNum) {
 		// HACK: unsynced code should just listen for the PlayerChanged event
 		gu->spectating           = true;
-		gu->spectatingFullView   = true;
-		gu->spectatingFullSelect = true;
+		gu->spectatingFullView   = false;
+		gu->spectatingFullSelect = false;
 
 		//FIXME use eventHandler?
 		CLuaUI::UpdateTeams();
