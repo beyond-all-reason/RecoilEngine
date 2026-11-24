@@ -143,6 +143,10 @@ private:
 	int lastPC2;
 	int lastPC3;
 
+	unsigned int autoRepairTag = 0;
+	bool repairFromFight = false;
+	int repairOutOfRangeFrame = -1;
+
 	bool range3D;
 };
 

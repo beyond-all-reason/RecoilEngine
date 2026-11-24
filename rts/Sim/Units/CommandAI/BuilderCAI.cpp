@@ -53,6 +53,9 @@ CR_REG_METADATA(CBuilderCAI , (
 	CR_MEMBER(lastPC1),
 	CR_MEMBER(lastPC2),
 	CR_MEMBER(lastPC3),
+	CR_MEMBER(autoRepairTag),
+	CR_MEMBER(repairFromFight),
+	CR_MEMBER(repairOutOfRangeFrame),
 	CR_POSTLOAD(PostLoad),
 	CR_PREALLOC(GetPreallocContainer)
 ))
@@ -783,7 +786,8 @@ void CBuilderCAI::ExecuteRepair(Command& c)
 			return;
 		}
 
-		if (tempOrder && owner->moveState <= MOVESTATE_MANEUVER) {
+		const bool canWaitForTarget = owner->immobile && !unit->immobile && c.GetTag() == autoRepairTag;
+		if (tempOrder && !canWaitForTarget && owner->moveState <= MOVESTATE_MANEUVER) {
 			// limit how far away we go when not roaming
 			if (LinePointDist(commandPos1, commandPos2, unit->pos) > std::max(500.0f, GetBuildRange(unit->buildeeRadius))) {
 				StopMoveAndFinishCommand();
@@ -792,12 +796,32 @@ void CBuilderCAI::ExecuteRepair(Command& c)
 		}
 
 		if (c.GetNumParams() == 5) {
-			const float3& pos = c.GetPos(1);
-			const float radius = c.GetParam(4) + 100.0f; // do not walk too far outside repair area
+			static constexpr float MIN_REPAIR_CHASE_DISTANCE = 100.0f;
+			static constexpr int REPAIR_TARGET_RETURN_FRAMES = 2 * GAME_SPEED;
 
-			if ((pos - unit->pos).SqLength2D() > radius * radius ||
-				(unit->IsMoving() && ((c.IsInternalOrder() && !TargetInterceptable(unit, unit->speed.Length2D())) || ownerBuilder->curBuild == unit)
-				&& !IsInBuildRange(unit))) {
+			const float3& pos = c.GetPos(1);
+			const float areaRadius = c.GetParam(4);
+			const float distSq = pos.SqDistance2D(unit->pos);
+			const bool outsideArea = owner->immobile
+				? distSq >= Square(areaRadius + unit->radius)
+				: distSq > Square(areaRadius + std::max(MIN_REPAIR_CHASE_DISTANCE, unit->radius));
+
+			const bool stopChasing = owner->immobile || (unit->IsMoving() &&
+				(ownerBuilder->curBuild == unit || (c.IsInternalOrder() && !TargetInterceptable(unit, unit->speed.Length2D()))));
+
+			const bool outOfReach = stopChasing && !IsInBuildRange(unit);
+			bool waitingForTarget = false;
+			if (canWaitForTarget) {
+				// Fight uses the tower's reach as its search area. Area repair has a player-chosen boundary.
+				if (outOfReach && (repairFromFight || !outsideArea)) {
+					if (repairOutOfRangeFrame < 0)
+						repairOutOfRangeFrame = gs->frameNum;
+					waitingForTarget = gs->frameNum - repairOutOfRangeFrame < REPAIR_TARGET_RETURN_FRAMES;
+				} else {
+					repairOutOfRangeFrame = -1;
+				}
+			}
+			if ((outsideArea || outOfReach) && !waitingForTarget) {
 				StopMoveAndFinishCommand();
 				return;
 			}
@@ -1765,6 +1789,9 @@ bool CBuilderCAI::FindRepairTargetAndRepair(
 		Command c(CMD_REPAIR, options | INTERNAL_ORDER, bestUnit->id, pos);
 		c.PushParam(radius);
 		commandQue.push_front(c);
+		autoRepairTag = commandQue.front().GetTag();
+		repairFromFight = attackEnemy;
+		repairOutOfRangeFrame = -1;
 	} else {
 		PushOrUpdateReturnFight(); // attackEnemy must be true
 		commandQue.push_front(Command(CMD_ATTACK, options | INTERNAL_ORDER, bestUnit->id));
