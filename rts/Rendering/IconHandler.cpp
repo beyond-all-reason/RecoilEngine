@@ -233,6 +233,7 @@ bool CIconHandler::AddIcon(
 	};
 
 	drawOrderIconCount += (drawOrder != 0.0f);
+	atlasNeedsUpdate.set(atlasIndex);
 
 	// do basic check instead of the full load procedure
 	return CFileHandler::FileExists(texFileName, SPRING_VFS_ALL);
