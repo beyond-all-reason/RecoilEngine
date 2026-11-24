@@ -214,11 +214,20 @@ bool CIconHandler::AddIcon(
 	float drawOrder
 ) {
 	auto it = iconsMap.find(iconName);
-	if (it != iconsMap.end()) {
-		FreeIcon(iconName);
-	} else {
+	if (it == iconsMap.end()) {
 		it = iconsMap.emplace(iconName, iconsData.size()).first;
 		iconsData.emplace_back();
+	} else if (it->second == defaultIconIdx && iconName != "default") {
+		// a freed name points at the default icon, give it its own slot again
+		it->second = iconsData.size();
+		iconsData.emplace_back();
+	} else {
+		// replace in place, units that hold this index get the new icon
+		const auto& oldIcon = iconsData[it->second];
+		if (const auto ai = oldIcon.GetAtlasIndex(); ai > 0)
+			atlasNeedsUpdate.set(ai);
+
+		drawOrderIconCount -= (oldIcon.GetDrawOrder() != 0.0f);
 	}
 
 	iconsData[it->second] = IconData{
