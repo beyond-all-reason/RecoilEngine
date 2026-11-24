@@ -633,7 +633,8 @@ bool LuaConstGL::PushEntries(lua_State* L)
 	/*** @field GL.SHADER_STORAGE_BARRIER_BIT integer */
 	PUSH_GL(SHADER_STORAGE_BARRIER_BIT);
 	/*** @field GL.ALL_BARRIER_BITS integer */
-	PUSH_GL(ALL_BARRIER_BITS);
+	// 0xFFFFFFFF does not fit lua_Number (float); -1 converts back to all bits set, as ALL_ATTRIB_BITS above
+	LuaPushNamedNumber(L, "ALL_BARRIER_BITS", -1.0f);
 
 	/*** @field GL.COLOR_ATTACHMENT0 integer */
 	PUSH_GL(COLOR_ATTACHMENT0);
