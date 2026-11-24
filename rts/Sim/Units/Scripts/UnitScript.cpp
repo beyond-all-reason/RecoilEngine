@@ -63,7 +63,6 @@ CR_REG_METADATA(CUnitScript, (
 	CR_MEMBER(doneAnims),
 
 	//Populated by children
-	CR_IGNORED(rootPiece),
 	CR_IGNORED(pieces),
 	CR_IGNORED(hasSetSFXOccupy),
 	CR_IGNORED(hasRockUnit),
@@ -226,10 +225,14 @@ void CUnitScript::TickAllAnims(int deltaTime)
 	}
 
 	spring::VectorEraseIfAll(anims, [](const auto& ai) { return ai.done; });
+
+	auto* rootPiece = unit->localModel.GetRoot();
 #if 1
 	// BFS pass
-	std::deque<std::pair<LocalModelPiece*, Transform>> q;
+	thread_local std::deque<std::pair<LocalModelPiece*, Transform>> q;
 	q.push_front({ rootPiece, Transform{} });
+
+	uint32_t lastDirtyRank = uint32_t(-1);
 
 	while (!q.empty()) {
 		// copy
@@ -237,13 +240,20 @@ void CUnitScript::TickAllAnims(int deltaTime)
 		q.pop_front();
 
 		if (lmp->GetDirty()) {
-			lmp->SetDirtyRaw(false);
-			lmp->SetWasUpdatedRaw(true);
+			lmp->SetDirty(false);
+
+			if unlikely(lmp->rank < lastDirtyRank) {
+				lastDirtyRank = lmp->rank;
+			}
+
 			lmp->UpdatePieceSpaceTransform();
+		}
+		if likely(lmp->rank >= lastDirtyRank) {
 			lmp->UpdateModelSpaceTransform(pTra);
+			lmp->SetWasUpdated(true);
 		}
 
-		const Transform& modelTra = lmp->GetModelSpaceTransformRaw();
+		const Transform& modelTra = lmp->GetModelSpaceTransform();
 
 		for (auto* child : lmp->children) {
 			q.push_back({ child, modelTra });
@@ -251,15 +261,24 @@ void CUnitScript::TickAllAnims(int deltaTime)
 	}
 #else
 	// DFS pass
-	auto WalkDFS = [](this auto&& self, LocalModelPiece* lmp, const Transform& pTra) -> void {
+
+	auto WalkDFS = [lastDirtyRank = uint32_t(-1)](this auto&& self, LocalModelPiece* lmp, const Transform& pTra) -> void {
 		if (lmp->GetDirty()) {
-			lmp->SetDirtyRaw(false);
-			lmp->SetWasUpdatedRaw(true);
+			lmp->SetDirty(false);
+
+			if unlikely(lmp->rank < lastDirtyRank) {
+				lastDirtyRank = lmp->rank;
+			}
+
 			lmp->UpdatePieceSpaceTransform();
-			lmp->UpdateModelSpaceTransform(pTra);
 		}
 
-		const Transform& modelTra = lmp->GetModelSpaceTransformRaw();
+		if likely(lmp->rank >= lastDirtyRank) {
+			lmp->UpdateModelSpaceTransform(pTra);
+			lmp->SetWasUpdated(true);
+		}
+
+		const Transform& modelTra = lmp->GetModelSpaceTransform();
 
 		for (auto* p : lmp->children)
 			self(p, modelTra);
