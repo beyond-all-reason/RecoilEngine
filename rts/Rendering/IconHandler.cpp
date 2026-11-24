@@ -92,6 +92,12 @@ bool CIconHandler::UpdateAtlasData(size_t atlasIdx)
 		}
 	}
 
+	if (auto it = invalidIcons.find("default"); it != invalidIcons.end()) {
+		bool res = atlas->AddTexFromFile("default", "bitmaps/defaultradardot.png");
+		assert(res);
+		invalidIcons.erase(it);
+	}
+
 	// everything above was loaded from a single image atlas, no need to run CTextureRenderAtlas machinery
 	if (auto allFiles = atlas->GetAllFileNames(); allFiles.size() == 1) {
 		const auto& uniqueSubTexMap = atlas->GetUniqueSubTexMap();
@@ -100,12 +106,14 @@ bool CIconHandler::UpdateAtlasData(size_t atlasIdx)
 			auto& item = iconsData[*iconsMap.try_get(iconName)];
 			item.SetTexCoords(AtlasedTexture{ it->second.subTexCoords, 0 });
 		}
-	}
 
-	if (auto it = invalidIcons.find("default"); it != invalidIcons.end()) {
-		bool res = atlas->AddTexFromFile("default", "bitmaps/defaultradardot.png");
-		assert(res);
-		invalidIcons.erase(it);
+		const auto& defTC = iconsData[defaultIconIdx].GetTexCoords();
+		for (const auto& iconName : invalidIcons) {
+			auto& item = iconsData[*iconsMap.try_get(iconName)];
+			item.SetTexCoords(defTC);
+		}
+
+		return true;
 	}
 
 	if (!atlas->CalculateAtlas()) {
@@ -149,6 +157,8 @@ bool CIconHandler::CreateAtlasTexture(size_t atlasIdx)
 		glBindTexture(GL_TEXTURE_2D, atlasTextureIDs[atlasIdx]);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+		atlas = nullptr;
 
 		return true;
 	}
