@@ -26,6 +26,8 @@ struct S3DModelPiece {
 		}
 
 		vertices.clear();
+		collisionVerts.clear();
+		closedCollisionMesh = false;
 		indices.clear();
 		shatterIndices.clear();
 
@@ -85,6 +87,23 @@ public:
 
 	void ReleaseShatterIndices();
 
+	/// Positions only, indexed exactly like GetVerticesVec(), built once at
+	/// model load. Collision tracing reads nothing but the position, and a
+	/// full SVertexData is 80 bytes of which 12 are the position -- pulling
+	/// whole vertices through the cache for a ray test wastes most of every
+	/// cache line it touches. Empty for pieces without geometry.
+	const std::vector<float3>& GetCollisionVertsVec() const { return collisionVerts; }
+
+	/// Fills collisionVerts from vertices. Called by the model loader for
+	/// every piece of every model type, so overriding PostProcessGeometry
+	/// cannot accidentally skip it.
+	void BuildCollisionVerts();
+
+	/// True when the collision triangles form a closed surface: every edge
+	/// is shared by exactly two of them. Only then does "inside the volume"
+	/// mean anything, so only then is a point ever reported as being there.
+	bool HasClosedCollisionMesh() const { return closedCollisionMesh; }
+
 	const std::vector<SVertexData>& GetVerticesVec() const { return vertices; }
 	const std::vector<uint32_t>& GetIndicesVec() const { return indices; }
 	const std::vector<uint32_t>& GetShatterIndicesVec() const { return shatterIndices; }
@@ -123,6 +142,8 @@ public:
 	uint32_t indxCount = ~0u;
 protected:
 	std::vector<SVertexData> vertices;
+	std::vector<float3> collisionVerts;
+	bool closedCollisionMesh = false;
 	std::vector<uint32_t> indices;
 	std::vector<uint32_t> shatterIndices;
 

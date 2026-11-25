@@ -101,6 +101,37 @@ void CSolidObject::PostLoad()
 		return;
 
 	localModel.SetModel(model, false);
+
+	// Deliberately not re-applying the def here. Piece volumes are
+	// serialized, so loading has already restored them -- including
+	// whatever scripts changed during the match. Applying the def on top
+	// would quietly undo all of it, and only on the next load.
+}
+
+void CSolidObject::ApplyPolygonPieceVolumes()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	// read from the def's volume rather than this object's: CUnit::PreInit
+	// calls this before it copies unitDef->collisionVolume into the instance
+	if (!GetDef()->collisionVolume.UsePolygonPieceVolumes())
+		return;
+
+	for (LocalModelPiece& lmp: localModel.pieces) {
+		CollisionVolume* cv = lmp.GetCollisionVolume();
+
+		if (cv == nullptr)
+			continue;
+
+		// scales/offsets are unused by this type: the shape and its
+		// placement both come from the piece geometry itself
+		cv->InitShape(
+			ZeroVector, ZeroVector,
+			CollisionVolume::COLVOL_TYPE_POLYGON,
+			CollisionVolume::COLVOL_HITTEST_CONT,
+			CollisionVolume::COLVOL_AXIS_Z
+		);
+	}
 }
 
 
