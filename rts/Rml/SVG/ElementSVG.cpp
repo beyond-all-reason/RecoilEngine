@@ -41,6 +41,8 @@
 #include <string.h>
 
 namespace RmlGui {
+RMLUI_RTTI_Define(ElementSVG)
+
 
 ElementSVG::ElementSVG(const Rml::String& tag) : Element(tag) {}
 
