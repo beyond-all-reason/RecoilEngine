@@ -504,10 +504,10 @@ void* LuaUtils::GetUserData(lua_State* L, int index, const string& type)
 	if (p != nullptr) {                               // value is a userdata?
 		if (lua_getmetatable(L, index)) {            // does it have a metatable?
 			lua_getfield(L, LUA_REGISTRYINDEX, tname); // get correct metatable
-			if (lua_rawequal(L, -1, -2)) {             // the correct mt?
-				lua_pop(L, 2);                           // remove both metatables
+			const bool isType = lua_rawequal(L, -1, -2); // the correct mt?
+			lua_pop(L, 2);                             // remove both metatables
+			if (isType)
 				return p;
-			}
 		}
 	}
 	return nullptr;
