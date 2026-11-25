@@ -809,8 +809,23 @@ bool CFontTexture::AddFallbackFont(const std::string& fontfile)
 
 	// Store pattern
 	FcPattern* pattern = FcFreeTypeQueryFace(face, reinterpret_cast<const FcChar8*>(fontfile.c_str()), 0, NULL);
+	if (pattern == nullptr) {
+		LOG_L(L_WARNING, "[%s] could not query pattern for %s", __func__, fontfile.c_str());
+		return false;
+	}
+
+	// QueryFace turns a relative path into one under the working directory,
+	// which LoadFontFace cannot open through the VFS. Keep the name that loaded.
+	FcPatternDel(pattern, FC_FILE);
+	if (!FcPatternAddString(pattern, FC_FILE, reinterpret_cast<const FcChar8*>(fontfile.c_str()))) {
+		FcPatternDestroy(pattern);
+		LOG_L(L_WARNING, "[%s] could not keep filename for %s", __func__, fontfile.c_str());
+		return false;
+	}
+
 	if (!FcFontSetAdd(set, pattern))
 	{
+		FcPatternDestroy(pattern);
 		LOG_L(L_WARNING, "[%s] could not add pattern for %s", __func__, fontfile.c_str());
 		return false;
 	}
