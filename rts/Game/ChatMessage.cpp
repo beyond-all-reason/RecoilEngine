@@ -5,6 +5,7 @@
 #include "Net/Protocol/BaseNetProtocol.h"
 #include "System/Net/PackPacket.h"
 #include "System/Net/UnpackPacket.h"
+#include "System/StringUtil.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -13,7 +14,13 @@ ChatMessage::ChatMessage(int from, int dest, const std::string& chat)
 	, destination(dest)
 {
 	// restrict all (player and autohost) chat-messages before they get Pack()'ed
-	msg.resize(std::min(chat.size(), MAX_MSG_SIZE));
+	size_t msgSize = chat.size();
+
+	// do not cut inside a UTF-8 character: drop the character that holds the first excess byte
+	if (msgSize > MAX_MSG_SIZE)
+		msgSize = utf8::PrevChar(chat, MAX_MSG_SIZE + 1);
+
+	msg.resize(msgSize);
 
 	const auto beg = chat.begin();
 	const auto end = chat.begin() + msg.size();
