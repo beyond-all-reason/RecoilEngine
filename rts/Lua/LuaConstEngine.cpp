@@ -34,7 +34,6 @@
  * @field modelVertexColor boolean Whether glTF `COLOR_0` is loaded into the models VBO (`color`, attribute 15; opaque white when absent)
  * @field liveConfigChanges integer Version of the set of springsettings that apply without a restart, bumped when more are added (1: those listed in the 2026.09 changelog)
  * @field selfDTimeInSeconds boolean Whether `Spring.GetUnitSelfDTime` returns seconds (half seconds if false)
- * @field luaMapShadowShader boolean Whether `Spring.SetMapShader` takes a shadow program and `DrawGroundPreShadow` exists
  */
 
 /***
@@ -96,7 +95,6 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 		LuaPushNamedBool(L, "modelVertexColor", true);
 		LuaPushNamedNumber(L, "liveConfigChanges", 1);
 		LuaPushNamedBool(L, "selfDTimeInSeconds", true);
-		LuaPushNamedBool(L, "luaMapShadowShader", true);
 	lua_rawset(L, -3);
 
 	lua_pushliteral(L, "textColorCodes");

@@ -547,7 +547,7 @@ void CSMFGroundDrawer::SetLuaShader(const LuaMapShaderData* luaMapShaderData)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	smfRenderStates[RENDER_STATE_LUA]->Update(this, luaMapShaderData);
-	luaShadowShader->LoadFromID(luaMapShaderData->shaderIDs[2]);
+	luaShadowShader->LoadFromID(luaMapShaderData->shadowShaderID);
 }
 
 void CSMFGroundDrawer::SetupBigSquare(const DrawPass::e& drawPass, const int bigSquareX, const int bigSquareY)

@@ -2029,7 +2029,7 @@ int LuaUnsyncedCtrl::SetMapShader(lua_State* L)
 	}
 
 	luaMapShaderData.combinedShader = luaL_optboolean(L, 3, false);
-	luaMapShaderData.shaderIDs[2] = shaders.GetProgramName(luaL_optint(L, 4, 0));
+	luaMapShaderData.shadowShaderID = shaders.GetProgramName(luaL_optint(L, 4, 0));
 
 	groundDrawer->SetLuaShader(&luaMapShaderData);
 	return 0;
