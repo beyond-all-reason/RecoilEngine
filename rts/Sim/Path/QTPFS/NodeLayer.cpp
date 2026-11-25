@@ -24,8 +24,10 @@ inline int __bsfd (int mask)
 #include "Node.h"
 
 #include "Map/MapInfo.h"
+#include "Sim/Misc/GroundBlockingObjectMap.h"
 #include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/GlobalSynced.h"
+#include "Sim/Misc/YardmapStatusEffectsMap.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
 #include "Sim/MoveTypes/MoveMath/MoveMath.h"
 #include "Sim/Objects/SolidObject.h"
@@ -130,8 +132,47 @@ bool QTPFS::NodeLayer::Update(UpdateThreadData& threadData, bool isInitialUpdate
 	MoveDefs::CollisionQueryStateTrack queryState;
 
 	const bool isSubmersible = md->IsComplexSubmersible();
+
+	// The submersible test below depends on the height of each square, but only where the square is under water.
+	// Elsewhere it gives the same result as the flood-filled test with a collider that is not under water either.
+	bool floodFill = true;
+	if (isSubmersible) {
+		const float* heightMap = readMap->GetMaxHeightMapSynced();
+		for (unsigned int hmz = r.z1; hmz < r.z2 && floodFill; ++hmz) {
+			const int chmz = std::clamp(int(hmz), md->zsizeh, mapDims.mapym1 + (-md->zsizeh));
+			for (unsigned int hmx = r.x1; hmx < r.x2 && floodFill; ++hmx) {
+				const int chmx = std::clamp(int(hmx), md->xsizeh, mapDims.mapxm1 + (-md->xsizeh));
+				floodFill = (heightMap[chmz * mapDims.mapx + chmx] >= 0.0f);
+			}
+		}
+	}
+
 	if (!isSubmersible) {
 		CMoveMath::FloodFillRangeIsBlocked(*md, nullptr, threadData.areaMaxBlockBits, threadData.maxBlockBits, threadData.threadId);
+	} else if (floodFill) {
+		MoveTypes::CheckCollisionQuery dryCollider(md);
+		dryCollider.pos.y = 0.0f;
+		CMoveMath::FloodFillRangeIsBlocked(dryCollider, threadData.areaMaxBlockBits, threadData.maxBlockBits, threadData.threadId);
+	} else {
+		// Only flag the squares holding objects: a footprint without any cannot be blocked.
+		blockBits.clear();
+		for (int z = blockRect.z1; z < blockRect.z2; ++z) {
+			for (int x = blockRect.x1; x < blockRect.x2; ++x) {
+				blockBits.emplace_back(!groundBlockingObjectMap.GetCellUnsafeConst(z * mapDims.mapx + x).empty());
+			}
+		}
+	}
+
+	// Every footprint sampled below lies within blockRect, so the per-square tests can be skipped when blockRect has
+	// no structures (or objects) or no exit-only squares at all.
+	const auto blockMask = floodFill ? std::uint8_t(CMoveMath::BLOCK_STRUCTURE) : std::uint8_t(1);
+	const bool anyBlocking = std::any_of(blockBits.begin(), blockBits.end(), [blockMask](std::uint8_t b) { return (b & blockMask) != 0; });
+
+	bool anyExitOnly = false;
+	for (int z = blockRect.z1; z < blockRect.z2 && !anyExitOnly; ++z) {
+		for (int x = blockRect.x1; x < blockRect.x2 && !anyExitOnly; ++x) {
+			anyExitOnly = yardmapStatusEffectsMap.AreAnyFlagsSet(x, z, YardmapStatusEffectsMap::EXIT_ONLY);
+		}
 	}
 
 	auto rangeIsBlocked = [&blockRect, &blockBits](const MoveDef& md, int chmx, int chmz){
@@ -159,7 +200,7 @@ bool QTPFS::NodeLayer::Update(UpdateThreadData& threadData, bool isInitialUpdate
 	// based on a virtual object, which can then be moved per query may be the simplest approach.
 	// We can't flood fill collision data like normal because the squares that collide can change
 	// as the unit's centre square's height changes.
-	auto submersibleRangeIsBlocked = [this, &virtualObject, &queryState, &tempNum, &threadData](const MoveDef& md, int chmx, int chmz){
+	auto submersibleRangeIsBlocked = [this, &virtualObject, &queryState, &tempNum, &threadData, &rangeIsBlocked](const MoveDef& md, int chmx, int chmz) -> int {
 		const int xmin = (chmx - md.xsizeh);
 		const int zmin = (chmz - md.zsizeh);
 		const int xmax = (chmx + md.xsizeh);
@@ -168,7 +209,11 @@ bool QTPFS::NodeLayer::Update(UpdateThreadData& threadData, bool isInitialUpdate
 		md.UpdateCheckCollisionQuery(virtualObject, queryState, {chmx, chmz});
 		if (queryState.refreshCollisionCache)
 			tempNum = gs->GetMtTempNum(threadData.threadId);
-		
+
+		// no objects on the sampled squares; the hash map reset skipped here happens on the next call instead
+		if (rangeIsBlocked(md, chmx, chmz) == 0)
+			return 0;
+
 		return CMoveMath::RangeIsBlockedHashedMt(xmin, xmax, zmin, zmax, &virtualObject, tempNum, threadData.threadId);
 	};
 
@@ -184,8 +229,9 @@ bool QTPFS::NodeLayer::Update(UpdateThreadData& threadData, bool isInitialUpdate
 			const int chmx = std::clamp(int(hmx), md->xsizeh, mapDims.mapxm1 + (-md->xsizeh));
 			const int chmz = std::clamp(int(hmz), md->zsizeh, mapDims.mapym1 + (-md->zsizeh));
 
-			int maxBlockBit = (!isSubmersible) ? rangeIsBlocked(*md, chmx, chmz)
-											  : submersibleRangeIsBlocked(*md, chmx, chmz);
+			int maxBlockBit = (!anyBlocking) ? 0
+							: (floodFill) ? rangeIsBlocked(*md, chmx, chmz)
+										  : submersibleRangeIsBlocked(*md, chmx, chmz);
 
 			// NOTE:
 			//   movetype code checks ONLY the *CENTER* square of a unit's footprint
@@ -218,7 +264,7 @@ bool QTPFS::NodeLayer::Update(UpdateThreadData& threadData, bool isInitialUpdate
 			curSpeedMods[recIdx] = newRelSpeedMod * float(MaxSpeedModTypeValue());
 			curSpeedBins[recIdx] = newSpeedModBin;
 
-			const bool isExitOnlyZone = md->IsInExitOnly(chmx, chmz);
+			const bool isExitOnlyZone = anyExitOnly && md->IsInExitOnly(chmx, chmz);
 			MapSquareData curSquareState(curSpeedBins[recIdx], isExitOnlyZone);
 
 			unsigned int cacheIdx =  recIdx;
