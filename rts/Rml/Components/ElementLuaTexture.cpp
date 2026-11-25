@@ -39,6 +39,7 @@
 #include "Rendering/GL/myGL.h"
 #include "Rml/Backends/RmlUi_Backend.h"
 #include "Rml/Backends/RmlUi_Renderer_GL3_Recoil.h"
+#include "Rml/SolLua/plugin/SolLuaDocument.h"
 
 #include "RmlUi/Core/ComputedValues.h"
 #include "RmlUi/Core/ElementUtilities.h"
@@ -281,7 +282,13 @@ bool ElementLuaTexture::LoadTexture()
 		rect_source = RectSource::None;
 	}
 
-	return LuaOpenGLUtils::ParseTextureImage(RmlGui::GetLuaState(), luaTexture, source_name);
+	// resolve the texture in the Lua state the document belongs to
+	lua_State* L = RmlGui::GetLuaState();
+	if (const auto* document = dynamic_cast<Rml::SolLua::SolLuaDocument*>(GetOwnerDocument())) {
+		L = document->GetLuaState();
+	}
+
+	return LuaOpenGLUtils::ParseTextureImage(L, luaTexture, source_name);
 }
 
 void ElementLuaTexture::UpdateRect()

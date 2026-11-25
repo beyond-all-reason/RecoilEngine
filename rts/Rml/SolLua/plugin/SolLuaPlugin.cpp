@@ -36,19 +36,84 @@
 #include "Rml/Backends/RmlUi_Backend.h"
 #include <RmlUi/Core.h>
 
+#include "SolLuaDocument.h"
+
 #include <algorithm>
 
 
 namespace Rml::SolLua
 {
+	// One plugin per Lua state that uses RmlUi (e.g. LuaMenu and LuaUI can be alive together).
+	// Only ever touched from the main thread.
+	static std::vector<SolLuaPlugin*> plugins;
+	static SolLuaPlugin* activePlugin = nullptr;
+	static int nextSerial = 1;
+
 	SolLuaPlugin::SolLuaPlugin(sol::state_view lua_state)
-		: m_lua_state{lua_state}
+		: m_lua_state{lua_state}, serial{nextSerial++}
 	{
+		plugins.push_back(this);
 	}
 
 	SolLuaPlugin::SolLuaPlugin(sol::state_view lua_state, const Rml::String& lua_environment_identifier)
-		: m_lua_state{lua_state}, m_lua_env_identifier{lua_environment_identifier}
+		: m_lua_state{lua_state}, m_lua_env_identifier{lua_environment_identifier}, serial{nextSerial++}
 	{
+		plugins.push_back(this);
+	}
+
+	SolLuaPlugin::~SolLuaPlugin()
+	{
+		plugins.erase(std::remove(plugins.begin(), plugins.end(), this), plugins.end());
+		if (activePlugin == this)
+			activePlugin = nullptr;
+	}
+
+	SolLuaPlugin* SolLuaPlugin::ForState(lua_State* L)
+	{
+		for (auto* plugin : plugins) {
+			if (plugin->GetLuaState() == L)
+				return plugin;
+		}
+		return nullptr;
+	}
+
+	SolLuaPlugin* SolLuaPlugin::Active()
+	{
+		return activePlugin;
+	}
+
+	SolLuaPlugin* SolLuaPlugin::Resolve(Rml::Element* hint)
+	{
+		if (activePlugin != nullptr)
+			return activePlugin;
+
+		if (hint != nullptr) {
+			if (auto* document = dynamic_cast<SolLuaDocument*>(hint->GetOwnerDocument())) {
+				if (auto* plugin = ForState(document->GetLuaState()))
+					return plugin;
+			}
+		}
+
+		// with a single Lua state there is no ambiguity. With several, guessing would bind the
+		// object to a state that may not be the one asking (and may be removed before it).
+		return plugins.size() == 1 ? plugins.front() : nullptr;
+	}
+
+	SolLuaPlugin::ScopedActive::ScopedActive(SolLuaPlugin* plugin)
+		: previous{activePlugin}
+	{
+		if (plugin != nullptr)
+			activePlugin = plugin;
+	}
+
+	SolLuaPlugin::ScopedActive::ScopedActive(lua_State* L)
+		: ScopedActive(ForState(L))
+	{
+	}
+
+	SolLuaPlugin::ScopedActive::~ScopedActive()
+	{
+		activePlugin = previous;
 	}
 
 	int SolLuaPlugin::GetEventClasses()
@@ -62,6 +127,39 @@ namespace Rml::SolLua
 
 	void SolLuaPlugin::OnContextDestroy(Context* context) {
 		luaContexts.erase(std::remove(luaContexts.begin(), luaContexts.end(), context), luaContexts.end());
+		std::erase_if(contextNames, [&](const auto& entry) { return entry.second == context->GetName(); });
+	}
+
+	Rml::String SolLuaPlugin::InternalContextName(const Rml::String& luaName, bool create)
+	{
+		if (const auto it = contextNames.find(luaName); it != contextNames.end()) {
+			return it->second;
+		}
+		if (!create) {
+			return {};
+		}
+		Rml::String internalName = luaName;
+		if (Rml::GetContext(internalName) != nullptr) {
+			// taken by another Lua state
+			internalName = luaName + "#" + std::to_string(serial);
+		}
+		contextNames[luaName] = internalName;
+		return internalName;
+	}
+
+	Rml::String SolLuaPlugin::LuaContextName(const Rml::String& internalName) const
+	{
+		for (const auto& [luaName, internal] : contextNames) {
+			if (internal == internalName) {
+				return luaName;
+			}
+		}
+		return internalName;
+	}
+
+	bool SolLuaPlugin::OwnsContext(const Context* context) const
+	{
+		return std::find(luaContexts.begin(), luaContexts.end(), context) != luaContexts.end();
 	}
 
 	void SolLuaPlugin::AddDocumentTracking(ElementDocument* document) {
@@ -83,10 +181,13 @@ namespace Rml::SolLua
 
 	void SolLuaPlugin::OnInitialise()
 	{
-		document_element_instancer = std::make_unique<SolLuaDocumentElementInstancer>(m_lua_state, m_lua_env_identifier);
-		event_listener_instancer = std::make_unique<SolLuaEventListenerInstancer>(m_lua_state);
-		Factory::RegisterElementInstancer("body", document_element_instancer.get());
-		Factory::RegisterEventListenerInstancer(event_listener_instancer.get());
+		// RmlUi's factories are global, so the instancers are shared by every plugin and pick the
+		// plugin (Lua state) per call. They must outlive any single plugin, which can be removed
+		// while another one (e.g. LuaMenu's) keeps running.
+		static SolLuaDocumentElementInstancer documentInstancer;
+		static SolLuaEventListenerInstancer listenerInstancer;
+		Factory::RegisterElementInstancer("body", &documentInstancer);
+		Factory::RegisterEventListenerInstancer(&listenerInstancer);
 	}
 
 	void SolLuaPlugin::OnShutdown()
