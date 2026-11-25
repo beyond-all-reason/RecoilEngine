@@ -3216,39 +3216,21 @@ int LuaSyncedRead::GetUnitsInPlanes(lua_State* L)
 		}
 	}
 
-	int startTeam, endTeam;
-
 	const int allegiance = LuaUtils::ParseAllegiance(L, __func__, 2);
-	if (allegiance >= 0) {
-		startTeam = allegiance;
-		endTeam = allegiance;
-	}
-	else if (allegiance == LuaUtils::MyUnits) {
-		const int readTeam = CLuaHandle::GetHandleReadTeam(L);
-		startTeam = readTeam;
-		endTeam = readTeam;
-	}
-	else {
-		startTeam = 0;
-		endTeam = teamHandler.ActiveTeams() - 1;
-	}
+
+	// GetFilteredUnits numbers the table from 1 and applies the allegiance
+	// filter itself, so it must be called once with all candidate units
+	const std::vector<CUnit*>& units =
+		(allegiance >= 0)? unitHandler.GetUnitsByTeam(allegiance):
+		(allegiance == LuaUtils::MyUnits)? unitHandler.GetUnitsByTeam(CLuaHandle::GetHandleReadTeam(L)):
+		unitHandler.GetActiveUnits();
 
 	const auto planesTest = [&](const CUnit *unit, const float3 &pos) {
 		return UnitInPlanes(pos, unit->radius, planes);
 	};
 
 	lua_newtable(L);
-
-	for (int team = startTeam; team <= endTeam; team++) {
-		if (allegiance == LuaUtils::AllyUnits && !LuaUtils::IsAlliedTeam(L, team))
-			continue;
-		if (allegiance == LuaUtils::EnemyUnits && LuaUtils::IsAlliedTeam(L, team))
-			continue;
-
-		const std::vector<CUnit*>& units = unitHandler.GetUnitsByTeam(team);
-
-		GetFilteredUnits(L, allegiance, units, planesTest);
-	}
+	GetFilteredUnits(L, allegiance, units, planesTest);
 
 	return 1;
 }
