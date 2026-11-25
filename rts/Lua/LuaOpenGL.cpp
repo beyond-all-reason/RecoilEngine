@@ -599,6 +599,7 @@ void LuaOpenGL::ResetGLState()
 	glCullFace(GL_BACK);
 
 	glDisable(GL_SCISSOR_TEST);
+	ApplyMiniMapClipping();
 
 	glDisable(GL_STENCIL_TEST);
 	glStencilMask(~0);
@@ -675,6 +676,7 @@ void LuaOpenGL::EnableCommon(DrawMode mode)
 		glPushAttrib(AttribBits);
 		ResetGLState();
 	}
+	ApplyMiniMapClipping();
 	// FIXME  --  not needed by shadow or minimap   (use a WorldCommon ? )
 	//glEnable(GL_NORMALIZE);
 	glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL, GL_SEPARATE_SPECULAR_COLOR);
@@ -7848,3 +7850,12 @@ int LuaOpenGL::PopDebugGroup(lua_State* L) {
 
 /******************************************************************************/
 /******************************************************************************/
+
+
+void LuaOpenGL::ApplyMiniMapClipping()
+{
+	if ((drawMode == DRAW_MINIMAP || drawMode == DRAW_MINIMAP_BACKGROUND) && minimap != nullptr && minimap->HasViewRectangle()) {
+		glEnable(GL_SCISSOR_TEST);
+		glScissor(minimap->GetPosX(), minimap->GetPosY(), minimap->GetSizeX(), minimap->GetSizeY());
+	}
+}

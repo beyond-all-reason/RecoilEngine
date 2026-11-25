@@ -274,9 +274,10 @@ float CSpringController::ZoomOut(const float3& curCamPos, const float3& newDir, 
 		}
 
 		rot = float3(2.677f, rot.y, 0.0f);
-		pos.x = mapDims.mapx * SQUARE_SIZE * 0.5f;
-		pos.z = mapDims.mapy * SQUARE_SIZE * 0.55f; // somewhat longer toward bottom
-		curDist = pos.Length2D() * 1.5f;
+		const auto bounds = GetViewBounds();
+		pos.x = bounds.CenterX();
+		pos.z = HasViewBounds() ? bounds.CenterZ() : bounds.Height() * 0.55f; // somewhat longer toward bottom
+		curDist = HasViewBounds() ? maxDist : pos.Length2D() * 1.5f;
 		return 1.0f;
 	}
 
@@ -395,8 +396,10 @@ void CSpringController::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 
-	pos.x = std::clamp(pos.x, 0.01f, mapDims.mapx * SQUARE_SIZE - 0.01f);
-	pos.z = std::clamp(pos.z, 0.01f, mapDims.mapy * SQUARE_SIZE - 0.01f);
+	const auto bounds = GetViewBounds();
+	pos.x = bounds.ClampX(pos.x);
+	pos.z = bounds.ClampZ(pos.z);
+	maxDist = std::max(minDist, std::max(bounds.Width(), bounds.Height()) * 1.333f);
 	curDist = std::clamp(curDist, minDist, maxDist);
 	pos.y = GetFocusSurfaceHeight(pos.x, pos.z, curDist); // always focus on the ground
 	rot.x = std::clamp(rot.x, math::PI * 0.51f, math::PI * 0.99f);

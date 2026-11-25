@@ -18,6 +18,7 @@
 #include "Game/Game.h"
 #include "Game/Camera.h"
 #include "Game/CameraHandler.h"
+#include "Game/WorldDrawBounds.h"
 #include "Game/Camera/CameraController.h"
 #include "Game/ChatMessage.h"
 #include "Game/GameSetup.h"
@@ -153,6 +154,10 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(SetCameraState);
 	REGISTER_LUA_CFUNC(SetCameraTarget);
+	REGISTER_LUA_CFUNC(SetCameraBounds);
+	REGISTER_LUA_CFUNC(SetMiniMapView);
+	REGISTER_LUA_CFUNC(SetWorldDrawBounds);
+	REGISTER_LUA_CFUNC(SetObjectDrawBounds);
 
 	REGISTER_LUA_CFUNC(RunDollyCamera);
 	REGISTER_LUA_CFUNC(PauseDollyCamera);
@@ -1261,6 +1266,92 @@ int LuaUnsyncedCtrl::SetCameraTarget(lua_State* L)
 	camHandler->CameraTransition(targetPos.w);
 
 	return 0;
+}
+
+
+// Validate into temporary state so rejected input cannot partially change a view.
+static bool ParseViewRectangle(lua_State* L, ViewRectangle& rectangle, bool requireMapBounds = true)
+{
+	const int arguments = lua_gettop(L);
+	if (arguments == 0 || (arguments == 1 && lua_isnil(L, 1)))
+		return true;
+	if (arguments != 4)
+		return (luaL_error(L, "Expected x0, z0, x1, z1, or nil to clear"), false);
+	rectangle = {static_cast<float>(luaL_checknumber_noassert(L, 1)), static_cast<float>(luaL_checknumber_noassert(L, 2)),
+		static_cast<float>(luaL_checknumber_noassert(L, 3)), static_cast<float>(luaL_checknumber_noassert(L, 4))};
+	return requireMapBounds ? rectangle.ValidForMap(mapDims.mapx * SQUARE_SIZE, mapDims.mapy * SQUARE_SIZE) : rectangle.Valid();
+}
+
+/*** Constrain local camera focus and region-relative zoom. Nil clears the bounds.
+ *
+ * @function Spring.SetCameraBounds
+ * @param x0 number?
+ * @param z0 number?
+ * @param x1 number?
+ * @param z1 number?
+ * @return boolean applied
+ */
+int LuaUnsyncedCtrl::SetCameraBounds(lua_State* L)
+{
+	ViewRectangle rectangle;
+	const bool applied = ParseViewRectangle(L, rectangle) && camHandler != nullptr;
+	if (applied) camHandler->SetCameraBounds(rectangle);
+	lua_pushboolean(L, applied);
+	return 1;
+}
+
+/*** Crop the local minimap and remap its input. Nil restores the whole map.
+ *
+ * @function Spring.SetMiniMapView
+ * @param x0 number?
+ * @param z0 number?
+ * @param x1 number?
+ * @param z1 number?
+ * @return boolean applied
+ */
+int LuaUnsyncedCtrl::SetMiniMapView(lua_State* L)
+{
+	ViewRectangle rectangle;
+	const bool applied = ParseViewRectangle(L, rectangle) && minimap != nullptr;
+	if (applied) minimap->SetViewRectangle(rectangle);
+	lua_pushboolean(L, applied);
+	return 1;
+}
+
+/*** Set terrain and native object drawing bounds. Nil clears both.
+ *
+ * @function Spring.SetWorldDrawBounds
+ * @param x0 number?
+ * @param z0 number?
+ * @param x1 number?
+ * @param z1 number?
+ * @return boolean applied
+ */
+int LuaUnsyncedCtrl::SetWorldDrawBounds(lua_State* L)
+{
+	ViewRectangle rectangle;
+	const bool applied = ParseViewRectangle(L, rectangle) && readMap != nullptr;
+	if (applied) worldDrawBounds::Set(rectangle);
+	lua_pushboolean(L, applied);
+	return 1;
+}
+
+/*** Set native object drawing bounds, which can extend past the map. Nil clears them.
+ *
+ * @function Spring.SetObjectDrawBounds
+ * @param x0 number?
+ * @param z0 number?
+ * @param x1 number?
+ * @param z1 number?
+ * @return boolean applied
+ */
+int LuaUnsyncedCtrl::SetObjectDrawBounds(lua_State* L)
+{
+	ViewRectangle rectangle;
+	const bool applied = ParseViewRectangle(L, rectangle, false) && readMap != nullptr;
+	if (applied) worldDrawBounds::objectRectangle = rectangle;
+	lua_pushboolean(L, applied);
+	return 1;
 }
 
 

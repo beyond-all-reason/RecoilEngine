@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_UNSYNCED_CTRL_H
-#define LUA_UNSYNCED_CTRL_H
+#pragma once
 
 struct lua_State;
 
@@ -42,6 +41,10 @@ class LuaUnsyncedCtrl {
 
 		static int SetCameraState(lua_State* L);
 		static int SetCameraTarget(lua_State* L);
+		static int SetCameraBounds(lua_State* L);
+		static int SetMiniMapView(lua_State* L);
+		static int SetWorldDrawBounds(lua_State* L);
+		static int SetObjectDrawBounds(lua_State* L);
 		static int RunDollyCamera(lua_State* L);
 		static int PauseDollyCamera(lua_State* L);
 		static int ResumeDollyCamera(lua_State* L);
@@ -241,5 +244,3 @@ class LuaUnsyncedCtrl {
 
 		static int Yield(lua_State* L);
 };
-
-#endif /* LUA_UNSYNCED_CTRL_H */

@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef MINIMAP_H
-#define MINIMAP_H
+#pragma once
 
 #include <string>
 #include <deque>
@@ -12,6 +11,7 @@
 #include "System/Color.h"
 #include "System/float3.h"
 #include "System/type2.h"
+#include "Game/ViewRectangle.h"
 
 
 class CUnit;
@@ -41,6 +41,11 @@ public:
 	void ConfigNotify(const std::string& key, const std::string& value);
 
 	float3 GetMapPosition(int x, int y) const;
+	void SetViewRectangle(const ViewRectangle& rectangle);
+	ViewRectangle GetViewRectangle() const;
+	bool HasViewRectangle() const { return viewRectangle.IsSet(); }
+	float2 WorldToMiniMap(float x, float z) const;
+	bool IsInView(float x, float z) const { return !HasViewRectangle() || viewRectangle.Contains(x, z); }
 	CUnit* GetSelectUnit(const float3& pos) const;
 
 	void UpdateGeometry();
@@ -124,6 +129,8 @@ protected:
 	void ResizeTextureCache();
 
 protected:
+	ViewRectangle viewRectangle;
+	bool viewNeedsUpdate = false;
 	int2 curPos;
 	int2 curDim;
 	int2 tmpPos;
@@ -217,6 +224,3 @@ protected:
 
 
 extern CMiniMap* minimap;
-
-
-#endif /* MINIMAP_H */

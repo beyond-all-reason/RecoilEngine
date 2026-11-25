@@ -19,8 +19,8 @@ public:
 	// clear the set after WorldDrawer and MiniMap have both used it
 	void Update() { luaQueuedUnitSet.clear(); }
 
-	void Draw(const CCommandAI*, int queueDrawDepth = -1) const;
-	void DrawLuaQueuedUnitSetCommands() const;
+	void Draw(const CCommandAI*, int queueDrawDepth = -1, bool onMiniMap = false) const;
+	void DrawLuaQueuedUnitSetCommands(bool onMiniMap = false) const;
 	void DrawQuedBuildingSquares(
 		const CBuilderCAI*,
 		const spring::unordered_set<unsigned int>& cancelledCommandTags,
