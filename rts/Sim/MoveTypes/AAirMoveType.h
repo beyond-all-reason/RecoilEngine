@@ -44,7 +44,10 @@ public:
 
 	void SetWantedAltitude(float altitude) { wantedHeight = mix(orgWantedHeight, altitude, altitude != 0.0f); }
 	void SetDefaultAltitude(float altitude) {
-		wantedHeight = altitude;
+		// while landing on a reserved spot, wantedHeight is the height of that spot
+		if (aircraftState != AIRCRAFT_LANDING || !HaveLandingPos())
+			wantedHeight = altitude;
+
 		orgWantedHeight = altitude;
 	}
 
