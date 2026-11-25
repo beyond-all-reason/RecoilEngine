@@ -2,6 +2,8 @@
 
 #include "LosHandler.h"
 
+#include <bit>
+
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitHandler.h"
@@ -15,6 +17,7 @@
 #include "System/SafeUtil.h"
 #include "System/TimeProfiler.h"
 #include "System/Threading/ThreadPool.h"
+#include "System/simd_compat.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -115,12 +118,16 @@ void ILosType::Kill()
 	}
 
 	instances.clear();
+	boundsPosX.clear();
+	boundsPosY.clear();
+	boundsRadius.clear();
 	freeIDs.clear();
 
 	delayedDeleteQue.clear();
 	delayedTerraQue.clear();
 	losUpdate.clear();
 	losCache.clear();
+	numCached = 0;
 
 	losRemove.clear();
 	losAdd.clear();
@@ -158,8 +165,8 @@ float ILosType::GetHeight(const CUnit* unit) const
 
 	const float emitHeight = (type == LOS_TYPE_LOS || type == LOS_TYPE_AIRLOS) ? unit->unitDef->losHeight : unit->unitDef->radarHeight;
 	const float losHeight  = std::max(unit->midPos.y + emitHeight, 0.0f);
-	const int bucketSize   = 1 << (mipLevel + 2);
-	const float iLosHeight = (int(losHeight) / bucketSize + 0.5f) * bucketSize; // save losHeight in buckets
+	const int bucketShift  = mipLevel + 2;
+	const float iLosHeight = ((int(losHeight) >> bucketShift) + 0.5f) * (1 << bucketShift); // save losHeight in buckets; shift == division, losHeight >= 0
 	return iLosHeight;
 }
 
@@ -257,6 +264,9 @@ inline void ILosType::UpdateUnit(CUnit* unit, bool ignore)
 	cacheFails += (algoType == LOS_ALGO_RAYCAST);
 	SLosInstance* li = CreateInstance();
 	li->Init(radius, allyteam, baseLos, height, hash);
+	boundsPosX[li->id] = li->basePos.x * mipDiv;
+	boundsPosY[li->id] = li->basePos.y * mipDiv;
+	boundsRadius[li->id] = li->radius * mipDiv;
 	li->refCount++;
 	unit->los[type] = li;
 	instanceHashes[hash].push_back(li);
@@ -311,11 +321,10 @@ inline void ILosType::RefInstance(SLosInstance* li)
 		return;
 
 	if (li->isCached) {
-		// reactivate cached instance
+		// reactivate cached instance, its losCache entry becomes stale
 		cacheRefs += (algoType == LOS_ALGO_RAYCAST);
-		auto it = std::find(losCache.begin(), losCache.end(), li);
 		li->isCached = false;
-		losCache.erase(it);
+		numCached--;
 	}
 
 	UpdateInstanceStatus(li, SLosInstance::TLosStatus::REACTIVATE);
@@ -354,7 +363,9 @@ inline void ILosType::AddInstanceToCache(SLosInstance* li)
 	}
 
 	li->isCached = true;
-	losCache.push_back(li);
+	li->cacheTag = ++lastCacheTag;
+	losCache.push_back({li, li->cacheTag});
+	numCached++;
 }
 
 
@@ -368,6 +379,9 @@ inline SLosInstance* ILosType::CreateInstance()
 	}
 
 	instances.emplace_back(instances.size());
+	boundsPosX.push_back(0);
+	boundsPosY.push_back(0);
+	boundsRadius.push_back(UNUSED_SLOT_RADIUS);
 	return &instances.back();
 }
 
@@ -383,6 +397,10 @@ inline void ILosType::DeleteInstance(SLosInstance* li)
 
 	*vit = vec.back();
 	vec.pop_back();
+
+	// otherwise a key per square ever seen piles up, and UpdateHeightMapSynced iterates them all
+	if (vec.empty())
+		instanceHashes.erase(pit);
 
 	// caller has to do that
 	assert(!li->isCached);
@@ -402,6 +420,7 @@ inline void ILosType::DeleteInstance(SLosInstance* li)
 	}
 
 	li->squares.clear();
+	boundsRadius[li->id] = UNUSED_SLOT_RADIUS;
 	freeIDs.push_back(li->id);
 }
 
@@ -576,6 +595,10 @@ void ILosType::Update()
 
 	// raycast terrain
 	if (algoType == LOS_ALGO_RAYCAST)  {
+		// nested in CLosHandler::Update's for_mt, where a plain notify only wakes workers if all of them sleep
+		if (losRecalc.size() > 1)
+			ThreadPool::NotifyWorkerThreads(true, false);
+
 		for_mt(0, losRecalc.size(), [&](const int idx) {
 			auto li = losRecalc[idx];
 			assert(li->refCount > 0);
@@ -592,10 +615,16 @@ void ILosType::Update()
 
 	// delete / move to cache unused instances
 	if (algoType == LOS_ALGO_RAYCAST) {
-		while (!losCache.empty() && ((losCache.size() + losDeleted.size()) > CACHE_SIZE)) {
-			SLosInstance* li = losCache.front();
+		while (numCached > 0 && ((numCached + losDeleted.size()) > CACHE_SIZE)) {
+			const CacheEntry entry = losCache.front();
 			losCache.pop_front();
+
+			if (!entry.IsValid())
+				continue;
+
+			SLosInstance* li = entry.instance;
 			li->isCached = false;
+			numCached--;
 			DeleteInstance(li);
 		}
 
@@ -603,6 +632,10 @@ void ILosType::Update()
 			assert(li->refCount == 0);
 			AddInstanceToCache(li);
 		}
+
+		// stale entries pile up behind long-cached ones
+		if (losCache.size() > 2 * CACHE_SIZE)
+			std::erase_if(losCache, [](const CacheEntry& entry) { return !entry.IsValid(); });
 	} else {
 		assert(losCache.empty());
 		for (SLosInstance* li: losDeleted) {
@@ -620,48 +653,63 @@ void ILosType::UpdateHeightMapSynced(SRectangle rect)
 	if (algoType == LOS_ALGO_CIRCLE)
 		return;
 
-	auto CheckOverlap = [&](SLosInstance* li, SRectangle rect) -> bool {
-		int2 pos = li->basePos * mipDiv;
-		const int radius = li->radius * mipDiv;
+	const int2 rectPos = {rect.x1 * SQUARE_SIZE, rect.y1 * SQUARE_SIZE};
+	const int hw = rect.GetWidth() * (SQUARE_SIZE / 2);
+	const int hh = rect.GetHeight() * (SQUARE_SIZE / 2);
 
-		const int hw = rect.GetWidth() * (SQUARE_SIZE / 2);
-		const int hh = rect.GetHeight() * (SQUARE_SIZE / 2);
+	const auto UpdateSlot = [&](const size_t id) {
+		const int radius = boundsRadius[id];
+		const int2 circleDistance = {std::abs(boundsPosX[id] - rectPos.x) - hw, std::abs(boundsPosY[id] - rectPos.y) - hh};
 
-		int2 circleDistance;
-		circleDistance.x = std::abs(pos.x - rect.x1 * SQUARE_SIZE) - hw;
-		circleDistance.y = std::abs(pos.y - rect.y1 * SQUARE_SIZE) - hh;
+		if (circleDistance.x > radius || circleDistance.y > radius)
+			return;
+		if (circleDistance.x > 0 && circleDistance.y > 0 && (Square(circleDistance.x) + Square(circleDistance.y)) > Square(radius))
+			return;
 
-		if (circleDistance.x > radius) { return false; }
-		if (circleDistance.y > radius) { return false; }
-		if (circleDistance.x <= 0) { return true; }
-		if (circleDistance.y <= 0) { return true; }
+		SLosInstance* li = &instances[id];
 
-		return (Square(circleDistance.x) + Square(circleDistance.y)) <= Square(radius);
+		if (li->isCached) {
+			// unused instance, delete it; leaves a stale losCache entry
+			li->isCached = false;
+			numCached--;
+			DeleteInstance(li);
+			return;
+		}
+
+		// relos used instances
+		if ((li->status & SLosInstance::TLosStatus::RECALC) == 0)
+			UpdateInstanceStatus(li, SLosInstance::TLosStatus::RECALC);
 	};
 
-	// delete unused instances that overlap with the changed rectangle
-	for (auto it = losCache.begin(); it != losCache.end();) {
-		SLosInstance* li = *it;
-		if (li->refCount > 0 || !CheckOverlap(li, rect)) {
-			++it;
-			continue;
-		}
+	// a few craters can land in one frame and each has to look at every instance,
+	// so slots are first rejected four at a time by the box around their reach
+	const size_t numSlots = boundsRadius.size();
+	      size_t id = 0;
 
-		it = losCache.erase(it);
-		li->isCached = false;
-		DeleteInstance(li);
+	const __m128i rectX = _mm_set1_epi32(rectPos.x);
+	const __m128i rectY = _mm_set1_epi32(rectPos.y);
+	const __m128i halfW = _mm_set1_epi32(hw);
+	const __m128i halfH = _mm_set1_epi32(hh);
+
+	const auto AbsDiff = [](const __m128i a, const __m128i b) {
+		const __m128i diff = _mm_sub_epi32(a, b);
+		const __m128i sign = _mm_srai_epi32(diff, 31);
+		return _mm_sub_epi32(_mm_xor_si128(diff, sign), sign);
+	};
+
+	for (; (id + 4) <= numSlots; id += 4) {
+		const __m128i radius = _mm_loadu_si128(reinterpret_cast<const __m128i*>(&boundsRadius[id]));
+		const __m128i distX = _mm_sub_epi32(AbsDiff(_mm_loadu_si128(reinterpret_cast<const __m128i*>(&boundsPosX[id])), rectX), halfW);
+		const __m128i distY = _mm_sub_epi32(AbsDiff(_mm_loadu_si128(reinterpret_cast<const __m128i*>(&boundsPosY[id])), rectY), halfH);
+		const __m128i outside = _mm_or_si128(_mm_cmpgt_epi32(distX, radius), _mm_cmpgt_epi32(distY, radius));
+
+		for (int inside = (~_mm_movemask_ps(_mm_castsi128_ps(outside))) & 0xF; inside != 0; inside &= (inside - 1)) {
+			UpdateSlot(id + std::countr_zero(static_cast<unsigned>(inside)));
+		}
 	}
 
-	// relos used instances
-	for (auto& p: instanceHashes) {
-		for (SLosInstance* li: p.second) {
-			if (li->status & SLosInstance::TLosStatus::RECALC)
-				continue;
-			if (!CheckOverlap(li, rect))
-				continue;
-
-			UpdateInstanceStatus(li, SLosInstance::TLosStatus::RECALC);
-		}
+	for (; id < numSlots; ++id) {
+		UpdateSlot(id);
 	}
 }
 
