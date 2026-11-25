@@ -176,6 +176,7 @@ CR_REG_METADATA(CGame, (
 	CR_IGNORED(skipLastDrawTime),
 
 	CR_IGNORED(updateDeltaSeconds),
+	CR_IGNORED(presentedUpdateDeltaSeconds),
 	CR_MEMBER(totalGameTime),
 
 	CR_IGNORED(chatSound),
@@ -941,6 +942,7 @@ void CGame::LoadFinalize()
 	lastSimFrameTime = lastReadNetTime;
 	lastDrawFrameTime = lastReadNetTime;
 	updateDeltaSeconds = 0.0f;
+	presentedUpdateDeltaSeconds = 0.0f;
 }
 
 
@@ -1251,6 +1253,7 @@ bool CGame::UpdateUnsynced(const spring_time currentTime)
 
 		totalGameTime += (modGameDeltaTimeSecs * (playing && !gameOver));
 		updateDeltaSeconds = modGameDeltaTimeSecs;
+		presentedUpdateDeltaSeconds = skipping ? modGameDeltaTimeSecs : (globalRendering->presentedClock.GetFrameTime() * 0.001f);
 	}
 
 	{
@@ -1374,7 +1377,7 @@ bool CGame::UpdateUnsynced(const spring_time currentTime)
 		constexpr float MAX_PRESENTED_SECS_NO_PERIOD = 0.25f;
 
 		const float engineTimeOffset = globalRendering->timeOffset;
-		const float enginePresentedSecs = globalRendering->presentedFrameTime * 0.001f;
+		const float enginePresentedSecs = globalRendering->presentedClock.GetFrameTime() * 0.001f;
 
 		float timeOffset = engineTimeOffset;
 		float presentedSecs = enginePresentedSecs;
@@ -1387,13 +1390,16 @@ bool CGame::UpdateUnsynced(const spring_time currentTime)
 
 		if (presentedSecs != enginePresentedSecs) {
 			const float period = globalRendering->displayPeriod;
-			const float maxSecs = std::max((period > 0.0f) ? (period * CGlobalRendering::MAX_SNAP_PERIODS * 0.001f) : MAX_PRESENTED_SECS_NO_PERIOD, enginePresentedSecs);
+			const float maxSecs = std::max((period > 0.0f) ? (period * CPresentedFrameClock::MAX_SNAP_PERIODS * 0.001f) : MAX_PRESENTED_SECS_NO_PERIOD, enginePresentedSecs);
 
-			globalRendering->OverridePresentedFrameTime(std::clamp(presentedSecs, 0.0f, maxSecs) * 1000.0f);
+			globalRendering->presentedClock.Override(std::clamp(presentedSecs, 0.0f, maxSecs) * 1000.0f);
+
+			if (!skipping)
+				presentedUpdateDeltaSeconds = globalRendering->presentedClock.GetFrameTime() * 0.001f;
 		}
 
-		TracyPlot("PresentedFrameTime", globalRendering->presentedFrameTime);
-		TracyPlot("PresentedFrameLag", globalRendering->presentedFrameLag);
+		TracyPlot("PresentedFrameTime", globalRendering->presentedClock.GetFrameTime());
+		TracyPlot("PresentedFrameLag", globalRendering->presentedClock.GetLag());
 	}
 
 	if ((currentTime - frameStartTime).toMilliSecsf() >= 1000.0f) {
