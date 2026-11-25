@@ -223,6 +223,9 @@ public:
 
 		mdCounter = 0;
 		mdChecksum = 0;
+
+		largestSize = 0;
+		largestSizeH = 0;
 	}
 
 	MoveDef* GetMoveDefByPathType(unsigned int pathType) { assert(pathType < mdCounter); return &moveDefs[pathType]; }
