@@ -144,6 +144,7 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(LoadSoundDef);
 	REGISTER_LUA_CFUNC(PlaySoundFile);
+	REGISTER_LUA_CFUNC(StopSoundByFilename);
 	REGISTER_LUA_CFUNC(PlaySoundStream);
 	REGISTER_LUA_CFUNC(StopSoundStream);
 	REGISTER_LUA_CFUNC(PauseSoundStream);
@@ -792,18 +793,33 @@ int LuaUnsyncedCtrl::LoadSoundDef(lua_State* L)
 
 /***
  * @alias SoundChannel
- * | "general" # 0
- * | "battle" # Same as `"sfx" | 1`
- * | "sfx" # Same as `"battle" | 1`
- * | "unitreply" # Same as `"voice" | 2`
- * | "voice" # Same as `"unitreply" | 2`
- * | "userinterface" # Same as "ui" | 3`
- * | "ui" # Same as "userinterface" | 3`
- * | 0 # General
- * | 1 # SFX
- * | 2 # Voice
- * | 3 # User interface
+ * | "general"
+ * | "battle" # Same as `"sfx"`
+ * | "sfx" # Same as `"battle"`
+ * | "unitreply" # Same as `"voice"`
+ * | "voice" # Same as `"unitreply"`
+ * | "userinterface" # Same as `"ui"`
+ * | "ui" # Same as `"userinterface"`
  */
+
+/// nullptr for anything that is not a SoundChannel
+static IAudioChannel* ParseSoundChannel(lua_State* L, int index)
+{
+	if (lua_israwstring(L, index)) {
+		switch (hashStringLower(lua_tostring(L, index))) {
+			case hashStringLower("general"      ): return Channels::General;
+			case hashStringLower("battle"       ):
+			case hashStringLower("sfx"          ): return Channels::Battle;
+			case hashStringLower("unitreply"    ):
+			case hashStringLower("voice"        ): return Channels::UnitReply;
+			case hashStringLower("userinterface"):
+			case hashStringLower("ui"           ): return Channels::UserInterface;
+			default: break;
+		}
+	}
+
+	return nullptr;
+}
 
 /*** @function Spring.PlaySoundFile
  * @param soundfile string
@@ -845,38 +861,10 @@ int LuaUnsyncedCtrl::PlaySoundFile(lua_State* L)
 	}
 
 	// last argument (with and without pos/speed arguments) is the optional channel
-	IAudioChannel* channel = Channels::General;
+	IAudioChannel* channel = ParseSoundChannel(L, index);
 
-	if (args >= index) {
-		if (lua_isstring(L, index)) {
-			switch (hashStringLower(lua_tostring(L, index))) {
-				case hashStringLower("battle"):
-				case hashStringLower("sfx"   ): {
-					channel = Channels::Battle;
-				} break;
-
-				case hashStringLower("unitreply"):
-				case hashStringLower("voice"    ): {
-					channel = Channels::UnitReply;
-				} break;
-
-				case hashStringLower("userinterface"):
-				case hashStringLower("ui"           ): {
-					channel = Channels::UserInterface;
-				} break;
-
-				default: {
-				} break;
-			}
-		} else if (lua_isnumber(L, index)) {
-			switch (lua_toint(L, index)) {
-				case  1: { channel = Channels::Battle       ; } break;
-				case  2: { channel = Channels::UnitReply    ; } break;
-				case  3: { channel = Channels::UserInterface; } break;
-				default: {                                    } break;
-			}
-		}
-	}
+	if (channel == nullptr)
+		channel = Channels::General;
 
 	if (index < 6) {
 		channel->PlaySample(soundID, volume);
@@ -892,6 +880,27 @@ int LuaUnsyncedCtrl::PlaySoundFile(lua_State* L)
 	}
 
 	lua_pushboolean(L, !CLuaHandle::GetHandleSynced(L));
+	return 1;
+}
+
+
+/*** Stops every playing instance of a sound started with `Spring.PlaySoundFile`.
+ *
+ * @function Spring.StopSoundByFilename
+ * @param soundfile string the name passed to `Spring.PlaySoundFile`
+ * @param channel SoundChannel? (Default: all channels)
+ * @return boolean stopped (always false in synced)
+ */
+int LuaUnsyncedCtrl::StopSoundByFilename(lua_State* L)
+{
+	const IAudioChannel* channel = ParseSoundChannel(L, 2);
+
+	if (channel == nullptr && !lua_isnoneornil(L, 2))
+		luaL_error(L, "[%s] unknown sound channel", __func__);
+
+	const bool stopped = sound->StopSoundItem(luaL_checksstring(L, 1), channel);
+
+	lua_pushboolean(L, stopped && !CLuaHandle::GetHandleSynced(L));
 	return 1;
 }
 

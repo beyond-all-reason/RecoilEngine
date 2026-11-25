@@ -851,7 +851,7 @@ std::uint32_t PathingState::CalcChecksum() const
 		nbytes = pathTypeOffsets.size() * sizeof(short2);
 		offset += nbytes;
 
-		std::memcpy(&rawBytes[offset - nbytes], pathTypeOffsets.data(), nbytes);
+		std::memcpy(rawBytes.data() + (offset - nbytes), pathTypeOffsets.data(), nbytes);
 	}
 
 	// for (int i=0; i<blockStates.peNodeOffsets.size(); i++){
@@ -866,7 +866,7 @@ std::uint32_t PathingState::CalcChecksum() const
 		nbytes = vertexCosts.size() * sizeof(float);
 		offset += nbytes;
 
-		std::memcpy(&rawBytes[offset - nbytes], vertexCosts.data(), nbytes);
+		std::memcpy(rawBytes.data() + (offset - nbytes), vertexCosts.data(), nbytes);
 
 		sha512::calc_digest(rawBytes, shaBytes); // hash(offsets|costs)
 		sha512::dump_digest(shaBytes, hexChars); // hexify(hash)

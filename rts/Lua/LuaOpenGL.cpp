@@ -6408,7 +6408,9 @@ int LuaOpenGL::GetFixedState(lua_State* L)
 		} break;
 		case hashString("depth"): {
 			lua_pushboolean(L, glIsEnabled(GL_DEPTH_TEST));
-			lua_pushboolean(L, glIsEnabled(GL_DEPTH_WRITEMASK));
+			GLboolean depthWriteMask = GL_FALSE;
+			glGetBooleanv(GL_DEPTH_WRITEMASK, &depthWriteMask);
+			lua_pushboolean(L, depthWriteMask);
 
 			lua_createtable(L, 0, 1);
 			PushFixedState(GL_DEPTH_FUNC);
