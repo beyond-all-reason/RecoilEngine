@@ -1136,6 +1136,8 @@ bool CMouseHandler::AssignMouseCursor(
 	// cursor is already loaded but not assigned, reuse it
 	if (haveFile) {
 		cursorCommandMap[cmdName] = fileIt->second;
+		if (activeCursorName == cmdName)
+			SetCursor(cmdName, true);
 		return true;
 	}
 
