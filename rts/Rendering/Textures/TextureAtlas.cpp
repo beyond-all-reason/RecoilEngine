@@ -314,16 +314,12 @@ void CTextureAtlas::ReloadTextures()
 		memTex.mem.resize(bitmap.GetMemSize(), 0);
 		std::memcpy(memTex.mem.data(), bitmap.GetRawMem(), memTex.mem.size());
 
-		for (const auto& texName : memTex.names) {
-			atlasAllocator->AddEntry(texName, int2(memTex.xsize, memTex.ysize));
-		}
+		atlasAllocator->AddEntry(memTex.names.front(), int2(memTex.xsize, memTex.ysize));
 	}
 
 	for (auto idx : nonFileEntries) {
 		const auto& memTex = memTextures[idx];
-		for (const auto& texName : memTex.names) {
-			atlasAllocator->AddEntry(texName, int2(memTex.xsize, memTex.ysize));
-		}
+		atlasAllocator->AddEntry(memTex.names.front(), int2(memTex.xsize, memTex.ysize));
 	}
 
 	Finalize();
