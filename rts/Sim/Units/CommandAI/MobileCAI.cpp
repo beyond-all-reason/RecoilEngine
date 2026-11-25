@@ -1915,7 +1915,7 @@ void CMobileCAI::UnloadUnits_LandFlood(Command& c)
 	const float radius = c.GetParam(3);
 	const float dist = std::max(64.0f, owner->unitDef->loadingRadius - radius);
 
-	if (pos.SqDistance2D(owner->pos) > dist) {
+	if (pos.SqDistance2D(owner->pos) > Square(dist)) {
 		SetGoal(pos, owner->pos, dist);
 		return;
 	}
