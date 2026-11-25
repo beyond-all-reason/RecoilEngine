@@ -693,17 +693,31 @@ sol::as_table_t<std::vector<lua_Number>> LuaVBOImpl::Download(sol::optional<int>
 	if (forceGPURead) {
 		vbo->Bind();
 		mappedBuf = vbo->MapBuffer(bufferOffsetInBytes, mappedBufferSizeInBytes, GL_MAP_READ_BIT);
+		if (mappedBuf == nullptr) {
+			vbo->UnmapBuffer();
+			vbo->Unbind();
+			LuaUtils::SolLuaError("[LuaVBOImpl::%s] Could not map the GPU buffer", __func__);
+		}
 	}
 	else {
+		// buffers from ModelsVBO have no CPU side copy
+		if (bufferData == nullptr)
+			LuaUtils::SolLuaError("[LuaVBOImpl::%s] This buffer has no CPU side copy, use forceGPURead", __func__);
+
 		mappedBuf = reinterpret_cast<GLubyte*>(bufferData) + bufferOffsetInBytes;
 	}
 
+	GLubyte* const mappedBufStart = mappedBuf;
 	int bytesRead = 0;
 
 	for (int e = 0; e < elemCount; ++e) {
 		for (const auto& va : bufferAttribDefsVec) {
 			const int   attrID = va.first;
 			const auto& attrDef = va.second;
+
+			// skip the alignment padding GetTypePtr() puts between attributes
+			bytesRead = e * elemSizeInBytes + attrDef.pointer;
+			mappedBuf = mappedBufStart + bytesRead;
 
 			int basicTypeSize = attrDef.size;
 
@@ -1092,6 +1106,12 @@ size_t LuaVBOImpl::UploadImpl(const std::vector<TIn>& dataVec, uint32_t elemOffs
 	if (dataVec.empty())
 		return 0u;
 
+	// buffers from ModelsVBO have no CPU side copy
+	if (bufferData == nullptr) {
+		LOG_L(L_ERROR, "[LuaVBOImpl::%s] This buffer has no CPU side copy to upload through", __func__);
+		return 0u;
+	}
+
 	const uint32_t bufferOffsetInBytes = elemOffset * elemSizeInBytes;
 	const int mappedBufferSizeInBytes = bufferSizeInBytes - bufferOffsetInBytes;
 
@@ -1113,12 +1133,18 @@ size_t LuaVBOImpl::UploadImpl(const std::vector<TIn>& dataVec, uint32_t elemOffs
 		return bytesWritten;
 	};
 
+	uint8_t* const bufferStart = buffDataWithOffset;
 	int bytesWritten = 0;
 
-	for (auto bdvIter = dataVec.cbegin(); bdvIter < dataVec.cend();) {
+	uint32_t e = 0;
+	for (auto bdvIter = dataVec.cbegin(); bdvIter < dataVec.cend(); ++e) {
 		for (const auto& va : bufferAttribDefsVec) {
 			const int   attrID = va.first;
 			const auto& attrDef = va.second;
+
+			// skip the alignment padding GetTypePtr() puts between attributes
+			bytesWritten = e * elemSizeInBytes + attrDef.pointer;
+			buffDataWithOffset = bufferStart + bytesWritten;
 
 			int basicTypeSize = attrDef.size;
 
@@ -1389,16 +1415,15 @@ int LuaVBOImpl::BindBufferRangeImpl(GLuint bindingIndex,  const sol::optional<in
 	if (target != GL_UNIFORM_BUFFER && target != GL_SHADER_STORAGE_BUFFER) {
 		LuaUtils::SolLuaError("[LuaVBOImpl::%s] (Un)binding target can only be equal to [%u] or [%u]", __func__, GL_UNIFORM_BUFFER, GL_SHADER_STORAGE_BUFFER);
 	}
-	defTarget = target;
 
-	switch (defTarget) {
+	switch (target) {
 	case GL_UNIFORM_BUFFER: {
 		if (bindingIndex < uboMinIndex || bindingIndex >= globalRendering->glslMaxUniformBufferBindings)
-			LuaUtils::SolLuaError("[LuaVBOImpl::%s] Invalid (Un)binding index [%u]. Index must be within [%u : %d)", __func__, uboMinIndex, globalRendering->glslMaxUniformBufferBindings);
+			LuaUtils::SolLuaError("[LuaVBOImpl::%s] Invalid (Un)binding index [%u]. Index must be within [%u : %d)", __func__, bindingIndex, uboMinIndex, globalRendering->glslMaxUniformBufferBindings);
 	} break;
 	case GL_SHADER_STORAGE_BUFFER: {
 		if (bindingIndex < ssboMinIndex || bindingIndex >= globalRendering->glslMaxStorageBufferBindings)
-			LuaUtils::SolLuaError("[LuaVBOImpl::%s] Invalid (Un)binding index [%u]. Index must be within [%u : %d)", __func__, ssboMinIndex, globalRendering->glslMaxStorageBufferBindings);
+			LuaUtils::SolLuaError("[LuaVBOImpl::%s] Invalid (Un)binding index [%u]. Index must be within [%u : %d)", __func__, bindingIndex, ssboMinIndex, globalRendering->glslMaxStorageBufferBindings);
 	} break;
 	default:
 		LuaUtils::SolLuaError("[LuaVBOImpl::%s] (Un)binding target can only be equal to [%u] or [%u]", __func__, GL_UNIFORM_BUFFER, GL_SHADER_STORAGE_BUFFER);
@@ -1406,13 +1431,14 @@ int LuaVBOImpl::BindBufferRangeImpl(GLuint bindingIndex,  const sol::optional<in
 
 	bool result = false;
 	if (bind) {
-		result = vbo->BindBufferRange(defTarget, bindingIndex, bufferOffsetInBytes, boundBufferSizeInBytes);
+		result = vbo->BindBufferRange(target, bindingIndex, bufferOffsetInBytes, boundBufferSizeInBytes);
 	} else {
-		result = vbo->UnbindBufferRange(defTarget, bindingIndex, bufferOffsetInBytes, boundBufferSizeInBytes);
+		result = vbo->UnbindBufferRange(target, bindingIndex, bufferOffsetInBytes, boundBufferSizeInBytes);
 	}
 	if (!result) {
 		LuaUtils::SolLuaError("[LuaVBOImpl::%s] Error (un)binding. See infolog for possible reasons", __func__);
 	}
+	defTarget = target;
 
 	return result ? bindingIndex : -1;
 }
