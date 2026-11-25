@@ -621,7 +621,8 @@ static std::shared_ptr<FontFace> GetFontForCharacters(const std::vector<char32_t
 
 			return face;
 		}
-		catch (content_error& ex) {
+		catch (const std::exception& ex) {
+			// content_error, or std::filesystem failing to convert a fontconfig path that is not UTF-8 (Windows code page)
 			invalidFonts.emplace(filename, origSize);
 			LOG_L(L_WARNING, "[%s] \"%s\" (s = %d): %s", __func__, filename.c_str(), origSize, ex.what());
 			continue;
