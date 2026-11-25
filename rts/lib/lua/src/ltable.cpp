@@ -397,7 +397,7 @@ static Node *getfreepos (Table *t) {
 ** put new key in its main position; otherwise (colliding node is in its main 
 ** position), new key goes to an empty position. 
 */
-static TValue *newkey (lua_State *L, Table *t, const TValue *key) {
+TValue *luaH_newkey (lua_State *L, Table *t, const TValue *key) {
   Node *mp = mainposition(t, key);
   if (!ttisnil(gval(mp)) || mp == dummynode) {
     Node *othern;
@@ -501,8 +501,23 @@ TValue *luaH_set (lua_State *L, Table *t, const TValue *key) {
     if (ttisnil(key)) luaG_runerror(L, "table index is nil");
     else if (ttisnumber(key) && luai_numisnan(nvalue(key)))
       luaG_runerror(L, "table index is NaN");
-    return newkey(L, t, key);
+    return luaH_newkey(L, t, key);
   }
+}
+
+
+/*
+** Assigns nil to `key` without an insertion when they key is absent, so
+** absent keys cannot move nodes or rehash the hash set during iteration.
+*/
+void luaH_setnil (lua_State *L, Table *t, const TValue *key) {
+  const TValue *p = luaH_get(t, key);
+  t->flags = 0;
+  if (p != luaO_nilobject)
+    setnilvalue(lua_cast(TValue *, p));
+  else if (ttisnil(key)) luaG_runerror(L, "table index is nil");
+  else if (ttisnumber(key) && luai_numisnan(nvalue(key)))
+    luaG_runerror(L, "table index is NaN");
 }
 
 
@@ -513,7 +528,7 @@ TValue *luaH_setnum (lua_State *L, Table *t, int key) {
   else {
     TValue k;
     setnvalue(&k, cast_num(key));
-    return newkey(L, t, &k);
+    return luaH_newkey(L, t, &k);
   }
 }
 
@@ -525,7 +540,7 @@ TValue *luaH_setstr (lua_State *L, Table *t, TString *key) {
   else {
     TValue k;
     setsvalue(L, &k, key);
-    return newkey(L, t, &k);
+    return luaH_newkey(L, t, &k);
   }
 }
 

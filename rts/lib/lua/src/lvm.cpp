@@ -161,9 +161,18 @@ void luaV_settable (lua_State *L, const TValue *t, TValue *key, StkId val) {
     const TValue *tm;
     if (ttistable(t)) {  /* `t' is a table? */
       Table *h = hvalue(t);
-      TValue *oldval = luaH_set(L, h, key); /* do a primitive set */
+      TValue *oldval = lua_cast(TValue *, luaH_get(h, key));
       if (!ttisnil(oldval) ||  /* result is no nil? */
           (tm = fasttm(L, h->metatable, TM_NEWINDEX)) == NULL) { /* or no TM? */
+        if (oldval == luaO_nilobject) {  /* absent key */
+          if (ttisnil(key))
+            luaG_runerror(L, "table index is nil");
+          else if (ttisnumber(key) && luai_numisnan(nvalue(key)))
+            luaG_runerror(L, "table index is NaN");
+          if (ttisnil(val))  /* nothing to insert */
+            return;
+          oldval = luaH_newkey(L, h, key);
+        }
         setobj2t(L, oldval, val);
         h->flags = 0;
         luaC_barriert(L, h, val);
