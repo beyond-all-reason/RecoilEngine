@@ -152,10 +152,11 @@ bool GameControllerTextInput::SendLabelInput() {
 }
 
 
-void GameControllerTextInput::PasteClipboard() {
+void GameControllerTextInput::PasteText(std::string text) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const CClipboard clipboard;
-	const std::string text = clipboard.GetContents();
+	// the input is a single line, so line breaks, tabs and other control characters become spaces
+	text = StringReplace(text, "\r\n", " ");
+	std::replace_if(text.begin(), text.end(), [](unsigned char c) { return (c < 0x20); }, ' ');
 
 	userInput.insert(writingPos, text);
 	writingPos += text.length();
@@ -378,10 +379,9 @@ bool GameControllerTextInput::HandlePasteCommand(const std::string& rawLine) {
 	const std::string pastecommand = "pastetext ";
 
 	if (rawLine.length() > pastecommand.length()) {
-		userInput.insert(writingPos, rawLine.substr(pastecommand.length(), rawLine.length() - pastecommand.length()));
-		writingPos += (rawLine.length() - pastecommand.length());
+		PasteText(rawLine.substr(pastecommand.length()));
 	} else {
-		PasteClipboard();
+		PasteText(CClipboard().GetContents());
 	}
 
 	return true;

@@ -71,7 +71,7 @@ public:
 	bool ConsumeReleasedKey(int keyCode, int scanCode) const;
 
 private:
-	void PasteClipboard();
+	void PasteText(std::string text);
 
 	bool HandleChatCommand(const std::string& command);
 	bool HandleEditCommand(const std::string& command);
