@@ -21,7 +21,9 @@
 #include "LuaUtils.h"
 #include "LuaVFS.h"
 #include "LuaZip.h"
+#include "Rendering/GlobalRendering.h"
 #include "Rendering/IconHandler.h"
+#include "Rendering/Fonts/glFont.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/EventHandler.h"
 #include "System/Log/ILog.h"
@@ -110,6 +112,20 @@ CLuaIntro::CLuaIntro()
 
 	// register for call-ins
 	eventHandler.AddClient(this);
+
+	// LoadingMT=2: this runs on the main thread in the load screen's own GL context while
+	// the loading thread runs the game load
+	if (globalRendering->OnIntroContext()) {
+		// the load screen gets everything it needs from CLoadScreen directly; events the
+		// loading thread broadcasts (GamePreload, CollectGarbage, ...) would run this Lua
+		// state from two threads at once
+		eventHandler.RemoveClient(this);
+		eventsDetached = true;
+
+		// the global font's VAOs belong to the game's context
+		if (font != nullptr)
+			defaultFont = CglFont::LoadFont(font->GetFilePath(), font->GetSize(), font->GetOutlineWidth(), font->GetOutlineWeight());
+	}
 }
 
 

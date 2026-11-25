@@ -709,6 +709,9 @@ bool CLuaHandle::HasCallIn(lua_State* L, const string& name) const
 bool CLuaHandle::UpdateCallIn(lua_State* L, const string& name)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (eventsDetached)
+		return true;
+
 	if (HasCallIn(L, name)) {
 		eventHandler.InsertEvent(this, name);
 	} else {

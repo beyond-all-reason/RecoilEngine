@@ -1,10 +1,50 @@
 #include "RenderBuffers.h"
 
+#include "Rendering/GlobalRendering.h"
+
 #include "System/Log/ILog.h"
 
 #include "System/Misc/TracyDefs.h"
 
 decltype(RenderBuffer::typedRenderBuffers) RenderBuffer::typedRenderBuffers;
+
+void RenderBuffer::Register()
+{
+	// some are made before globalRendering exists
+	introOwned = (globalRendering != nullptr && globalRendering->OnIntroContext());
+
+	std::lock_guard<spring::mutex> lck(allRenderBuffersMutex);
+	allRenderBuffers.emplace_back(this);
+}
+
+void RenderBuffer::Unregister()
+{
+	std::lock_guard<spring::mutex> lck(allRenderBuffersMutex);
+	const bool result = spring::VectorErase(allRenderBuffers, this);
+	assert(result);
+}
+
+void RenderBuffer::SwapRenderBuffers()
+{
+	std::lock_guard<spring::mutex> lck(allRenderBuffersMutex);
+
+	for (auto* rb : allRenderBuffers) {
+		if (rb) {
+			rb->SwapBuffer();
+		}
+	}
+}
+
+void RenderBuffer::SwapIntroRenderBuffers()
+{
+	std::lock_guard<spring::mutex> lck(allRenderBuffersMutex);
+
+	for (auto* rb : allRenderBuffers) {
+		if (rb != nullptr && rb->introOwned) {
+			rb->SwapBuffer();
+		}
+	}
+}
 
 void RenderBuffer::InitStatic()
 {

@@ -660,6 +660,7 @@ CFontTexture::CFontTexture(const std::string& fontfile, int size, int _outlinesi
 	, isColor(false)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	introOwned = globalRendering->OnIntroContext();
 	atlasAlloc.SetMaxSize(globalRendering->maxTextureSize, globalRendering->maxTextureSize);
 
 	atlasGlyphs.reserve(1024);

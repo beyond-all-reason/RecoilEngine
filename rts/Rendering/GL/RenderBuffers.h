@@ -7,6 +7,7 @@
 
 #include "System/TypeToStr.h"
 #include "System/ContainerUtil.h"
+#include "System/Threading/SpringThreading.h"
 #include "System/Log/ILog.h"
 #include "System/FileSystem/FileHandler.h"
 #include "Rendering/Shaders/Shader.h"
@@ -35,29 +36,24 @@ public:
 	RenderBuffer()
 		:initCapacity{ 0, 0 }
 	{
-		allRenderBuffers.emplace_back(this);
+		Register();
 	}
 	RenderBuffer(std::array<size_t, 2> c)
 		:initCapacity{ c }
 	{
-		allRenderBuffers.emplace_back(this);
+		Register();
 	}
 
 	virtual ~RenderBuffer() {
-		bool result = spring::VectorErase(allRenderBuffers, this);
-		assert(result);
+		Unregister();
 	}
 
 	template <typename T>
 	static TypedRenderBuffer<T>& GetTypedRenderBuffer();
 
-	static void SwapRenderBuffers() {
-		for (auto* rb : allRenderBuffers) {
-			if (rb) {
-				rb->SwapBuffer();
-			}
-		}
-	}
+	static void SwapRenderBuffers();
+	/// LoadingMT=2: only the buffers made in the load screen's own GL context
+	static void SwapIntroRenderBuffers();
 
 	virtual void SwapBuffer() = 0;
 	virtual const char* GetBufferName() const = 0;
@@ -80,7 +76,15 @@ protected:
 	// [0] := vertex, [1] := index
 	std::array<size_t, 2> initCapacity = { 0, 0 };
 private:
+	void Register();
+	void Unregister();
+
+	// made while the load screen draws in its own GL context (LoadingMT=2), its VAO lives there
+	bool introOwned = false;
+
 	static inline std::vector<RenderBuffer*> allRenderBuffers;
+	// LoadingMT=2 creates and swaps buffers on two threads
+	static inline spring::mutex allRenderBuffersMutex;
 	static std::array<std::unique_ptr<RenderBuffer>, 15> typedRenderBuffers;
 public:
 	static auto GetAllStandardRenderBuffers() -> const decltype(typedRenderBuffers)& { return typedRenderBuffers; };
