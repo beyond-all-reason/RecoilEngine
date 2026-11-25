@@ -684,15 +684,29 @@ static bool SetMoveTypeValue(AMoveType* mt, const char* key, ValueType val)
 	return (mt->SetMemberValue(spring::LiteHash(key, strlen(key), 0), &val));
 }
 
-static inline bool SetMoveTypeValue(lua_State* L, AMoveType* moveType, int keyIdx, int valIdx)
+static inline bool SetMoveTypeValue(lua_State* L, AMoveType* moveType, int keyIdx, int valIdx, const char* caller)
 {
-	if (lua_isnumber(L, valIdx))
-		return (SetMoveTypeValue<float>(moveType, lua_tostring(L, keyIdx), lua_tofloat(L, valIdx)));
+	if (!lua_israwstring(L, keyIdx)) {
+		LOG_L(L_WARNING, "[%s] movetype key must be a string, got %s", caller, luaL_typename(L, keyIdx));
+		return false;
+	}
 
-	if (lua_isboolean(L, valIdx))
-		return (SetMoveTypeValue<bool>(moveType, lua_tostring(L, keyIdx), lua_toboolean(L, valIdx)));
+	const char* key = lua_tostring(L, keyIdx);
+	bool assigned = false;
 
-	return false;
+	if (lua_isnumber(L, valIdx)) {
+		assigned = SetMoveTypeValue<float>(moveType, key, lua_tofloat(L, valIdx));
+	} else if (lua_isboolean(L, valIdx)) {
+		assigned = SetMoveTypeValue<bool>(moveType, key, lua_toboolean(L, valIdx));
+	} else {
+		LOG_L(L_WARNING, "[%s] movetype key \"%s\" needs a number or boolean value, got %s", caller, key, luaL_typename(L, valIdx));
+		return false;
+	}
+
+	if (!assigned)
+		LOG_L(L_WARNING, "[%s] unknown movetype key \"%s\"", caller, key);
+
+	return assigned;
 }
 
 /***
@@ -754,22 +768,18 @@ static int SetMoveTypeData(lua_State* L, AMoveType* moveType, const char* caller
 
 			if (lua_istable(L, tableIdx)) {
 				for (lua_pushnil(L); lua_next(L, tableIdx) != 0; lua_pop(L, 1)) {
-					if (lua_israwstring(L, -2) && SetMoveTypeValue(L, moveType, -2, -1)) {
+					if (SetMoveTypeValue(L, moveType, -2, -1, caller))
 						numAssignedValues++;
-					} else {
-						LOG_L(L_WARNING, "[%s] incompatible movetype key for %s", __func__, caller);
-					}
 				}
+			} else {
+				LOG_L(L_WARNING, "[%s] expected a table of movetype values, or a key and a value, got %s", caller, luaL_typename(L, tableIdx));
 			}
 		} break;
 
 		case 3: {
 			// three args (unitID, "key", (number | bool) value)
-			if (lua_isstring(L, 2) && SetMoveTypeValue(L, moveType, 2, 3)) {
+			if (SetMoveTypeValue(L, moveType, 2, 3, caller))
 				numAssignedValues++;
-			} else {
-				LOG_L(L_WARNING, "[%s] incompatible movetype key for %s", __func__, caller);
-			}
 		} break;
 	}
 
