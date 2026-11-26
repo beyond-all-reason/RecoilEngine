@@ -79,6 +79,7 @@ LocalModelPiece::~LocalModelPiece()
 void LocalModelPiece::SetDirty() {
 	RECOIL_DETAILED_TRACY_ZONE;
 	dirty = true;
+	localModel->SetPrevTransformsStale();
 
 	for (LocalModelPiece* child: children) {
 		if (child->dirty)
