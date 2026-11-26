@@ -1416,13 +1416,14 @@ void CGame::ClientReadNet()
 					if (fromAllyTeam == gu->myAllyTeam) {
 						msg << "Alliance: you have " << (allied ? "allied" : "unallied") << " allyteam " << +whichAllyTeam << ".";
 					} else if (whichAllyTeam == gu->myAllyTeam) {
-						msg << "Alliance: allyteam " << +whichAllyTeam << " has " << (allied ? "allied" : "unallied") <<  " with you.";
+						msg << "Alliance: allyteam " << +fromAllyTeam << " has " << (allied ? "allied" : "unallied") <<  " with you.";
 					} else {
 						/* Don't print other alliances, it is up to the game whether they should be revealed.
 						 * The two messages above would ideally also not be printed, but most games would
 						 * likely want them and, more importantly, there aren't good standard wupgets yet. */
 					}
-					LOG("%s", msg.str().c_str());
+					if (!msg.str().empty())
+						LOG("%s", msg.str().c_str());
 
 					// stop attacks against former foe
 					if (allied) {
