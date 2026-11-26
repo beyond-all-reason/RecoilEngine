@@ -1,5 +1,7 @@
 /* This file is part of the Recoil engine (GPL v2 or later). */
 
+/*** @env synced, unsynced */
+
 #include "LuaTracyExtra.h"
 
 #include "LuaInclude.h"

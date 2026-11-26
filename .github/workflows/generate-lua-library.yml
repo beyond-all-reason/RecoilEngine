@@ -56,8 +56,9 @@ jobs:
 
       - name: Copy changes into library repo
         run: |
-          rm -rf library/library
+          rm -rf library/library library/handles
           cp -r "recoil/${{env.RECOIL_LUA_LIBRARY_DIR}}" library
+          cp -r recoil/rts/Lua/handles library/handles
 
       # Always try to update library repo (even if generation did not make changes).
       # Hand-written files may have changed without generated output changing,

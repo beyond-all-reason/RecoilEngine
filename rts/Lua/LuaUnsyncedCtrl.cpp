@@ -1,5 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+/*** @env unsynced */
+
 #include "LuaUnsyncedCtrl.h"
 
 #include "Game/Camera/DollyController.h"
@@ -666,6 +668,7 @@ static void PrintMessage(lua_State* L, const string& msg)
 
 
 /*** @function Spring.SendMessage
+ * @env synced, unsynced
  * @param message string
  * @return nil
  */
@@ -687,6 +690,7 @@ int LuaUnsyncedCtrl::SendMessage(lua_State* L)
  * ```
  *
  * @function Spring.SendMessageToSpectators
+ * @env synced, unsynced
  * @param message string Message to send.
  * 
  * @return nil
@@ -701,6 +705,7 @@ int LuaUnsyncedCtrl::SendMessageToSpectators(lua_State* L)
 
 
 /*** @function Spring.SendMessageToPlayer
+ * @env synced, unsynced
  * @param playerID PlayerID
  * @param message string
  * @return nil
@@ -715,6 +720,7 @@ int LuaUnsyncedCtrl::SendMessageToPlayer(lua_State* L)
 
 
 /*** @function Spring.SendMessageToTeam
+ * @env synced, unsynced
  * @param teamID TeamID
  * @param message string
  * @return nil
@@ -729,6 +735,7 @@ int LuaUnsyncedCtrl::SendMessageToTeam(lua_State* L)
 
 
 /*** @function Spring.SendMessageToAllyTeam
+ * @env synced, unsynced
  * @param allyID AllyTeamID
  * @param message string
  * @return nil
@@ -3835,6 +3842,7 @@ int LuaUnsyncedCtrl::SetBuildFacing(lua_State* L)
 
 
 /*** @function Spring.SendLuaUIMsg
+ * @env synced, unsynced
  * @param message string
  * @param mode string? "s"/"specs" | "a"/"allies"
  * @return nil
