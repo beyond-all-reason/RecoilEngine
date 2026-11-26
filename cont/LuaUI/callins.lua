@@ -92,6 +92,7 @@ CallInsList = {
 	"DrawGroundPreDeferred",
 	"DrawGroundDeferred",
 	"DrawGroundPostDeferred",
+	"DrawGroundPreShadow",
 	"DrawUnitsPostDeferred",
 	"DrawFeaturesPostDeferred",
 	"DrawScreenEffects",

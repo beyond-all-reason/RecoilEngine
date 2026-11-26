@@ -301,6 +301,7 @@ class CEventHandler
 		void DrawGroundPreDeferred();
 		void DrawGroundDeferred();
 		void DrawGroundPostDeferred();
+		void DrawGroundPreShadow();
 		void DrawUnitsPostDeferred();
 		void DrawFeaturesPostDeferred();
 		void DrawScreenPost();

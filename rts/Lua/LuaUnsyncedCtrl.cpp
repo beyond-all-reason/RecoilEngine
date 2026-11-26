@@ -2015,9 +2015,12 @@ int LuaUnsyncedCtrl::SetModelLightTrackingState(lua_State* L)
  * Passing in a value of 0 will cause the respective shader to revert back to its engine default.
  * Custom map shaders that declare a uniform ivec2 named "texSquare" can sample from the default diffuse texture(s), which are always bound to TU 0.
  *
+ * The shadow program draws the ground into the shadow map (reference: `GLSL/ShadowGenVertMapProg.glsl`) and has to be a program of its own. It reads the vertex position from `gl_Vertex`, the shadow camera from `gl_ModelViewMatrix` and `gl_ProjectionMatrix` and the heightmap from TU 1; the uniforms `ivec2 texSquare`, `float borderMinHeight` and `vec4 mapSize` are set when declared. Programs are validated when assigned, so set their sampler units at creation. It is not used while terrain shadows are off.
+ *
  * @param standardShaderID integer
  * @param deferredShaderID integer
  * @param combinedShader boolean? (Default: `false`) Declares that the deferred program also writes the lit forward color to fragment output 5, with non-zero alpha where ground is opaque (the composite skips zero-alpha pixels). With `AllowCombinedMapRendering` the ground is then rasterized only once (no forward pass, `DrawGroundPreForward` is not called, and on void maps the alpha test reads output 0's alpha); otherwise the flag is ignored and both programs run as before.
+ * @param shadowShaderID integer? (Default: `0`) Draws the ground into the shadow map, e.g. to `discard` where the other programs do. `DrawGroundPreShadow` runs before each draw.
  * @return nil
  */
 int LuaUnsyncedCtrl::SetMapShader(lua_State* L)
@@ -2035,6 +2038,7 @@ int LuaUnsyncedCtrl::SetMapShader(lua_State* L)
 	}
 
 	luaMapShaderData.combinedShader = luaL_optboolean(L, 3, false);
+	luaMapShaderData.shadowShaderID = shaders.GetProgramName(luaL_optint(L, 4, 0));
 
 	groundDrawer->SetLuaShader(&luaMapShaderData);
 	return 0;

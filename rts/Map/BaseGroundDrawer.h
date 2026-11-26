@@ -21,6 +21,9 @@ struct LuaMapShaderData {
 	// [1] := deferred program from gl.CreateShader
 	unsigned int shaderIDs[2];
 
+	// program from gl.CreateShader that draws the ground into the shadow map
+	unsigned int shadowShaderID = 0;
+
 	// if true, [1] also writes the lit forward color (see AllowCombinedMapRendering)
 	bool combinedShader = false;
 };
