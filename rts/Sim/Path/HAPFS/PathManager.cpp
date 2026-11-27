@@ -449,10 +449,20 @@ unsigned int CPathManager::RequestPath(
 		auto searchView = registry.view<PathSearch>();
 		for ( entt::entity entity : searchView ) {
 			auto& search = searchView.get<PathSearch>(entity);
-			if (search.caller == caller) {
-				existingSearch = &search;
+			if (search.caller != caller)
+				continue;
+
+			// a pending extension belongs to the path the caller is currently following.
+			// a new request must not take over that path id (the caller keeps following
+			// the old path until the new one is ready) nor inherit the extension marker,
+			// which would make Update() skip the search entirely.
+			if (registry.all_of<PathExtension>(entity)) {
+				registry.destroy(entity);
 				break;
 			}
+
+			existingSearch = &search;
+			break;
 		}
 
 		MultiPath newPath = MultiPath(moveDef, startPos, goalPos, goalRadius);
