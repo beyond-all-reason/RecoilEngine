@@ -39,6 +39,7 @@ class DamageArray;
 class DynDamageArray;
 struct SolidObjectDef;
 struct UnitDef;
+class CUnitExtractor;
 struct UnitLoadParams;
 struct SLosInstance;
 
@@ -97,6 +98,7 @@ public:
 	void DropCurrentAttackTarget();
 
 	int GetBlockingMapID() const override { return id; }
+	const YardMapStatus* GetBlockMap() const override;
 
 	void ChangeLos(int losRad, int airRad);
 
@@ -298,6 +300,7 @@ public:
 
 	CCommandAI* commandAI = nullptr;
 	CUnitScript* script = nullptr;
+	CUnitExtractor* extractor = nullptr;
 
 	// current attackee
 	SWeaponTarget curTarget;
