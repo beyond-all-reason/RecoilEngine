@@ -160,7 +160,7 @@ add_library(engineSim STATIC
 		"${CMAKE_CURRENT_SOURCE_DIR}/Weapons/WeaponTarget.cpp"
 	)
 
-target_link_libraries(engineSim SDL2::SDL2 Tracy::TracyClient nowide::nowide fmt::fmt)
+target_link_libraries(engineSim $<COMPILE_ONLY:SDL2::SDL2> Tracy::TracyClient nowide::nowide fmt::fmt)
 
 if(ENABLE_STREFLOP)
 	target_link_libraries(engineSim streflop)

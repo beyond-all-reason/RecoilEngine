@@ -109,6 +109,9 @@ extern DECLSPEC int SDLCALL SDL_WM_IconifyWindow() {
 extern DECLSPEC void SDLCALL SDL_HideWindow(SDL_Window* window) {
 }
 
+extern DECLSPEC void SDLCALL SDL_ShowWindow(SDL_Window* window) {
+}
+
 extern DECLSPEC int SDLCALL SDL_SetWindowFullscreen(SDL_Window* window, Uint32 flags) {
 	return 0;
 }
@@ -237,6 +240,10 @@ extern DECLSPEC int SDLCALL SDL_ShowCursor(int toggle) {
 
 extern DECLSPEC Uint32 SDLCALL SDL_GetMouseState(int* x, int* y) {
 	return 0;
+}
+
+extern DECLSPEC SDL_Window* SDLCALL SDL_GetMouseFocus(void) {
+	return NULL;
 }
 
 extern DECLSPEC int SDLCALL SDL_NumJoysticks() {
