@@ -57,6 +57,8 @@ public:
 	void ParseExplosionTables();
 	void ReloadGenerators(const std::string&);
 
+	bool IsCustomGeneratorDefined(const char* tag) const;
+
 	unsigned int LoadCustomGeneratorID(const char* tag) { return (LoadGeneratorID(tag, CEG_PREFIX_STRING)); }
 	unsigned int LoadGeneratorID(const char* tag, const char* pre = "");
 
