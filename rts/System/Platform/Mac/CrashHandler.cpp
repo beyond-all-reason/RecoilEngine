@@ -35,6 +35,23 @@ static bool HaveAddr2LineMac()
 	return (i == 0);
 }
 
+// atos runs through the shell, and module paths contain spaces
+// (the engine lives in "~/Library/Application Support/...")
+static std::string ShellQuote(const std::string& str)
+{
+	std::string quoted = "'";
+
+	for (const char c: str) {
+		if (c == '\'') {
+			quoted += "'\\''";
+		} else {
+			quoted += c;
+		}
+	}
+
+	return (quoted + "'");
+}
+
 /**
  * @brief TranslateStackTrace
  * @param stacktrace These are the lines and addresses produced by backtrace_symbols()
@@ -99,8 +116,9 @@ static void TranslateStackTrace(StackTrace& stacktrace, const int logLevel)
 		addrPathMap[numAddrPairs++] = {stackFrame.addr, stackFrame.path};
 	}
 
-	// sort by address
+	// sort by address, and keep one entry per module so atos runs once for each
 	std::sort(addrPathMap.begin(), addrPathMap.begin() + numAddrPairs, [](const AddrPathPair& a, const AddrPathPair& b) { return (a.first < b.first); });
+	numAddrPairs = std::unique(addrPathMap.begin(), addrPathMap.begin() + numAddrPairs) - addrPathMap.begin();
 
 	LOG_L(L_DEBUG, "[%s][4]", __func__);
 
@@ -123,7 +141,7 @@ static void TranslateStackTrace(StackTrace& stacktrace, const int logLevel)
 	#else
 		#error "Unsupported architecture"
 	#endif
-		execCommandBuffer << ADDR2LINE << " -o " << modulePath << " -arch " << atosArch << " -l " << std::hex << addrPathPair.first;
+		execCommandBuffer << ADDR2LINE << " -o " << ShellQuote(modulePath) << " -arch " << atosArch << " -l " << std::hex << addrPathPair.first;
 
 		// insert requested addresses that should be translated by atos
 		int i = 0;
@@ -148,12 +166,12 @@ static void TranslateStackTrace(StackTrace& stacktrace, const int logLevel)
 		if (cmdOut != nullptr) {
 			char line[2048];
 
-			while (fgets(line, sizeof(line), cmdOut) != nullptr) {
+			while (!stackFrameIndices.empty() && fgets(line, sizeof(line), cmdOut) != nullptr) {
 				i = stackFrameIndices.front();
 				stackFrameIndices.pop_front();
 
 				StackEntry entry;
-				entry.funcname = std::string(line);
+				entry.funcname = std::string(line, strcspn(line, "\n"));
 
 				stacktrace[i].entries.push_back(entry);
 			}
@@ -169,6 +187,12 @@ static void LogStacktrace(const int logLevel, StackTrace& stacktrace)
 {
 	// Print out the translated StackTrace
 	for (const StackFrame& stackFrame: stacktrace) {
+		// atos failed or is missing (no Command Line Tools), keep backtrace_symbols' line
+		if (stackFrame.entries.empty()) {
+			LOG_I(logLevel, "[%02u]   %s", stackFrame.level, stackFrame.symbol.c_str());
+			continue;
+		}
+
 		for (const StackEntry& stackEntry: stackFrame.entries) {
 			LOG_I(logLevel, "[%02u]   %s", stackFrame.level, stackEntry.funcname.c_str());
 		}
