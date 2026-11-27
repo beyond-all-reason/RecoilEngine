@@ -861,7 +861,7 @@ void TBitmapAction<T, ch>::MakeGrayScale()
 				(rgb.b * 0.114f);
 
 			const AccumChanType val = std::max(
-				static_cast<AccumChanType>((256.0f / 255.0f) * luma),
+				static_cast<AccumChanType>((256.0f / 255.0f) * luma * N),
 				AccumChanType(0)
 			);
 
