@@ -80,6 +80,7 @@ public:
 	PacketType SendPlayerLeft(uint8_t playerNum, uint8_t bIntended);
 	PacketType SendLogMsg(uint8_t playerNum, uint8_t logMsgLvl, const std::string& strData);
 	PacketType SendLuaMsg(uint8_t playerNum, uint16_t script, uint8_t mode, const std::vector<uint8_t>& rawData);
+	PacketType SendDediMsg(uint8_t playerNum, uint16_t header, const std::vector<uint8_t>& payload);
 	PacketType SendCurrentFrameProgress(int32_t frameNum);
 	PacketType SendPing(uint8_t playerNum, uint8_t pingTag, float localTime);
 
