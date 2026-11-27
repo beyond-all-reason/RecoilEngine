@@ -306,6 +306,9 @@ void LuaTextures::Unpublish(GLuint id)
 
 void LuaTextures::ApplyParams(const Texture& tex) const
 {
+	if (tex.target == GL_TEXTURE_2D_MULTISAMPLE)
+		return;
+
 	glTexParameteri(tex.target, GL_TEXTURE_WRAP_S, tex.wrap_s);
 	glTexParameteri(tex.target, GL_TEXTURE_WRAP_T, tex.wrap_t);
 	glTexParameteri(tex.target, GL_TEXTURE_WRAP_R, tex.wrap_r);
