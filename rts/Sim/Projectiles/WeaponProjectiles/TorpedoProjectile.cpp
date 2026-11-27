@@ -122,13 +122,18 @@ void CTorpedoProjectile::Update()
 	} else {
 		if (--ttl > 0) {
 			if (!luaMoveCtrl) {
-				speed.w += (std::max(0.2f, tracking) * (speed.w < maxSpeed));
+				if (TestControlArea()) {
+					speed.w += (std::max(0.2f, tracking) * (speed.w < maxSpeed));
 
-				const float3 targetObjVel = UpdateTargetingPos();
-				const float3 targetHitVel = UpdateTargetingDir(targetObjVel);
+					const float3 targetObjVel = UpdateTargetingPos();
+					const float3 targetHitVel = UpdateTargetingDir(targetObjVel);
 
-				// do not need to update dir or speed.w here
-				CWorldObject::SetVelocity(targetHitVel);
+					// do not need to update dir or speed.w here
+					CWorldObject::SetVelocity(targetHitVel);
+				} else {
+					// out of control area bounds; handle as expired ttl
+					SetVelocityAndSpeed((speed * 0.98f) + (UpVector * mygravity));
+				}
 			}
 
 			explGenHandler.GenExplosion(
