@@ -3,6 +3,7 @@
 #include "MouseHandler.h"
 
 #include "CommandColors.h"
+#include "System/Input/ControllerInput.h"
 #include "InputReceiver.h"
 #include "GuiHandler.h"
 #include "MiniMap.h"
@@ -124,8 +125,10 @@ void CMouseHandler::InitStatic()
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(mouse == nullptr);
 	assert(mouseInput == nullptr);
+	assert(controllerInput == nullptr);
 
 	mouseInput = IMouseInput::GetInstance(configHandler->GetBool("MouseRelativeModeWarp"));
+	controllerInput = CControllerInput::GetInstance();
 	mouse = new CMouseHandler();
 }
 
@@ -133,6 +136,7 @@ void CMouseHandler::KillStatic()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	spring::SafeDelete(mouse);
+	CControllerInput::FreeInstance();
 	IMouseInput::FreeInstance(mouseInput);
 }
 
