@@ -664,6 +664,7 @@ const GLbitfield AttribBits =
 	GL_LINE_BIT         |
 	GL_POINT_BIT        |
 	GL_POLYGON_BIT      |
+	GL_SCISSOR_BIT      |
 	GL_VIEWPORT_BIT;
 
 
