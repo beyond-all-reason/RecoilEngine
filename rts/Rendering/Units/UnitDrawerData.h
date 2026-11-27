@@ -129,12 +129,17 @@ public:
 	}
 
 	// IconsAsUI
+	// furthest camera-to-ground distance Update() measures
+	static constexpr float iconZoomDistMax = 150000.0f;
+	// fade checks compare iconZoomDist / (0.75 * iconSize + 0.25), so no fade distance above this can take effect
+	static constexpr float iconFadeDistMax = iconZoomDistMax / 0.25f;
+
 	float GetUnitIconScaleUI() const { return iconScale; }
 	float GetUnitIconFadeStart() const { return iconFadeStart; }
 	float GetUnitIconFadeVanish() const { return iconFadeVanish; }
 	void SetUnitIconScaleUI(float scale) { iconScale = std::clamp(scale, 0.1f, 10.0f); }
-	void SetUnitIconFadeStart(float scale) { iconFadeStart = std::clamp(scale, 1.0f, 10000.0f); }
-	void SetUnitIconFadeVanish(float scale) { iconFadeVanish = std::clamp(scale, 1.0f, 10000.0f); }
+	void SetUnitIconFadeStart(float scale) { iconFadeStart = std::clamp(scale, 1.0f, iconFadeDistMax); }
+	void SetUnitIconFadeVanish(float scale) { iconFadeVanish = std::clamp(scale, 1.0f, iconFadeDistMax); }
 
 	// *UnitDefImage
 	void SetUnitDefImage(const UnitDef* unitDef, const std::string& texName);
