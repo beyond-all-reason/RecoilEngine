@@ -645,8 +645,11 @@ void CLuaUnitScript::Killed()
 
 	inKilled = true;
 
-	if (!RunCallIn(fn, 2, 1))
+	if (!RunCallIn(fn, 2, 1)) {
+		inKilled = false;
+		unit->KilledScriptFinished(unit->delayedWreckLevel);
 		return;
+	}
 
 	// If Killed returns an integer, it signals it hasn't started a thread.
 	// In this case the return value is the delayedWreckLevel.
