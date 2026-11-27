@@ -107,6 +107,8 @@ public:
 
 	virtual void Unmap() = 0;
 	virtual void SwapBuffer() {};
+	// discards the contents, for users that upload everything again afterwards
+	virtual void Invalidate() {};
 
 	virtual bool HasClientPtr() const { return false; };
 	virtual uint32_t BufferElemOffset() const { return 0; };
@@ -248,11 +250,25 @@ public:
 		);
 
 		this->Unbind();
+		uploaded = true;
+	}
+
+	void Invalidate() override {
+		if (!uploaded)
+			return;
+
+		// orphan the storage, otherwise uploads into ranges that queued draws
+		// still read make the driver wait or copy through a staging buffer
+		this->Bind();
+		glBufferData(this->target, this->byteSize, nullptr, this->optimizeForStreaming ? GL_STREAM_DRAW : GL_STATIC_DRAW);
+		this->Unbind();
+		uploaded = false;
 	}
 
 	bool HasClientPtr() const override { return clientMem; };
 private:
 	bool clientMem;
+	bool uploaded = false;
 	T* buffer;
 };
 
