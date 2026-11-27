@@ -698,12 +698,17 @@ sol::as_table_t<std::vector<lua_Number>> LuaVBOImpl::Download(sol::optional<int>
 		mappedBuf = reinterpret_cast<GLubyte*>(bufferData) + bufferOffsetInBytes;
 	}
 
+	GLubyte* const mappedBufStart = mappedBuf;
 	int bytesRead = 0;
 
 	for (int e = 0; e < elemCount; ++e) {
 		for (const auto& va : bufferAttribDefsVec) {
 			const int   attrID = va.first;
 			const auto& attrDef = va.second;
+
+			// skip the alignment padding GetTypePtr() puts between attributes
+			bytesRead = e * elemSizeInBytes + attrDef.pointer;
+			mappedBuf = mappedBufStart + bytesRead;
 
 			int basicTypeSize = attrDef.size;
 
@@ -1113,12 +1118,18 @@ size_t LuaVBOImpl::UploadImpl(const std::vector<TIn>& dataVec, uint32_t elemOffs
 		return bytesWritten;
 	};
 
+	uint8_t* const bufferStart = buffDataWithOffset;
 	int bytesWritten = 0;
 
-	for (auto bdvIter = dataVec.cbegin(); bdvIter < dataVec.cend();) {
+	uint32_t e = 0;
+	for (auto bdvIter = dataVec.cbegin(); bdvIter < dataVec.cend(); ++e) {
 		for (const auto& va : bufferAttribDefsVec) {
 			const int   attrID = va.first;
 			const auto& attrDef = va.second;
+
+			// skip the alignment padding GetTypePtr() puts between attributes
+			bytesWritten = e * elemSizeInBytes + attrDef.pointer;
+			buffDataWithOffset = bufferStart + bytesWritten;
 
 			int basicTypeSize = attrDef.size;
 
