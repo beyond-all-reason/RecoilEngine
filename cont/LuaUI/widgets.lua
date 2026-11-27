@@ -159,6 +159,8 @@ local flexCallIns = {
   'DrawGenesis',
   'DrawWorld',
   'DrawWorldPreUnit',
+  'DrawWorldPreProjectiles',
+  'DrawWorldPreAlpha',
   'DrawWorldPreParticles',
   'DrawWorldShadow',
   'DrawWorldReflection',
@@ -1317,6 +1319,20 @@ end
 function widgetHandler:DrawWorldPreUnit()
   for _,w in ripairs(self.DrawWorldPreUnitList) do
     w:DrawWorldPreUnit()
+  end
+  return
+end
+
+function widgetHandler:DrawWorldPreProjectiles()
+  for _,w in ripairs(self.DrawWorldPreProjectilesList) do
+    w:DrawWorldPreProjectiles()
+  end
+  return
+end
+
+function widgetHandler:DrawWorldPreAlpha()
+  for _,w in ripairs(self.DrawWorldPreAlphaList) do
+    w:DrawWorldPreAlpha()
   end
   return
 end
