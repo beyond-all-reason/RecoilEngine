@@ -1470,8 +1470,6 @@ bool CGroundMoveType::CanApplyImpulse(const float3& impulse)
 	if (impulse.SqLength() <= 0.01f)
 		return false;
 
-	UseHeading(false);
-
 	skidRotSpeed = 0.0f;
 	skidRotAccel = 0.0f;
 
@@ -1569,7 +1567,6 @@ void CGroundMoveType::UpdateSkid()
 			owner->ClearPhysicalStateBit(CSolidObject::PSTATE_BIT_SKIDDING);
 			owner->script->StopSkidding();
 
-			UseHeading(true);
 			// update wanted-heading after coming to a stop
 			ChangeHeading(owner->heading);
 		} else {
@@ -1608,7 +1605,6 @@ void CGroundMoveType::UpdateSkid()
 			owner->SetPhysicalStateBit(CSolidObject::PSTATE_BIT_FLYING);
 			owner->SetPhysicalStateBit(CSolidObject::PSTATE_BIT_SKIDDING);
 
-			UseHeading(false);
 		} else if (negAltitude > spd.y) {
 			// LHS is always negative, so this becomes true when the
 			// unit is falling back down and will impact the ground

@@ -59,70 +59,15 @@ void HUDDrawer::DrawModel(const CUnit* unit)
 		glTranslatef(0.0f, 0.0f, -unit->radius);
 		glScalef(1.0f / unit->radius, 1.0f / unit->radius, 1.0f / unit->radius);
 
-		if (unit->moveType->UseHeading()) {
-			glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
-			glRotatef(180.0f, 0.0f, 0.0f, 1.0f);
-		} else {
-			CMatrix44f m(ZeroVector,
-				float3(camera->GetRight().x, camera->GetUp().x, camera->GetDir().x),
-				float3(camera->GetRight().y, camera->GetUp().y, camera->GetDir().y),
-				float3(camera->GetRight().z, camera->GetUp().z, camera->GetDir().z));
-			glMultMatrixf(m.m);
-		}
+		CMatrix44f m(ZeroVector,
+			float3(camera->GetRight().x, camera->GetUp().x, camera->GetDir().x),
+			float3(camera->GetRight().y, camera->GetUp().y, camera->GetDir().y),
+			float3(camera->GetRight().z, camera->GetUp().z, camera->GetDir().z));
+		glMultMatrixf(m.m);
 
 		glColor4f(1.0f, 1.0f, 1.0f, 0.25f);
 		unit->localModel.Draw();
 	glPopMatrix();
-}
-
-void HUDDrawer::DrawUnitDirectionArrow(const CUnit* unit)
-{
-	glDisable(GL_TEXTURE_2D);
-
-	if (unit->moveType->UseHeading()) {
-		glPushMatrix();
-			glTranslatef(-0.8f, -0.4f, 0.0f);
-			glScalef(0.33f, 0.33f * globalRendering->aspectRatio, 0.33f);
-			glRotatef(unit->heading * 180.0f / 32768 + 180, 0.0f, 0.0f, 1.0f);
-
-			glColor4f(0.3f, 0.9f, 0.3f, 0.4f);
-			glBegin(GL_TRIANGLE_FAN);
-				glVertex2f(-0.2f, -0.3f);
-				glVertex2f(-0.2f,  0.3f);
-				glVertex2f( 0.0f,  0.4f);
-				glVertex2f( 0.2f,  0.3f);
-				glVertex2f( 0.2f, -0.3f);
-				glVertex2f(-0.2f, -0.3f);
-			glEnd();
-		glPopMatrix();
-	}
-}
-void HUDDrawer::DrawCameraDirectionArrow(const CUnit* unit)
-{
-	glDisable(GL_TEXTURE_2D);
-
-	if (unit->moveType->UseHeading()) {
-		glPushMatrix();
-			glTranslatef(-0.8f, -0.4f, 0.0f);
-			glScalef(0.33f, 0.33f * globalRendering->aspectRatio, 0.33f);
-
-			glRotatef(
-				GetHeadingFromVector(camera->GetDir().x, camera->GetDir().z) * 180.0f / 32768 + 180,
-				0.0f, 0.0f, 1.0f
-			);
-			glScalef(0.4f, 0.4f, 0.3f);
-
-			glColor4f(0.4f, 0.4f, 1.0f, 0.6f);
-			glBegin(GL_TRIANGLE_FAN);
-				glVertex2f(-0.2f, -0.3f);
-				glVertex2f(-0.2f,  0.3f);
-				glVertex2f( 0.0f,  0.5f);
-				glVertex2f( 0.2f,  0.3f);
-				glVertex2f( 0.2f, -0.3f);
-				glVertex2f(-0.2f, -0.3f);
-			glEnd();
-		glPopMatrix();
-	}
 }
 
 void HUDDrawer::DrawWeaponStates(const CUnit* unit)
@@ -287,10 +232,7 @@ void HUDDrawer::Draw(const CUnit* unit)
 		Blending(GL_TRUE),
 		BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-	glPushMatrix();
-		DrawUnitDirectionArrow(unit);
-		DrawCameraDirectionArrow(unit);
-	glPopMatrix();
+	glDisable(GL_TEXTURE_2D);
 
 	state << DepthTest(GL_TRUE);
 		DrawModel(unit);

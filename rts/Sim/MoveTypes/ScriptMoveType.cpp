@@ -57,8 +57,6 @@ CR_REG_METADATA(CScriptMoveType, (
 CScriptMoveType::CScriptMoveType(CUnit* unit): AMoveType(unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// use the transformation matrix instead of heading
-	UseHeading(false);
 
 	// creg
 	if (unit == nullptr)
