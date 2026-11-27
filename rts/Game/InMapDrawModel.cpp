@@ -50,7 +50,7 @@ bool CInMapDrawModel::MapDrawPrimitive::IsVisibleToPlayer(bool drawAllMarks) con
 	const bool alliedAB = teamHandler.Ally(allyTeam, gu->myAllyTeam);
 	const bool alliedBA = teamHandler.Ally(gu->myAllyTeam, allyTeam);
 
-	return (gu->spectating || drawAllMarks || (!spectator && alliedAB && alliedBA));
+	return ((gu->spectating && gu->spectatingFullView) || drawAllMarks || (!spectator && alliedAB && alliedBA));
 }
 
 
