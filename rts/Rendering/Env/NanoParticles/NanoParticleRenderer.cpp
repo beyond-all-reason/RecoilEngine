@@ -202,7 +202,7 @@ bool Renderer::InitShader()
 	builtForceNoGeometryShader = cfg.forceNoGeometryShader;
 	std::string geometryLog;
 
-	if (!cfg.forceNoGeometryShader) {
+	if (!cfg.forceNoGeometryShader && globalRendering->supportGeometryShaders) {
 		shader = shaderHandler->CreateProgramObject(SHADER_POOL, SHADER_NAME_GEOM);
 		shader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/NanoParticleVertProg.glsl", "", GL_VERTEX_SHADER));
 		shader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/NanoParticleGeomProg.glsl", "", GL_GEOMETRY_SHADER));
