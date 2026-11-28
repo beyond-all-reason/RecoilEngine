@@ -155,7 +155,7 @@ protected:
 
 private:
 	// FIXME make synced?
-	spring::unsynced_set<CObject*> commandDeathDependences;
+	SharedObjectSet commandDeathDependences;
 	/**
 	 * continuously set to some non-zero value while target is in radar
 	 * decremented by 1 every SlowUpdate (!), command is canceled when
