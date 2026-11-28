@@ -467,7 +467,15 @@ bool CStrafeAirMoveType::Update()
 
 			const CCommandQueue& cmdQue = owner->commandAI->commandQue;
 
-			const bool isAttacking = (!cmdQue.empty() && (cmdQue.front()).GetID() == CMD_ATTACK);
+			bool isAttacking = false;
+			if (!cmdQue.empty()) {
+				const int cmdID = cmdQue.front().GetID();
+				isAttacking = (cmdID == CMD_ATTACK);
+				if (!isAttacking) {
+					const auto it = gs->customCommands.find(cmdID);
+					isAttacking = (it != gs->customCommands.end() && it->second.attack);
+				}
+			}
 			const bool keepAttacking = ((owner->curTarget.type == Target_Unit && !owner->curTarget.unit->isDead) || owner->curTarget.type == Target_Pos);
 
 			/*
