@@ -80,3 +80,21 @@ Change the window without touching the shared config by passing `-config <file>`
 **Only trust deltas measured in one run.** Absolute frame rates move about 10% between runs even frozen and focused. Mouse position is one uncontrolled variable, since hovering changes what the UI draws.
 
 GL timer queries do not work here, so do not reach for them. Zink on KosmicKrisp does not advertise `GL_ARB_timer_query` and `glQueryCounter` silently returns zeros.
+
+## Sync and screenshot checks
+
+These come from Adam Burgess's macOS port, qant-au/tellurion, changed to use this tree's paths and `run-capped.sh`. None of them has been run in this tree yet. Treat the first run of each as a test of the script.
+
+| script | what it checks | needs |
+|---|---|---|
+| `sync-test.sh` | streflop gives bit-identical results to the committed x86 SSE and arm64 NEON references. CPU only, it takes seconds. | nothing beyond cmake, ninja and python3 |
+| `replay-check.sh <demo.sdfz>` | a BAR replay re-simulates with every recorded checksum equal. The checksums come from the x86 client that recorded it, so this is the cross-platform sync check. | `spring-headless` built, the demo's game and map in `~/dev/spring-testdata`, a demo recorded on the same engine version |
+| `visreg.sh --demo <demo.sdfz>` | six screenshots of a replay at fixed sim frames match approved baselines in `visreg-baselines/` | the graphical engine, so ask before running it. Pillow for the comparison. No baselines exist yet, so the first run ends with `VISREG_NO_BASELINE` and its pictures need a person to look at them before `--bless` |
+
+`replay-check.sh` and `visreg.sh` need the `SPRING_DEMO_SPEED` commit on this branch to play at 20x. Without it a replay plays in real time, and `visreg.sh` hits its 420 s limit.
+
+`find-fleet-replays.py <engine version>` lists public BAR replays recorded on that version, with a download address for each. `demo-sync-packets.py` counts the checksums in a demo, and `replay-check.sh` refuses one that has none, since it would pass whatever the simulation did.
+
+Run them from a terminal rather than through an agent. The `git-safe` hook refuses to run scripts and binaries it cannot read, which covers all three.
+
+`visreg.sh` runs with its own write dir, so BAR's `LuaUI/Config/BYAR.lua` from `~/dev/spring-testdata` is not used. If BAR's "Mission Info" dialog shows during a replay, it pauses the run until someone presses Esc.
