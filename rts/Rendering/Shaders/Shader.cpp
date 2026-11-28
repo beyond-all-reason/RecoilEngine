@@ -726,13 +726,15 @@ namespace Shader {
 			}
 		}
 
+		// Restore uniforms before validating. A re-linked program has every sampler back on
+		// unit 0, which fails validation when it declares more than one sampler type, and
+		// gating the restore on that validation would leave it invalid for good.
+		if (IsValid())
+			GLSLCopyState(objID, oldValid ? oldProgID : 0, &uniformStates);
+
 		// FIXME: fails on ATI, see https://springrts.com/mantis/view.php?id=4715
 		if (validate && (!globalRendering->haveAMD && !globalRendering->haveIntel))
 			Validate();
-
-		// copy full program state from old to new program (uniforms etc.)
-		if (IsValid())
-			GLSLCopyState(objID, oldValid ? oldProgID : 0, &uniformStates);
 
 		// delete old program when not further used
 		if (deleteOldShader)
