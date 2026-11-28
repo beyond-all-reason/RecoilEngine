@@ -24,6 +24,7 @@
 #include "Sim/Units/UnitHandler.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Misc/LosHandler.h"
+#include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Map/Ground.h"
 #include "Map/ReadMap.h"
@@ -62,6 +63,8 @@ CR_REG_METADATA(GhostSolidObject, (
 	CR_MEMBER(facing),
 	CR_MEMBER(team),
 	CR_MEMBER(paletteIndex),
+	CR_MEMBER(requiresSonar),
+	CR_MEMBER(sonarDetectable),
 	CR_IGNORED(currentIconIndex),
 
 	CR_IGNORED(worldTransformAlloc),
@@ -104,6 +107,16 @@ CR_REG_METADATA(CUnitDrawerData::SavedData, (
 
 ///////////////////////////
 
+
+bool GhostSolidObject::IsInLos(int allyTeam) const
+{
+	if (!losHandler->InLos(pos, allyTeam))
+		return false;
+	if (!requiresSonar || losHandler->GetGlobalLOS(allyTeam))
+		return true;
+
+	return sonarDetectable && losHandler->InSonar(pos, allyTeam, teamHandler.AllyTeam(team));
+}
 
 void GhostSolidObject::PostLoad()
 {
@@ -275,7 +288,7 @@ void CUnitDrawerData::UpdateGhostedBuildings()
 			for (int i = 0; i < dgb.size(); /*no-op*/) {
 				GhostSolidObject* gso = dgb[i];
 
-				if (!losHandler->InLos(gso->pos, allyTeam)) {
+				if (!gso->IsInLos(allyTeam)) {
 					++i;
 					continue;
 				}
@@ -654,6 +667,8 @@ bool CUnitDrawerData::UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost
 				gso->facing = u->buildFacing;
 				gso->dir = u->frontdir;
 				gso->team = u->team;
+				gso->requiresSonar = modInfo.requireSonarUnderWater && u->IsUnderWater() && !u->useAirLos;
+				gso->sonarDetectable = u->CanBeDetectedBySonar();
 				gso->paletteIndex = u->paletteIndex;
 				gso->radius = u->radius;
 				gso->GetModel();

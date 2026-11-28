@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef UNIT_H
-#define UNIT_H
+#pragma once
 
 #include <optional>
 #include <vector>
@@ -179,6 +178,7 @@ public:
 		posErrorMask[at / 32] &= ~((1 << (at % 32)) * (bit == 0));
 	}
 
+	bool CanBeDetectedBySonar() const { return IsInWater() && (!sonarStealth || beingBuilt); }
 	bool IsInLosForAllyTeam(int allyTeam) const { return ((losStatus[allyTeam] & LOS_INLOS) != 0); }
 
 	void SetLosStatus(int allyTeam, unsigned short newStatus);
@@ -567,5 +567,3 @@ struct GlobalUnitParams {
 };
 
 extern GlobalUnitParams globalUnitParams;
-
-#endif // UNIT_H

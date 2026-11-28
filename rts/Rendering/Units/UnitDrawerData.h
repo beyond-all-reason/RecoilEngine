@@ -22,6 +22,7 @@ public:
 	void IncRef() { (refCount++); }
 	bool DecRef() { return ((refCount--) > 1); }
 	const S3DModel* GetModel() const;
+	bool IsInLos(int allyTeam) const;
 	void PostLoad();
 	// (re)allocate and fill the batched-draw world transform slot from pos/facing
 	void InitWorldTransform();
@@ -42,6 +43,8 @@ public:
 	// per-instance palette (equal to team unless a custom Lua color palette was assigned).
 	uint8_t team;
 	uint16_t paletteIndex;
+	bool requiresSonar;
+	bool sonarDetectable;
 
 	size_t currentIconIndex;
 
