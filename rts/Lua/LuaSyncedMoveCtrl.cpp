@@ -463,7 +463,7 @@ int LuaSyncedMoveCtrl::SetHeading(lua_State* L)
 	if (moveType == nullptr)
 		return 0;
 
-	const short heading = (short)luaL_checknumber(L, 2);
+	const short heading = static_cast<short>(luaL_checkint(L, 2));
 	ASSERT_SYNCED((short)heading);
 	moveType->SetHeading(heading);
 	return 0;

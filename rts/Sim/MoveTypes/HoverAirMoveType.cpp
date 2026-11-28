@@ -671,9 +671,9 @@ void CHoverAirMoveType::UpdateHeading()
 	const short deltaHeading = refHeading - owner->heading;
 
 	if (deltaHeading > 0) {
-		owner->AddHeading(std::min(deltaHeading, short( turnRate)), owner->IsOnGround(), false, 0.0f);
+		owner->AddHeading(std::min(deltaHeading, FloatToHeading( turnRate)), owner->IsOnGround(), false, 0.0f);
 	} else {
-		owner->AddHeading(std::max(deltaHeading, short(-turnRate)), owner->IsOnGround(), false, 0.0f);
+		owner->AddHeading(std::max(deltaHeading, FloatToHeading(-turnRate)), owner->IsOnGround(), false, 0.0f);
 	}
 }
 
