@@ -235,7 +235,7 @@ bool CUnitHandler::AddUnit(CUnit* unit)
 bool CUnitHandler::GarbageCollectUnit(unsigned int id)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (inUpdateCall)
+	if (inUpdateCall || units[id] == nullptr || units[id]->IsPreDeleting())
 		return false;
 
 	assert(unitsToBeRemoved.empty());
@@ -262,7 +262,7 @@ void CUnitHandler::QueueDeleteUnits()
 bool CUnitHandler::QueueDeleteUnit(CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!unit->deathScriptFinished)
+	if (unit->IsPreDeleting() || !unit->deathScriptFinished)
 		return false;
 
 	// there are many ways to fiddle with "deathScriptFinished", so a unit may
@@ -278,8 +278,13 @@ void CUnitHandler::DeleteUnits()
 {
 	ZoneScopedC(tracy::Color::Goldenrod);
 	while (!unitsToBeRemoved.empty()) {
-		DeleteUnit(unitsToBeRemoved.back());
+		// DeleteUnit may run synced Lua which is allowed to
+		// trigger another immediate deletion, so do not leave this entry
+		// in the queue while the callin is active
+		CUnit* delUnit = unitsToBeRemoved.back();
+
 		unitsToBeRemoved.pop_back();
+		DeleteUnit(delUnit);
 	}
 }
 
@@ -288,7 +293,10 @@ void CUnitHandler::DeleteUnit(CUnit* delUnit)
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(delUnit->isDead);
 
-	// we want to call RenderUnitDestroyed while the unit is still valid
+	const int previousDeletingRefID = CSolidObject::GetDeletingRefID();
+	// Lua may prune virtual references while the complete unit is still readable.
+	// Do not notify native dependants here: they must run after native teardown.
+	delUnit->SetPreDeleting(true);
 	eventHandler.RenderUnitDestroyed(delUnit);
 
 	const auto it = std::find(activeUnits.begin(), activeUnits.end(), delUnit);
@@ -314,15 +322,18 @@ void CUnitHandler::DeleteUnit(CUnit* delUnit)
 	idPool.FreeID(delUnit->id, true);
 
 	units[delUnit->id] = nullptr;
+	// The ID is now inaccessible. Native destruction keeps its original semantics.
+	delUnit->SetPreDeleting(false);
 
 	entt::entity delUnitEntity = delUnit->entityReference;
 
 	CSolidObject::SetDeletingRefID(delUnit->id);
 	unitMemPool.free(delUnit);
-	CSolidObject::SetDeletingRefID(-1);
+	CSolidObject::SetDeletingRefID(previousDeletingRefID);
 
 	assert( Sim::registry.valid(delUnitEntity) );
 	Sim::registry.destroy(delUnitEntity);
+
 }
 
 void CUnitHandler::UpdateUnitMoveTypes()

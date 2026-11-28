@@ -13,6 +13,7 @@ CR_REG_METADATA(CObject, (
 	CR_MEMBER(sync_id),
 
 	CR_MEMBER(detached),
+	CR_MEMBER(preDeleting),
 
 	CR_MEMBER(listening),
 	CR_MEMBER(listeners),
@@ -104,6 +105,9 @@ CObject::~CObject()
 //   to waste memory
 void CObject::AddDeathDependence(CObject* obj, DependenceType dep)
 {
+	if (preDeleting || obj->preDeleting)
+		return;
+
 	assert(!detached && !obj->detached);
 
 	// check this explicitly

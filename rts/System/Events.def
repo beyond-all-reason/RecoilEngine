@@ -48,6 +48,8 @@
 	SETUP_EVENT(UnitReverseBuilt,        MANAGED_BIT)
 	SETUP_EVENT(UnitConstructionDecayed, MANAGED_BIT)
 	SETUP_EVENT(UnitDestroyed,           MANAGED_BIT)
+	SETUP_EVENT(RenderUnitDestroyed,     MANAGED_BIT)
+	SETUP_EVENT(UnitAttackTargetChanged,             MANAGED_BIT)
 	SETUP_EVENT(UnitTaken,               MANAGED_BIT)
 	SETUP_EVENT(UnitGiven,               MANAGED_BIT)
 
@@ -183,7 +185,6 @@
 
 	SETUP_EVENT(RenderUnitPreCreated,     MANAGED_BIT | UNSYNCED_BIT)
 	SETUP_EVENT(RenderUnitCreated,      MANAGED_BIT | UNSYNCED_BIT)
-	SETUP_EVENT(RenderUnitDestroyed,    MANAGED_BIT | UNSYNCED_BIT)
 
 	SETUP_EVENT(RenderFeaturePreCreated,MANAGED_BIT | UNSYNCED_BIT)
 	SETUP_EVENT(RenderFeatureCreated,   MANAGED_BIT | UNSYNCED_BIT)

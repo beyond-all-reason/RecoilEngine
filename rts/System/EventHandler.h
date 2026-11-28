@@ -1,8 +1,9 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef EVENT_HANDLER_H
-#define EVENT_HANDLER_H
+#pragma once
 
+#include <cstdint>
+#include <deque>
 #include <string>
 #include <vector>
 
@@ -76,6 +77,8 @@ class CEventHandler
 		void UnitConstructionDecayed(const CUnit* unit, float timeSinceLastBuild, float iterationPeriod, float part);
 		void UnitFromFactory(const CUnit* unit, const CUnit* factory, bool userOrders);
 		void UnitDestroyed(const CUnit* unit, const CUnit* attacker, int weaponDefID);
+		void QueueUnitAttackTargetChange(const CUnit& unit, const SWeaponTarget& oldTarget, const SWeaponTarget& newTarget, bool neutralized);
+		void DispatchUnitAttackTargetChanges();
 		void UnitTaken(const CUnit* unit, int oldTeam, int newTeam);
 		void UnitGiven(const CUnit* unit, int oldTeam, int newTeam);
 
@@ -377,6 +380,18 @@ class CEventHandler
 
 	private:
 		EventMap eventMap;
+
+		struct AttackTargetChange {
+			int unitID;
+			int unitDefID;
+			int unitTeam;
+			entt::entity unitEntity;
+			UnitAttackTarget oldTarget;
+			UnitAttackTarget newTarget;
+			entt::entity neutralizedTarget;
+		};
+		std::deque<AttackTargetChange> attackTargetChanges;
+		std::uint64_t deliveredTargetChanges = 0;
 
 		EventClientList handles;
 
@@ -817,5 +832,3 @@ inline void CEventHandler::RenderProjectileDestroyed(const CProjectile* proj)
 #undef UNIT_CALLIN_NO_PARAM
 #undef UNIT_CALLIN_INT_PARAMS
 #undef UNIT_CALLIN_LOS_PARAM
-
-#endif /* EVENT_HANDLER_H */

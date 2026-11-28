@@ -94,11 +94,11 @@ bool LuaSyncedMoveCtrl::PushMoveCtrl(lua_State* L)
 
 
 
-static inline CUnit* ParseUnit(lua_State* L, const char* caller, int index)
+static inline CUnit* ParseUnit(lua_State* L, const char* caller, int index, bool allowFinalizing = false)
 {
 	CUnit* unit = unitHandler.GetUnit(luaL_checkint(L, index));
 
-	if (unit == nullptr)
+	if (unit == nullptr || (unit->IsPreDeleting() && !allowFinalizing))
 		return nullptr;
 	if (!CanControlUnit(L, unit))
 		return nullptr;
@@ -107,9 +107,9 @@ static inline CUnit* ParseUnit(lua_State* L, const char* caller, int index)
 }
 
 
-static inline CScriptMoveType* ParseScriptMoveType(lua_State* L, const char* caller, int index)
+static inline CScriptMoveType* ParseScriptMoveType(lua_State* L, const char* caller, int index, bool allowFinalizing = false)
 {
-	CUnit* unit = ParseUnit(L, caller, index);
+	CUnit* unit = ParseUnit(L, caller, index, allowFinalizing);
 
 	if (unit == nullptr)
 		return nullptr;
@@ -144,7 +144,7 @@ static inline DerivedMoveType* ParseDerivedMoveType(lua_State* L, const char* ca
  */
 int LuaSyncedMoveCtrl::IsEnabled(lua_State* L)
 {
-	CUnit* unit = ParseUnit(L, __func__, 1);
+	CUnit* unit = ParseUnit(L, __func__, 1, true);
 
 	if (unit == nullptr)
 		return 0;
@@ -212,7 +212,7 @@ int LuaSyncedMoveCtrl::SetTag(lua_State* L)
  */
 int LuaSyncedMoveCtrl::GetTag(lua_State* L)
 {
-	CScriptMoveType* moveType = ParseScriptMoveType(L, __func__, 1);
+	CScriptMoveType* moveType = ParseScriptMoveType(L, __func__, 1, true);
 
 	if (moveType == nullptr)
 		return 0;

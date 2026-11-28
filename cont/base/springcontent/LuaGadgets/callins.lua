@@ -52,6 +52,7 @@ CALLIN_LIST = {
 	"UnitReverseBuilt",
 	"UnitConstructionDecayed",
 	"UnitDestroyed",
+	"UnitAttackTargetChanged",
 	"RenderUnitDestroyed",
 	"UnitExperience",
 	"UnitIdle",

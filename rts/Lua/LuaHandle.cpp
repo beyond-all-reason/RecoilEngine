@@ -1288,6 +1288,73 @@ void CLuaHandle::UnitDestroyed(const CUnit* unit, const CUnit* attacker, int wea
 }
 
 
+static void PushUnitAttackTarget(lua_State* L, const UnitAttackTarget& target)
+{
+	lua_createtable(L, 0, 6);
+	switch (target.type) {
+		case Target_Unit: {
+			LuaPushNamedString(L, "type", "unit");
+			LuaPushNamedNumber(L, "unitID", target.unitID);
+		} break;
+		case Target_Pos: {
+			LuaPushNamedString(L, "type", "ground");
+			LuaPushNamedNumber(L, "x", target.groundPos.x);
+			LuaPushNamedNumber(L, "y", target.groundPos.y);
+			LuaPushNamedNumber(L, "z", target.groundPos.z);
+		} break;
+		default: LuaPushNamedString(L, "type", "none"); break;
+	}
+	LuaPushNamedBool(L, "isUserTarget", target.isUserTarget);
+	LuaPushNamedBool(L, "isManualFire", target.isManualFire);
+}
+
+/*** Called for changes to the unit-wide attack target, including ground targets,
+ * changes of targeting flags, and loss of a target. Individual weapons can aim
+ * independently. Only full-read synced handles receive this event.
+ * Changes are delivered in order before GameFramePost or after native neutral
+ * queue cleanup. Changes made during delivery wait for the next dispatch.
+ * A destroyed source, or a deleted neutralized target, cancels pending delivery.
+ * Snapshots describe the transition; a target ID can since have been deleted.
+ * @function Callins:UnitAttackTargetChanged
+ * @param unitID UnitID
+ * @param unitDefID UnitDefID
+ * @param unitTeam TeamID
+ * @param oldTarget table Fields: type ("none", "unit", "ground"), unitID or x/y/z, isUserTarget, isManualFire.
+ * @param newTarget table Same fields as oldTarget.
+ * @param reason string "neutralized" for SetNeutral queue cleanup, otherwise "changed".
+ * @return integer[]? Only for "neutralized": tags to erase with the same semantics as native Attack/Fight cleanup.
+ */
+std::vector<int> CLuaHandle::UnitAttackTargetChanged(int unitID, int unitDefID, int unitTeam, const UnitAttackTarget& oldTarget, const UnitAttackTarget& newTarget, bool neutralized)
+{
+	LUA_CALL_IN_CHECK(L);
+	luaL_checkstack(L, 12, __func__);
+	const LuaUtils::ScopedDebugTraceBack traceBack(L);
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return {};
+
+	lua_pushnumber(L, unitID);
+	lua_pushnumber(L, unitDefID);
+	lua_pushnumber(L, unitTeam);
+	PushUnitAttackTarget(L, oldTarget);
+	PushUnitAttackTarget(L, newTarget);
+	lua_pushstring(L, neutralized ? "neutralized" : "changed");
+	if (!RunCallInTraceback(L, cmdStr, 6, neutralized ? 1 : 0, traceBack.GetErrFuncIdx(), false) || !neutralized)
+		return {};
+	std::vector<int> tags;
+	if (lua_istable(L, -1)) {
+		for (int i = 1, count = lua_objlen(L, -1); i <= count; ++i) {
+			lua_rawgeti(L, -1, i);
+			if (lua_isnumber(L, -1))
+				tags.push_back(lua_toint(L, -1));
+			lua_pop(L, 1);
+		}
+	}
+	lua_pop(L, 1);
+	return tags;
+}
+
+
 /*** Called when a unit is transferred between teams. This is called before `UnitGiven` and in that moment unit is still assigned to the oldTeam.
  *
  * @function Callins:UnitTaken
@@ -2062,7 +2129,10 @@ void CLuaHandle::UnitArrivedAtGoal(const CUnit* unit)
 }
 
 
-/*** Called just before a unit is invalid, after it finishes its death animation.
+/*** Called in synced and unsynced code after the death script finishes, immediately
+ * before native teardown. The unit is still readable. Synced gadgets can prune
+ * virtual references here. Orders and new dependencies on the unit are rejected.
+ * Native death dependencies are notified later, during destruction.
  *
  * @function Callins:RenderUnitDestroyed
  *

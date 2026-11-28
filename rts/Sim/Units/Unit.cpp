@@ -1,5 +1,8 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include <utility>
+#include <vector>
+
 #include "System/RangesCompat.h"
 #include "UnitDef.h"
 #include "Unit.h"
@@ -1744,16 +1747,27 @@ void CUnit::SetNeutral(bool b) {
 
 	// stop any units targeting us manually or automatically
 	// TestTarget tests for neutrality only if !isUserTarget
+	//
+	// finish all native queue cleanup before entering Lua, so a callin
+	// can not invalidate the remaining listener snapshot entries
+	bool targetChanged = false;
+
 	for (int i = 0, n = unitIDs[0]; i < n; i++) {
 		CUnit* unit = unitHandler.GetUnit(unitIDs[1 + i]);
-		CCommandAI* cai = unit->commandAI;
+
+		if (unit == nullptr)
+			continue;
 
 		if (unit->curTarget.type != Target_Unit || unit->curTarget.unit != this)
 			continue;
 
-		unit->DropCurrentAttackTarget();
-		cai->StopAttackingTargetIf([&](const CUnit* t) { return (t == this); });
+		unit->SetAttackTarget(SWeaponTarget(), true);
+		unit->commandAI->StopAttackingTargetIf([&](const CUnit* t) { return (t == this); });
+		targetChanged = true;
 	}
+
+	if (targetChanged)
+		eventHandler.DispatchUnitAttackTargetChanges();
 }
 
 
@@ -1779,6 +1793,9 @@ bool CUnit::IsIdle() const
 bool CUnit::AttackUnit(CUnit* targetUnit, bool isUserTarget, bool wantManualFire, bool fpsMode)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (IsPreDeleting() || (targetUnit != nullptr && targetUnit->IsPreDeleting()))
+		return false;
+
 	// don't self-target
 	if (targetUnit == this)
 		return false;
@@ -1791,11 +1808,8 @@ bool CUnit::AttackUnit(CUnit* targetUnit, bool isUserTarget, bool wantManualFire
 	SWeaponTarget newTarget = SWeaponTarget(targetUnit, isUserTarget);
 	newTarget.isManualFire = wantManualFire || fpsMode;
 
-	if (curTarget != newTarget) {
-		DropCurrentAttackTarget();
-		curTarget = newTarget;
-		AddDeathDependence(targetUnit, DEPENDENCE_TARGET);
-	}
+	if (curTarget != newTarget)
+		SetAttackTarget(newTarget);
 
 	bool ret = false;
 	for (CWeapon* w: weapons) {
@@ -1810,10 +1824,8 @@ bool CUnit::AttackGround(const float3& pos, bool isUserTarget, bool wantManualFi
 	SWeaponTarget newTarget = SWeaponTarget(pos, isUserTarget);
 	newTarget.isManualFire = wantManualFire || fpsMode;
 
-	if (curTarget != newTarget) {
-		DropCurrentAttackTarget();
-		curTarget = newTarget;
-	}
+	if (curTarget != newTarget)
+		SetAttackTarget(newTarget);
 
 	bool ret = false;
 	for (CWeapon* w: weapons) {
@@ -1825,7 +1837,13 @@ bool CUnit::AttackGround(const float3& pos, bool isUserTarget, bool wantManualFi
 
 void CUnit::DropCurrentAttackTarget()
 {
+	SetAttackTarget(SWeaponTarget());
+}
+
+void CUnit::SetAttackTarget(const SWeaponTarget& target, bool neutralized)
+{
 	RECOIL_DETAILED_TRACY_ZONE;
+	eventHandler.QueueUnitAttackTargetChange(*this, curTarget, target, neutralized);
 	if (curTarget.type == Target_Unit)
 		DeleteDeathDependence(curTarget.unit, DEPENDENCE_TARGET);
 
@@ -1834,7 +1852,9 @@ void CUnit::DropCurrentAttackTarget()
 			w->DropCurrentTarget();
 	}
 
-	curTarget = SWeaponTarget();
+	curTarget = target;
+	if (curTarget.type == Target_Unit)
+		AddDeathDependence(curTarget.unit, DEPENDENCE_TARGET);
 }
 
 

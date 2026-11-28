@@ -3,6 +3,8 @@
 #include "System/EventHandler.h"
 
 #include "Game/GameHelper.h"
+#include "Sim/Units/UnitHandler.h"
+#include "Sim/Units/CommandAI/CommandAI.h"
 #include "Lua/LuaCallInCheck.h"
 #include "Lua/LuaOpenGL.h"  // FIXME -- should be moved
 
@@ -35,6 +37,8 @@ CEventHandler::CEventHandler()
 void CEventHandler::ResetState()
 {
 	mouseOwner = nullptr;
+	attackTargetChanges.clear();
+	deliveredTargetChanges = 0;
 
 	eventMap.clear();
 	eventMap.reserve(64);
@@ -565,7 +569,66 @@ void CEventHandler::GameFrame(int gameFrame)
 void CEventHandler::GameFramePost(int gameFrame)
 {
 	ZoneScoped;
+	DispatchUnitAttackTargetChanges();
 	ITERATE_EVENTCLIENTLIST(GameFramePost, gameFrame);
+}
+
+void CEventHandler::QueueUnitAttackTargetChange(const CUnit& unit, const SWeaponTarget& oldTarget, const SWeaponTarget& newTarget, bool neutralized)
+{
+	if (listUnitAttackTargetChanged.empty() || oldTarget == newTarget)
+		return;
+
+	const auto snapshot = [](const SWeaponTarget& target) -> UnitAttackTarget {
+		int id = -1;
+		if (target.type == Target_Unit) {
+			// Death dependants can drop their target from the CObject destructor,
+			// when the derived CUnit and its ID are no longer readable.
+			const CObject* object = target.unit;
+			id = object->detached ? CSolidObject::GetDeletingRefID() : target.unit->id;
+		}
+		return {target.type, target.groundPos, id, target.isUserTarget, target.isManualFire};
+	};
+
+	attackTargetChanges.push_back({unit.id, unit.unitDef->id, unit.team, unit.entityReference, snapshot(oldTarget), snapshot(newTarget),
+		neutralized ? oldTarget.unit->entityReference : entt::null});
+}
+
+void CEventHandler::DispatchUnitAttackTargetChanges()
+{
+	// A listener may change targets again. Bound this dispatch to the changes
+	// already queued. Nested SetNeutral must finish its own cleanup before it
+	// returns to Lua, and may therefore consume the rest of our batch.
+	const auto end = deliveredTargetChanges + attackTargetChanges.size();
+	while (deliveredTargetChanges < end) {
+		++deliveredTargetChanges;
+		const auto change = attackTargetChanges.front();
+		attackTargetChanges.pop_front();
+		const bool neutralized = (change.neutralizedTarget != entt::null);
+		const auto canDeliver = [&]() {
+			const CUnit* source = unitHandler.GetUnit(change.unitID);
+			if (source == nullptr || source->entityReference != change.unitEntity)
+				return false;
+			if (!neutralized)
+				return true;
+			const CUnit* target = unitHandler.GetUnit(change.oldTarget.unitID);
+			return target != nullptr && target->entityReference == change.neutralizedTarget;
+		};
+
+		std::vector<int> removedTags;
+		for (size_t i = 0; i < listUnitAttackTargetChanged.size(); ) {
+			if (!canDeliver())
+				break;
+
+			CEventClient* ec = listUnitAttackTargetChanged[i];
+			if (ec->GetSynced() && ec->GetFullRead()) {
+				const auto tags = ec->UnitAttackTargetChanged(change.unitID, change.unitDefID, change.unitTeam, change.oldTarget, change.newTarget, neutralized);
+				removedTags.insert(removedTags.end(), tags.begin(), tags.end());
+			}
+			i += (i < listUnitAttackTargetChanged.size() && ec == listUnitAttackTargetChanged[i]);
+		}
+		if (neutralized && !removedTags.empty() && canDeliver())
+			unitHandler.GetUnit(change.unitID)->commandAI->RemoveCommandsByTag(removedTags);
+	}
 }
 
 void CEventHandler::GameProgress(int gameFrame)
