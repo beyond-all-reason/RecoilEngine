@@ -145,7 +145,7 @@ static int findindex (lua_State *L, Table *t, StkId key) {
     Node *n = mainposition(t, key);
     do {  /* check whether `key' is somewhere in the chain */
       /* key may be dead already, but it is ok to use it in `next' */
-      if (luaO_rawequalObj(key2tval(n), key) ||
+      if (luaO_rawequalObj_inl(key2tval(n), key) ||
             (ttype(gkey(n)) == LUA_TDEADKEY && iscollectable(key) &&
              gcvalue(gkey(n)) == gcvalue(key))) {
         i = cast_int(n - gnode(t, 0));  /* key index in hash table */
@@ -435,18 +435,25 @@ static TValue *newkey (lua_State *L, Table *t, const TValue *key) {
 */
 const TValue *luaH_getnum (Table *t, int key) {
   /* (1 <= key && key <= t->sizearray) */
-  if (lua_cast(unsigned int, key-1) < lua_cast(unsigned int, t->sizearray))
+  if (lua_cast(unsigned int, key) - 1u < lua_cast(unsigned int, t->sizearray))
     return &t->array[key-1];
-  else {
-    lua_Number nk = cast_num(key);
-    Node *n = hashnum(t, nk);
-    do {  /* check whether `key' is somewhere in the chain */
-      if (ttisnumber(gkey(n)) && luai_numeq(nvalue(gkey(n)), nk))
-        return gval(n);  /* that's it */
-      else n = gnext(n);
-    } while (n);
-    return luaO_nilobject;
-  }
+  else
+    return luaH_getnumhash(t, key);
+}
+
+
+/*
+** hash-part half of luaH_getnum (Recoil: split out for luaH_getnum_inl)
+*/
+const TValue *luaH_getnumhash (Table *t, int key) {
+  lua_Number nk = cast_num(key);
+  Node *n = hashnum(t, nk);
+  do {  /* check whether `key' is somewhere in the chain */
+    if (ttisnumber(gkey(n)) && luai_numeq(nvalue(gkey(n)), nk))
+      return gval(n);  /* that's it */
+    else n = gnext(n);
+  } while (n);
+  return luaO_nilobject;
 }
 
 
@@ -454,13 +461,7 @@ const TValue *luaH_getnum (Table *t, int key) {
 ** search function for strings
 */
 const TValue *luaH_getstr (Table *t, TString *key) {
-  Node *n = hashstr(t, key);
-  do {  /* check whether `key' is somewhere in the chain */
-    if (ttisstring(gkey(n)) && rawtsvalue(gkey(n)) == key)
-      return gval(n);  /* that's it */
-    else n = gnext(n);
-  } while (n);
-  return luaO_nilobject;
+  return luaH_getstr_inl(t, key);
 }
 
 
@@ -482,7 +483,7 @@ const TValue *luaH_get (Table *t, const TValue *key) {
     default: {
       Node *n = mainposition(t, key);
       do {  /* check whether `key' is somewhere in the chain */
-        if (luaO_rawequalObj(key2tval(n), key))
+        if (luaO_rawequalObj_inl(key2tval(n), key))
           return gval(n);  /* that's it */
         else n = gnext(n);
       } while (n);
