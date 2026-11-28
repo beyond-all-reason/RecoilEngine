@@ -925,7 +925,7 @@ void CMobileCAI::ExecuteAttack(Command& c)
 					StopMoveAndFinishCommand();
 					return;
 				}
-				if (SkipCrashingTarget(targetUnit)) {
+				if (SkipTarget(targetUnit)) {
 					StopMoveAndFinishCommand();
 					return;
 				}
@@ -960,7 +960,7 @@ void CMobileCAI::ExecuteAttack(Command& c)
 		StopMoveAndFinishCommand();
 		return;
 	}
-	if (SkipCrashingTarget(orderTarget)) {
+	if (SkipTarget(orderTarget)) {
 		owner->DropCurrentAttackTarget();
 		StopMoveAndFinishCommand();
 		return;
