@@ -132,6 +132,7 @@ add_library(engineSim STATIC
 		"${CMAKE_CURRENT_SOURCE_DIR}/Units/UnitDef.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Units/UnitDefHandler.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Units/UnitHandler.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Units/GhostSightings.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Units/UnitLoader.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Units/UnitToolTipMap.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Units/UnitTypes/Builder.cpp"

@@ -250,10 +250,10 @@ bool CEventHandler::CommandFallback(const CUnit* unit, const Command& cmd)
 }
 
 
-bool CEventHandler::AllowCommand(const CUnit* unit, const Command& cmd, int playerNum, bool fromSynced, bool fromLua)
+bool CEventHandler::AllowCommand(const CUnit* unit, const Command& cmd, int playerNum, bool fromSynced, bool fromLua, bool& clearKeepHeight)
 {
 	ZoneScoped;
-	return ControlIterateDefTrue(listAllowCommand, &CEventClient::AllowCommand, unit, cmd, playerNum, fromSynced, fromLua);
+	return ControlIterateDefTrue(listAllowCommand, &CEventClient::AllowCommand, unit, cmd, playerNum, fromSynced, fromLua, clearKeepHeight);
 }
 
 
@@ -752,6 +752,17 @@ DRAW_CALLIN(InMiniMapBackground)
 		return skipEngineDrawing;                                             \
   }
 
+
+bool CEventHandler::DrawGhost(const GhostDrawInfo& info)
+{
+	for (size_t i = 0; i < listDrawGhost.size(); ) {
+		CEventClient* ec = listDrawGhost[i];
+		if (ec->DrawGhost(info))
+			return true;
+		i += (i < listDrawGhost.size() && ec == listDrawGhost[i]);
+	}
+	return false;
+}
 
 DRAW_ENTITY_CALLIN(Unit, (const CUnit* unit), (unit))
 DRAW_ENTITY_CALLIN(Feature, (const CFeature* feature), (feature))

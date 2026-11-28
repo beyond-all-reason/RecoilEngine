@@ -1,6 +1,8 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "LuaHandle.h"
+#include "Rendering/Units/GhostDrawInfo.h"
+#include "Sim/Units/GhostSightings.h"
 #include "lua_privileges.h"
 
 #include "LuaGaia.h"
@@ -1645,8 +1647,15 @@ void CLuaHandle::LosCallIn(const LuaHashString& hs,
 		lua_pushnumber(L, unit->unitDef->id);
 	}
 
-	// call the routine
-	RunCallIn(L, hs, GetHandleFullRead(L) ? 4 : 2, 0);
+	int args = GetHandleFullRead(L) ? 4 : 2;
+	if (GetHandleFullRead(L) && unit->leavesGhost) {
+		const auto id = ghostSightings.LiveKey(allyTeam, unit->id);
+		if (id != 0) {
+			lua_pushnumber(L, id);
+			++args;
+		}
+	}
+	RunCallIn(L, hs, args, 0);
 }
 
 
@@ -1660,6 +1669,7 @@ void CLuaHandle::LosCallIn(const LuaHashString& hs,
  * @param unitTeam TeamID
  * @param allyTeam AllyTeamID
  * @param unitDefID UnitDefID
+ * @param ghostID integer? Observer's sighting, when available to full-read handles.
  */
 void CLuaHandle::UnitEnteredRadar(const CUnit* unit, int allyTeam)
 {
@@ -1679,6 +1689,7 @@ void CLuaHandle::UnitEnteredRadar(const CUnit* unit, int allyTeam)
  * @param unitTeam TeamID
  * @param allyTeam AllyTeamID who's LOS the unit entered.
  * @param unitDefID UnitDefID
+ * @param ghostID integer? Observer's sighting, when available to full-read handles.
  */
 void CLuaHandle::UnitEnteredLos(const CUnit* unit, int allyTeam)
 {
@@ -1699,6 +1710,7 @@ void CLuaHandle::UnitEnteredLos(const CUnit* unit, int allyTeam)
  * @param unitTeam TeamID
  * @param allyTeam AllyTeamID
  * @param unitDefID UnitDefID
+ * @param ghostID integer? Observer's sighting, when available to full-read handles.
  */
 void CLuaHandle::UnitLeftRadar(const CUnit* unit, int allyTeam)
 {
@@ -1718,6 +1730,7 @@ void CLuaHandle::UnitLeftRadar(const CUnit* unit, int allyTeam)
  * @param unitTeam TeamID
  * @param allyTeam AllyTeamID
  * @param unitDefID UnitDefID
+ * @param ghostID integer? Observer's sighting, when available to full-read handles.
  */
 void CLuaHandle::UnitLeftLos(const CUnit* unit, int allyTeam)
 {
@@ -2896,6 +2909,42 @@ void CLuaHandle::RunDrawCallIn(const LuaHashString& hs)
 	RunCallIn(L, hs, 0, 0);
 
 	LuaOpenGL::SetDrawingEnabled(L, false);
+}
+
+/*** Replace the rendering of an observer's stored ghost. Return true only when drawn.
+ * @function Callins:DrawGhost
+ * @param info table Observer-specific ghostID and teamColor (RGBA) captured at loss of LOS.
+ * @return boolean suppressEngineDraw
+ */
+bool CLuaHandle::DrawGhost(const GhostDrawInfo& info)
+{
+	if (GetSynced() || !CanReadAllyTeam(info.allyTeam))
+		return false;
+	LUA_CALL_IN_CHECK(L, false);
+	luaL_checkstack(L, 24, __func__);
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return false;
+	lua_createtable(L, 0, 2);
+	lua_pushnumber(L, info.ghostID);
+	lua_setfield(L, -2, "ghostID");
+	lua_createtable(L, 4, 0);
+	for (int i = 0; i < 4; ++i) {
+		lua_pushnumber(L, info.teamColor[i]);
+		lua_rawseti(L, -2, i + 1);
+	}
+	lua_setfield(L, -2, "teamColor");
+	const bool oldDrawState = LuaOpenGL::IsDrawingEnabled(L);
+	LuaOpenGL::SetDrawingEnabled(L, true);
+	LuaOpenGL::SetGhostDrawContext(L, &info);
+	const bool success = RunCallIn(L, cmdStr, 1, 1);
+	LuaOpenGL::SetGhostDrawContext(L, nullptr);
+	LuaOpenGL::SetDrawingEnabled(L, oldDrawState);
+	if (!success)
+		return false;
+	const bool handled = lua_isboolean(L, -1) && lua_toboolean(L, -1);
+	lua_pop(L, 1);
+	return handled;
 }
 
 #define DRAW_CALLIN(name)                     \

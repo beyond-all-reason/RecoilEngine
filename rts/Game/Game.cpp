@@ -97,6 +97,7 @@
 #include "Sim/Units/CommandAI/CommandAI.h"
 #include "Sim/Units/Scripts/UnitScriptFactory.h"
 #include "Sim/Units/Scripts/UnitScriptEngine.h"
+#include "Sim/Units/GhostSightings.h"
 #include "Sim/Units/UnitHandler.h"
 #include "Sim/Units/UnitDefHandler.h"
 #include "Sim/Weapons/WeaponDefHandler.h"
@@ -1843,11 +1844,10 @@ void CGame::SimFrame() {
 			unitHandler.UpdatePostAnimation();
 		}
 		envResHandler.Update();
+		// Use the same LOS map that produced this frame's unit contact transitions.
+		if (ghostSightings.ExpireVisibleSites())
+			CUnitDrawer::UpdateGhostedBuildings();
 		losHandler->Update();
-		// dead ghosts have to be updated in sim, after los,
-		// to make sure they represent the current knowledge correctly.
-		// should probably be split from drawer
-		CUnitDrawer::UpdateGhostedBuildings();
 		interceptHandler.Update(false);
 
 		teamHandler.GameFrame(gs->frameNum);

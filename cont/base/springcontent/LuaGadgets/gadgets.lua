@@ -1045,6 +1045,15 @@ function gadgetHandler:DrawUnit(unitID, drawMode)
   return false
 end
 
+function gadgetHandler:DrawGhost(info)
+  for _,g in r_ipairs(self.DrawGhostList) do
+    if g:DrawGhost(info) then
+      return true
+    end
+  end
+  return false
+end
+
 function gadgetHandler:DrawFeature(featureID, drawMode)
   for _,g in r_ipairs(self.DrawFeatureList) do
     if (g:DrawFeature(featureID, drawMode)) then
@@ -1552,30 +1561,30 @@ function gadgetHandler:UnitGiven(unitID, unitDefID, unitTeam, oldTeam)
 end
 
 
-function gadgetHandler:UnitEnteredRadar(unitID, unitTeam, allyTeam, unitDefID)
+function gadgetHandler:UnitEnteredRadar(unitID, unitTeam, allyTeam, unitDefID, ghostID)
   for _,g in r_ipairs(self.UnitEnteredRadarList) do
-    g:UnitEnteredRadar(unitID, unitTeam, allyTeam, unitDefID)
+    g:UnitEnteredRadar(unitID, unitTeam, allyTeam, unitDefID, ghostID)
   end
 end
 
 
-function gadgetHandler:UnitEnteredLos(unitID, unitTeam, allyTeam, unitDefID)
+function gadgetHandler:UnitEnteredLos(unitID, unitTeam, allyTeam, unitDefID, ghostID)
   for _,g in r_ipairs(self.UnitEnteredLosList) do
-    g:UnitEnteredLos(unitID, unitTeam, allyTeam, unitDefID)
+    g:UnitEnteredLos(unitID, unitTeam, allyTeam, unitDefID, ghostID)
   end
 end
 
 
-function gadgetHandler:UnitLeftRadar(unitID, unitTeam, allyTeam, unitDefID)
+function gadgetHandler:UnitLeftRadar(unitID, unitTeam, allyTeam, unitDefID, ghostID)
   for _,g in r_ipairs(self.UnitLeftRadarList) do
-    g:UnitLeftRadar(unitID, unitTeam, allyTeam, unitDefID)
+    g:UnitLeftRadar(unitID, unitTeam, allyTeam, unitDefID, ghostID)
   end
 end
 
 
-function gadgetHandler:UnitLeftLos(unitID, unitTeam, allyTeam, unitDefID)
+function gadgetHandler:UnitLeftLos(unitID, unitTeam, allyTeam, unitDefID, ghostID)
   for _,g in r_ipairs(self.UnitLeftLosList) do
-    g:UnitLeftLos(unitID, unitTeam, allyTeam, unitDefID)
+    g:UnitLeftLos(unitID, unitTeam, allyTeam, unitDefID, ghostID)
   end
 end
 

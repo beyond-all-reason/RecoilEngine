@@ -3360,10 +3360,9 @@ int LuaUnsyncedRead::WorldToScreenCoords(lua_State* L)
  * @param includeSky boolean? (Default: `false`)
  * @param ignoreWater boolean? (Default: `false`)
  * @param heightOffset number? (Default: `0`)
- * @return string? description of traced position
- * @return UnitID|FeatureID|string|xyz|nil unitID or feature, position triple when onlyCoords=true
- * @return FeatureID|string|nil featureID or ground
- * @return xyz? coords
+ * @param includeGhosts boolean? Opt in to remembered model hits in the world view. A model hit returns "ghost" and its radar unit ID or, without contact, its sighting ID. Radar icon hits return "unit" and the unit ID.
+ * @return ("unit"|"feature"|"ground"|"sky"|"ghost")? description Type of the traced object or position.
+ * @return UnitID|FeatureID|integer|xyz|nil result Unit, feature or ghost sighting ID, or world coordinates.
  */
 int LuaUnsyncedRead::TraceScreenRay(lua_State* L)
 {
@@ -3427,6 +3426,16 @@ int LuaUnsyncedRead::TraceScreenRay(lua_State* L)
 	// trace for player's allyteam
 	const float traceDist = TraceRay::GuiTraceRay(camPos, pxlDir, rawRange, nullptr, unit, feature, true, onlyCoords, ignoreWater);
 	const float planeDist = CGround::LinePlaneCol(camPos, pxlDir, rawRange, luaL_optnumber(L, newArgIdx, 0.0f));
+
+	if (!onlyCoords && optArgIdx == 3 && luaL_optboolean(L, 8, false)) {
+		const float targetID = CUnitDrawer::TraceGhost(camPos, pxlDir, traceDist >= 0.0f ? traceDist : rawRange, unit);
+		if (targetID >= 0) {
+			lua_pushliteral(L, "ghost");
+			lua_pushnumber(L, targetID);
+			return 2;
+		}
+	}
+
 
 	const float3 tracePos = camPos + (pxlDir * traceDist);
 	const float3 planePos = camPos + (pxlDir * planeDist); // backup (for includeSky and onlyCoords)

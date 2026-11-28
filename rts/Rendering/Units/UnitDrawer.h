@@ -54,6 +54,7 @@ public:
 	//static void UpdateStatic(); //use base
 public:
 	// Interface with CUnitDrawerData
+	static float TraceGhost(const float3& start, const float3& dir, float length, const CUnit* excludeUnit) { return modelDrawerData->TraceGhost(start, dir, length, excludeUnit); }
 	static void UpdateGhostedBuildings() { modelDrawerData->UpdateGhostedBuildings(); }
 
 	static uint32_t GetUnitDefImage(const UnitDef* ud) { return modelDrawerData->GetUnitDefImage(ud); }
@@ -81,7 +82,7 @@ public:
 	static const std::vector<CUnit*>& GetUnsortedUnits() { return modelDrawerData->GetUnsortedObjects(); }
 
 	static void ClearPreviousDrawFlags() { modelDrawerData->ClearPreviousDrawFlags(); }
-	static void UnitLeavesGhostChanged(const CUnit* unit, const bool leaveDeadGhost) { modelDrawerData->UnitLeavesGhostChanged(unit, leaveDeadGhost); }
+	static void UnitLeavesGhostChanged(const CUnit* unit) { modelDrawerData->UnitLeavesGhostChanged(unit); }
 
 	static void UpdateCurrentUnitIcon(const CUnit* unit) { modelDrawerData->UpdateCurrentUnitIcon(unit); }
 public:

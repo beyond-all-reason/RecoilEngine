@@ -24,6 +24,17 @@
 #include "System/SpringMath.h"
 #include "System/Log/ILog.h"
 
+static float3 GetCommandDrawPosition(const Command& command, bool followGround)
+{
+	float3 pos = command.GetPos(0);
+	if ((command.GetOpts() & KEEP_TARGET_HEIGHT) != 0)
+		return pos;
+	if (followGround)
+		pos.y = CGround::GetHeightReal(pos.x, pos.z, false);
+	pos.y += 3.0f;
+	return pos;
+}
+
 static const CUnit* GetTrackableUnit(const CUnit* caiOwner, const CUnit* cmdUnit)
 {
 	if (cmdUnit == nullptr)
@@ -123,11 +134,7 @@ void CommandDrawer::DrawCommands(const CCommandAI* cai, int queueDrawDepth) cons
 				} else {
 					assert(ci->GetNumParams() >= 3);
 
-					const float x = ci->GetParam(0);
-					const float z = ci->GetParam(2);
-					const float y = CGround::GetHeightReal(x, z, false) + 3.0f;
-
-					lineDrawer.DrawLineAndIcon(cmdID, float3(x, y, z), cmdColors.attack);
+					lineDrawer.DrawLineAndIcon(cmdID, GetCommandDrawPosition(*ci, true), cmdColors.attack);
 				}
 			} break;
 
@@ -189,11 +196,7 @@ void CommandDrawer::DrawAirCAICommands(const CAirCAI* cai, int queueDrawDepth) c
 				} else {
 					assert(ci->GetNumParams() >= 3);
 
-					const float x = ci->GetParam(0);
-					const float z = ci->GetParam(2);
-					const float y = CGround::GetHeightReal(x, z, false) + 3.0f;
-
-					lineDrawer.DrawLineAndIcon(cmdID, float3(x, y, z), cmdColors.attack);
+					lineDrawer.DrawLineAndIcon(cmdID, GetCommandDrawPosition(*ci, true), cmdColors.attack);
 				}
 			} break;
 
@@ -314,11 +317,7 @@ void CommandDrawer::DrawBuilderCAICommands(const CBuilderCAI* cai, int queueDraw
 				} else {
 					assert(ci->GetNumParams() >= 3);
 
-					const float x = ci->GetParam(0);
-					const float z = ci->GetParam(2);
-					const float y = CGround::GetHeightReal(x, z, false) + 3.0f;
-
-					lineDrawer.DrawLineAndIcon(cmdID, float3(x, y, z), cmdColors.attack);
+					lineDrawer.DrawLineAndIcon(cmdID, GetCommandDrawPosition(*ci, true), cmdColors.attack);
 				}
 			} break;
 
@@ -427,13 +426,13 @@ void CommandDrawer::DrawFactoryCAICommands(const CFactoryCAI* cai, int queueDraw
 
 		switch (cmdID) {
 			case CMD_MOVE: {
-				lineDrawer.DrawLineAndIcon(cmdID, ci->GetPos(0) + UpVector * 3.0f, cmdColors.move);
+				lineDrawer.DrawLineAndIcon(cmdID, GetCommandDrawPosition(*ci, false), cmdColors.move);
 			} break;
 			case CMD_FIGHT: {
-				lineDrawer.DrawLineAndIcon(cmdID, ci->GetPos(0) + UpVector * 3.0f, cmdColors.fight);
+				lineDrawer.DrawLineAndIcon(cmdID, GetCommandDrawPosition(*ci, false), cmdColors.fight);
 			} break;
 			case CMD_PATROL: {
-				lineDrawer.DrawLineAndIcon(cmdID, ci->GetPos(0) + UpVector * 3.0f, cmdColors.patrol);
+				lineDrawer.DrawLineAndIcon(cmdID, GetCommandDrawPosition(*ci, false), cmdColors.patrol);
 			} break;
 
 			case CMD_ATTACK: {
@@ -446,11 +445,7 @@ void CommandDrawer::DrawFactoryCAICommands(const CFactoryCAI* cai, int queueDraw
 				} else {
 					assert(ci->GetNumParams() >= 3);
 
-					const float x = ci->GetParam(0);
-					const float z = ci->GetParam(2);
-					const float y = CGround::GetHeightReal(x, z, false) + 3.0f;
-
-					lineDrawer.DrawLineAndIcon(cmdID, float3(x, y, z), cmdColors.attack);
+					lineDrawer.DrawLineAndIcon(cmdID, GetCommandDrawPosition(*ci, true), cmdColors.attack);
 				}
 			} break;
 
@@ -537,11 +532,7 @@ void CommandDrawer::DrawMobileCAICommands(const CMobileCAI* cai, int queueDrawDe
 				}
 
 				if (ci->GetNumParams() >= 3) {
-					const float x = ci->GetParam(0);
-					const float z = ci->GetParam(2);
-					const float y = CGround::GetHeightReal(x, z, false) + 3.0f;
-
-					lineDrawer.DrawLineAndIcon(cmdID, float3(x, y, z), cmdColors.attack);
+					lineDrawer.DrawLineAndIcon(cmdID, GetCommandDrawPosition(*ci, true), cmdColors.attack);
 				}
 			} break;
 
@@ -628,7 +619,7 @@ void CommandDrawer::DrawDefaultCommand(const Command& c, const CUnit* owner) con
 		case  1: {         } break;
 		case  2: {         } break;
 		default: {
-			const float3 endPos = c.GetPos(0) + UpVector * 3.0f;
+			const float3 endPos = GetCommandDrawPosition(c, false);
 
 			if (!dd->showArea || (c.GetNumParams() < 4)) {
 				lineDrawer.DrawLineAndIcon(dd->cmdIconID, endPos, dd->color);

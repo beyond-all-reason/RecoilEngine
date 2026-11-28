@@ -2,6 +2,8 @@
 
 #include "LuaSyncedRead.h"
 
+#include <cmath>
+
 #include "LuaInclude.h"
 
 #include "LuaConfig.h"
@@ -59,6 +61,7 @@
 #include "Sim/Units/QueuedBuildOverlap.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
+#include "Sim/Units/GhostSightings.h"
 #include "Sim/Units/UnitHandler.h"
 #include "Sim/Units/UnitDefHandler.h"
 #include "Sim/Units/UnitLoader.h"
@@ -193,6 +196,8 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetUnitsInPlanes);
 	REGISTER_LUA_CFUNC(GetUnitsInSphere);
 	REGISTER_LUA_CFUNC(GetUnitsInCylinder);
+	REGISTER_LUA_CFUNC(GetGhostsInCylinder);
+	REGISTER_LUA_CFUNC(GetGhostPosition);
 
 	REGISTER_LUA_CFUNC(GetUnitArrayCentroid);
 	REGISTER_LUA_CFUNC(GetUnitMapCentroid);
@@ -8389,6 +8394,71 @@ static int GetEffectiveLosAllyTeam(lua_State* L, int arg)
 	return (luaL_argerror(L, arg, "Invalid allyTeam"));
 }
 
+
+/*** Get remembered buildings whose last observed aimpoint is within a horizontal radius.
+ * Includes radar contacts with a remembered model. Results expose only the observer's snapshot.
+ * @function Spring.GetGhostsInCylinder
+ * @param x number
+ * @param z number
+ * @param radius number
+ * @param allyTeamID integer? Observing allyteam. Required for full-read handles without a specific read allyteam.
+ * @return integer[] ghostIDs Observer-specific sighting IDs.
+ */
+int LuaSyncedRead::GetGhostsInCylinder(lua_State* L)
+{
+	const float x = luaL_checkfloat(L, 1);
+	const float z = luaL_checkfloat(L, 2);
+	const float radius = luaL_checkfloat(L, 3);
+	luaL_argcheck(L, radius >= 0.0f, 3, "expected a nonnegative radius");
+	const int at = GetEffectiveLosAllyTeam(L, 4);
+	lua_newtable(L);
+	if (at == CEventClient::NoAccessTeam)
+		return 1;
+	luaL_argcheck(L, teamHandler.IsValidAllyTeam(at), 4, "expected an observing allyteam");
+	const float3 center(x, 0.0f, z);
+	const float radiusSq = radius * radius;
+	int count = 0;
+	for (const auto& [key, ghost] : ghostSightings.ForAllyTeam(at)) {
+		if (!(ghost.aimPos.SqDistance2D(center) <= radiusSq))
+			continue;
+		lua_pushnumber(L, key);
+		lua_rawseti(L, -2, ++count);
+	}
+	return 1;
+}
+
+
+/*** Read the frozen aimpoint of one sighting belonging to the observing allyteam.
+ * @function Spring.GetGhostPosition
+ * @param ghostID integer
+ * @param allyTeamID AllyTeamID? Required for full-read handles without a read allyteam.
+ * @return number? aimX
+ * @return number? aimY
+ * @return number? aimZ
+ * @return UnitID? contact Only while the same unit is currently in LOS or radar.
+ */
+int LuaSyncedRead::GetGhostPosition(lua_State* L)
+{
+	const lua_Number id = luaL_checknumber(L, 1);
+	const int at = GetEffectiveLosAllyTeam(L, 2);
+	if (at == CEventClient::NoAccessTeam)
+		return 0;
+	luaL_argcheck(L, teamHandler.IsValidAllyTeam(at), 2, "expected an observing allyteam");
+	if (!(id >= 1) || !std::isfinite(id))
+		return 0;
+	const auto* ghost = ghostSightings.Find(at, id);
+	if (ghost == nullptr)
+		return 0;
+	for (int i = 0; i < 3; ++i)
+		lua_pushnumber(L, ghost->aimPos[i]);
+	if (ghost->unitID < 0)
+		return 3;
+	const CUnit* unit = unitHandler.GetUnit(ghost->unitID);
+	if (unit == nullptr || !(unit->losStatus[at] & (LOS_INLOS | LOS_INRADAR)))
+		return 3;
+	lua_pushnumber(L, unit->id);
+	return 4;
+}
 
 /***
  *

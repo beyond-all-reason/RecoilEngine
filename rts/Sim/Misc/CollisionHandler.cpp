@@ -200,6 +200,23 @@ bool CCollisionHandler::Collision(const CollisionVolume* v, const CMatrix44f& m,
 
 
 bool CCollisionHandler::MouseHit(
+	const CollisionVolume* v,
+	const CMatrix44f& m,
+	const float3& p0,
+	const float3& p1,
+	CollisionQuery* cq
+) {
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (cq != nullptr)
+		cq->Reset();
+	if (v->IgnoreHits())
+		return false;
+
+	return Intersect(v, m, p0, p1, cq);
+}
+
+
+bool CCollisionHandler::MouseHit(
 	const CSolidObject* o,
 	const CMatrix44f& m,
 	const float3& p0,

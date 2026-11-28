@@ -167,6 +167,7 @@ CALLIN_LIST = {
 	"DrawInMiniMap",
 
 	"DrawUnit",
+	"DrawGhost",
 	"DrawFeature",
 	"DrawShield",
 	"DrawProjectile",

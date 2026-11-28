@@ -1,9 +1,14 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 #pragma once
 
+#include <array>
 #include <ranges>
+#include <unordered_map>
 
 #include "System/float3.h"
+#include "System/float4.h"
+#include "System/Matrix44f.h"
+#include "Sim/Misc/CollisionVolume.h"
 #include "Rendering/Common/ModelDrawerData.h"
 #include "Rendering/UnitDefImage.h"
 #include "Game/GlobalUnsynced.h"
@@ -16,38 +21,37 @@ namespace GL {
 	struct GeometryBuffer;
 }
 
+// Frozen at LOS loss. Never read a hidden unit to resolve a player's target.
+struct GhostTarget {
+	CR_DECLARE_STRUCT(GhostTarget)
+	float sightingKey = 0;
+	CMatrix44f modelTransform;
+	float4 teamColor;
+	std::string modelName;
+	const S3DModel* GetModel() const;
+	mutable const S3DModel* model = nullptr;
+	float3 midPos;
+	float radius = 0.0f;
+	size_t iconIndex = 0;
+	CMatrix44f selectionTransform;
+	CollisionVolume selectionVolume;
+	bool selectable = false;
+	bool minimapIcon = true;
+};
+
 class GhostSolidObject {
 	CR_DECLARE_STRUCT(GhostSolidObject)
 public:
-	void IncRef() { (refCount++); }
-	bool DecRef() { return ((refCount--) > 1); }
-	const S3DModel* GetModel() const;
 	void PostLoad();
-	// (re)allocate and fill the batched-draw world transform slot from pos/facing
-	void InitWorldTransform();
-public:
-	std::string modelName;
-
-	float3 pos;
-	float3 midPos;
-	float3 dir;
-	float radius;
-	float iconRadius;
-
-	int refCount;
-	int facing; //FIXME replaced with dir-vector just legacy decal drawer uses this
-
+	GhostTarget target;
 	// color identity captured when the ghost was created; a ghost keeps the color it was last
 	// seen under. team drives the legacy (GLSL) team-color path, paletteIndex drives the GL4
 	// per-instance palette (equal to team unless a custom Lua color palette was assigned).
 	uint8_t team;
 	uint16_t paletteIndex;
 
-	size_t currentIconIndex;
 
 	ScopedTransformMemAlloc worldTransformAlloc;
-private:
-	mutable const S3DModel* model;
 };
 
 class CUnitDrawerData : public CUnitDrawerDataBase {
@@ -74,9 +78,9 @@ public:
 
 	void PlayerChanged(int playerID) override;
 
-	bool UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost);
-	void UnitLeavesGhostChanged(const CUnit* unit, const bool leaveDeadGhost);
-	void ReviewPrevLos(const CUnit* unit);
+	bool UpdateUnitGhosts(const CUnit* unit);
+	void UnitLeavesGhostChanged(const CUnit* unit);
+	float TraceGhost(const float3& start, const float3& dir, float length, const CUnit* excludeUnit) const;
 public:
 	class TempDrawUnit {
 		CR_DECLARE_STRUCT(TempDrawUnit)
@@ -103,6 +107,7 @@ public:
 	struct LiveGhostBuilding {
 		CR_DECLARE_STRUCT(LiveGhostBuilding)
 		CUnit* unit = nullptr;
+		GhostTarget target;
 		uint16_t paletteIndex = 0;
 		uint8_t team = 0;
 	};
@@ -174,8 +179,8 @@ public:
 	}
 
 	// world transform slot (in transformsMemStorage) for a live ghost building; INVALID_INDEX if none
-	size_t GetLiveGhostTransform(const CUnit* unit) const {
-		const auto it = liveGhostTransforms.find(unit);
+	size_t GetLiveGhostTransform(float ghostID) const {
+		const auto it = liveGhostTransforms.find(ghostID);
 		return (it != liveGhostTransforms.end()) ? it->second.first.GetOffset(false) : TransformsMemStorage::INVALID_INDEX;
 	}
 
@@ -223,8 +228,8 @@ private:
 	// rebuilds the per-unit world transform slots for live ghost buildings of the local allyTeam.
 	// scan-based so it self-heals across savegame load, allyTeam/spectator changes and leavesGhost toggles.
 	void UpdateLiveGhostTransforms();
-	// maps unit -> { RAII-owned world transform slot, last sweep stamp seen }
-	spring::unordered_map<const CUnit*, std::pair<ScopedTransformMemAlloc, int>> liveGhostTransforms;
+	// maps sighting ID -> { RAII-owned world transform slot, last sweep stamp seen }
+	std::unordered_map<float, std::pair<ScopedTransformMemAlloc, int>> liveGhostTransforms;
 	int liveGhostSweepStamp = 0;
 
 	// icons

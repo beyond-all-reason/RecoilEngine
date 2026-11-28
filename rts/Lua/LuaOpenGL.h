@@ -10,6 +10,7 @@
 #include "Lua/LuaHandle.h"
 
 struct lua_State;
+struct GhostDrawInfo;
 
 
 class LuaOpenGL {
@@ -36,6 +37,7 @@ class LuaOpenGL {
 		static bool IsDrawingEnabled(lua_State* L) { return GetLuaContextData(L)->drawingEnabled; }
 		static void SetDrawingEnabled(lua_State* L, bool value) { GetLuaContextData(L)->drawingEnabled = value; }
 
+		static void SetGhostDrawContext(lua_State* L, const GhostDrawInfo* info);
 		static bool CanUseShaders() { return canUseShaders; }
 
 		static bool GetSafeMode() { return safeMode; }
@@ -288,6 +290,7 @@ class LuaOpenGL {
 		static int UnitCommon(lua_State* L, bool applyTransform, bool callDrawUnit);
 
 		static int Unit(lua_State* L);
+		static int GhostRaw(lua_State* L);
 		static int UnitRaw(lua_State* L);
 		static int UnitTextures(lua_State* L);
 		static int UnitShape(lua_State* L);

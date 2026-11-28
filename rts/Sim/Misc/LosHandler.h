@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LOS_HANDLER_H
-#define LOS_HANDLER_H
+#pragma once
 
 #include <vector>
 #include <deque>
@@ -261,7 +260,8 @@ public:
 	// returns whether a square is being sonar-jammed
 	// (even when the square is not in sonar-coverage)
 	bool InSonarJammer(const float3 pos, int allyTeam) const;
-	bool InSonarJammer(const CUnit* unit, int allyTeam) const;
+
+	bool InSonar(const float3 pos, int allyTeam, int targetAllyTeam) const;
 
 
 	bool InSeismicDistance(const CUnit* unit, int allyTeam) const {
@@ -333,5 +333,3 @@ private:
 
 
 extern CLosHandler* losHandler;
-
-#endif /* LOS_HANDLER_H */
