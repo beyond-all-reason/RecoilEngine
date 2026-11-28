@@ -51,6 +51,8 @@
 
 #include "System/Misc/TracyDefs.h"
 
+#include <limits>
+
 #endif
 
 CR_BIND_INTERFACE(CUnitScript)
@@ -1229,7 +1231,16 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		if (shield == nullptr)
 			return -1;
 
-		return int(static_cast<const CPlasmaRepulser*>(shield)->GetCurPower() * float(COBSCALE));
+		// shieldPower * COBSCALE leaves int range from a charge of 32768 up, and an
+		// out-of-range float->int conversion is undefined: x86 (cvttss2si) gives
+		// INT_MIN, ARM64 (fcvtzs) saturates to INT_MAX, so a COB script branching
+		// on it (the Cortex high-level commander does) desyncs across them. Give
+		// every platform the x86 result the fleet computes. Recoil issue #3421.
+		const float scaled = static_cast<const CPlasmaRepulser*>(shield)->GetCurPower() * float(COBSCALE);
+		if (scaled >= -2147483648.0f && scaled < 2147483648.0f)
+			return int(scaled);
+
+		return std::numeric_limits<int>::min();
 	} break;
 
 	case STEALTH: {
