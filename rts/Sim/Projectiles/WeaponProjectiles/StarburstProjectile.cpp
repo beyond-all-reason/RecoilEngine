@@ -252,8 +252,13 @@ void CStarburstProjectile::UpdateTrajectory()
 	}
 
 	// stage "out of fuel"
-	// changes dir and speed.w, must keep speed-vector in sync
-	SetDirectionAndSpeed((dir + (UpVector * mygravity)).Normalize(), speed.w - mygravity);
+  if (mygravity > 0.0f) {
+    SetVelocityAndSpeed(speed + UpVector * mygravity);
+    return;
+  }
+
+  // changes dir and speed.w, must keep speed-vector in sync
+  SetDirectionAndSpeed((dir + (UpVector * mygravity)).Normalize(), speed.w - mygravity);
 }
 
 

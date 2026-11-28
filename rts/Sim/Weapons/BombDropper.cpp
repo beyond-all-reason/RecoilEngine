@@ -43,39 +43,45 @@ CBombDropper::CBombDropper(CUnit* owner, const WeaponDef* def, bool useTorps)
 	maxForwardAngleDif = -1.0f;
 }
 
-
 float CBombDropper::GetPredictedImpactTime(const float3& impactPos) const
 {
-	RECOIL_DETAILED_TRACY_ZONE;
-	if (weaponMuzzlePos.y <= impactPos.y)
-		return 0.0f;
+  RECOIL_DETAILED_TRACY_ZONE;
 
-	// Definitions:
-	// d := (mostly negative) distance from plane to explosion position
-	// v := vertical plane speed (bomb starts with it)
-	// g := myGravity (negative)
-	//
-	// We want to solve:    d = v * t + 0.5 * g * t^2
-	//                  <=> 0 = t^2 + (2v/g) * t - (2d/g)
-	//                             -> a=2v/g    b=-(2d/g)
-	// Using pq-formula there are 2 solutions (we want the t>0 +solution):
-	//                 x(+,-) = -p +- sqrt((p^2 - q)  with p=a/2   q=b
-	//             =>         = -v/g + sqrt(v^2/g^2 + 2d/g)
-	//            <=>         = -v/g + sqrt( (v^2 + 2dg)/g^2 )
-	//            <=>         = -v/g + sqrt(v^2 + 2dg) / |g|
-	// Now we use (g is negative!):  +1/|g| = +1/(-g) = -1/g
-	//             =>         = (-v - sqrt(v^2 + 2dg)) / g
-	//            <=>         = -(v + sqrt(v^2 + 2dg)) / g
+  if (weaponMuzzlePos.y <= impactPos.y)
+    return 0.0f;
 
-	const float d = impactPos.y - weaponMuzzlePos.y;
-	const float v = owner->speed.y;
-	const float g = (weaponDef->myGravity == 0) ? mapInfo->map.gravity: -weaponDef->myGravity;
+  const float heightDifference = impactPos.y - weaponMuzzlePos.y;
+  const float verticalVelocity = owner->speed.y;
+  const float gravityAcceleration = (weaponDef->myGravity == 0.0f)
+    ? mapInfo->map.gravity
+    : -weaponDef->myGravity;
 
-	const float tt = v*v + 2.f * d * g;
+  if (gravityAcceleration == 0.0f) {
+    if (verticalVelocity >= 0.0f)
+      return 0.0f;
 
-	return ((tt >= 0.0f)? ((-v - math::sqrt(tt)) / g) : 0.0f);
+    return heightDifference / verticalVelocity;
+  }
+
+  const float discriminant = verticalVelocity * verticalVelocity
+    + 2.0f * heightDifference * gravityAcceleration;
+
+  if (discriminant < 0.0f)
+    return 0.0f;
+
+  const float discriminantRoot = math::sqrt(discriminant);
+
+  // Avoid subtracting nearly equal values when gravity is weak.
+  if (verticalVelocity < 0.0f) {
+    return -2.0f * heightDifference / (-verticalVelocity + discriminantRoot);
+  }
+
+  // A bomb moving upward cannot reach a lower target under upward gravity.
+  if (gravityAcceleration > 0.0f)
+    return 0.0f;
+
+  return (-verticalVelocity - discriminantRoot) / gravityAcceleration;
 }
-
 
 bool CBombDropper::TestTarget(const float3& pos, const SWeaponTarget& trg) const
 {
