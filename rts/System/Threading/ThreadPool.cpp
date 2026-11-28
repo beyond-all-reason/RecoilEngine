@@ -59,7 +59,17 @@ struct ThreadStats {
 
 
 // external background threads which are only joined on exit
-static std::vector< spring::thread > extThreads;
+// a fatal error can call exit() before ClearExtJobs runs, and destroying a
+// joinable thread calls std::terminate, so detach whatever is left instead
+struct ExtThreadVector : public std::vector< spring::thread > {
+	~ExtThreadVector() {
+		for (auto& t: *this) {
+			if (t.joinable())
+				t.detach();
+		}
+	}
+};
+static ExtThreadVector extThreads;
 static std::vector< std::future<void> > extFutures;
 
 static _threadlocal bool inMultiThreadedSection(false);
@@ -716,7 +726,8 @@ void AddExtJob(std::future<void>&& f) {
 
 static void JoinExtThreads() {
 	for (auto& t: extThreads) {
-		t.join();
+		if (t.joinable())
+			t.join();
 	}
 
 	extThreads.clear();
