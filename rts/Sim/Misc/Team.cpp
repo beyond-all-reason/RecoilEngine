@@ -45,6 +45,7 @@ CR_REG_METADATA(CTeam, (
 	CR_MEMBER(resPrevExpense),
 	CR_MEMBER(resShare),
 	CR_MEMBER(resDelayedShare),
+	CR_MEMBER(resExcessThisFrame),
 	CR_MEMBER(resSent),
 	CR_MEMBER(resPrevSent),
 	CR_MEMBER(resReceived),
@@ -119,63 +120,6 @@ void CTeam::ClampStartPosInStartBox(float3* pos) const
 	pos->z = ipos.y;
 }
 
-
-bool CTeam::UseMetal(float amount)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	if (res.metal < amount)
-		return false;
-
-	res.metal -= amount;
-	resExpense.metal += amount;
-	return true;
-}
-
-bool CTeam::UseEnergy(float amount)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	if (res.energy < amount)
-		return false;
-
-	res.energy -= amount;
-	resExpense.energy += amount;
-	return true;
-}
-
-
-
-void CTeam::AddMetal(float amount, bool useIncomeMultiplier)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	if (useIncomeMultiplier)
-		amount *= GetIncomeMultiplier();
-
-	res.metal += amount;
-	resIncome.metal += amount;
-
-	if (res.metal <= resStorage.metal)
-		return;
-
-	resDelayedShare.metal += (res.metal - resStorage.metal);
-	res.metal = resStorage.metal;
-}
-
-void CTeam::AddEnergy(float amount, bool useIncomeMultiplier)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	if (useIncomeMultiplier)
-		amount *= GetIncomeMultiplier();
-
-	res.energy += amount;
-	resIncome.energy += amount;
-
-	if (res.energy > resStorage.energy) {
-		resDelayedShare.energy += (res.energy - resStorage.energy);
-		res.energy = resStorage.energy;
-	}
-}
-
-
 bool CTeam::HaveResources(const SResourcePack& amount) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -196,7 +140,7 @@ void CTeam::AddResources(SResourcePack amount, bool useIncomeMultiplier)
 		if (res[i] <= resStorage[i])
 			continue;
 
-		resDelayedShare[i] += (res[i] - resStorage[i]);
+		resExcessThisFrame[i] += (res[i] - resStorage[i]);
 		res[i] = resStorage[i];
 	}
 }

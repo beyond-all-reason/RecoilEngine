@@ -30,6 +30,8 @@
 #include "System/Log/ILog.h"
 #include "System/Sound/ISoundChannels.h"
 
+#include "Rendering/Env/NanoParticles/NanoParticleEmitter.h"
+#include "Rendering/Env/NanoParticles/NanoParticleSystem.h"
 #include "System/Misc/TracyDefs.h"
 
 using std::min;
@@ -350,7 +352,7 @@ bool CBuilder::UpdateBuild(const Command& fCommand)
 		adjBuildSpeed = std::min(repairSpeed, unitDef->maxRepairSpeed * 0.5f - curBuildee->repairAmount); // repair
 
 	if (adjBuildSpeed > 0.0f && curBuildee->AddBuildPower(this, adjBuildSpeed)) {
-		CreateNanoParticle(curBuildee->midPos, curBuildee->radius * 0.5f, false);
+		CreateNanoParticle(curBuildee->midPos, curBuildee->radius * 0.5f, false, false, curBuildee, true);
 		return true;
 	}
 
@@ -516,7 +518,7 @@ bool CBuilder::UpdateCapture(const Command& fCommand)
 	curCapturee->captureProgress += captureProgressStep;
 	curCapturee->captureProgress = std::min(curCapturee->captureProgress, 1.0f);
 
-	CreateNanoParticle(curCapturee->midPos, curCapturee->radius * 0.7f, false, true);
+	CreateNanoParticle(curCapturee->midPos, curCapturee->radius * 0.7f, false, true, curCapturee);
 
 	if (curCapturee->captureProgress < 1.0f)
 		return true;
@@ -605,6 +607,15 @@ void CBuilder::SetRepairTarget(CUnit* target)
 void CBuilder::SetReclaimTarget(CSolidObject* target)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// A target already being destroyed (detached) cannot have a death dependence
+	// registered (AddDeathDependence no-ops on detached objects), which would leave
+	// curReclaim dangling. This happens when ~CObject's DependentDied cascade re-enters
+	// reclaim logic mid-deletion (e.g. CBuilderCAI::ExecuteGuard reading a guardee's
+	// stale curReclaim) on the very feature being freed. Refuse the dead target.
+	assert(target != nullptr);
+	if (target->detached)
+		return;
+
 	if (dynamic_cast<CFeature*>(target) != nullptr && !static_cast<CFeature*>(target)->def->reclaimable)
 		return;
 
@@ -630,6 +641,11 @@ void CBuilder::SetReclaimTarget(CSolidObject* target)
 void CBuilder::SetResurrectTarget(CFeature* target)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// see SetReclaimTarget: never depend on an object that is already being destroyed
+	assert(target != nullptr);
+	if (target->detached)
+		return;
+
 	if (curResurrect == target || target->udef == nullptr)
 		return;
 
@@ -646,6 +662,11 @@ void CBuilder::SetResurrectTarget(CFeature* target)
 void CBuilder::SetCaptureTarget(CUnit* target)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// see SetReclaimTarget: never depend on an object that is already being destroyed
+	assert(target != nullptr);
+	if (target->detached)
+		return;
+
 	if (target == curCapture)
 		return;
 
@@ -957,9 +978,14 @@ void CBuilder::HelpTerraform(CBuilder* unit)
 }
 
 
-void CBuilder::CreateNanoParticle(const float3& goal, float radius, bool inverse, bool highPriority)
+void CBuilder::CreateNanoParticle(const float3& goal, float radius, bool inverse, bool highPriority, const CUnit* targetUnit, bool fadeWhenTargetComplete)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (NanoParticles::system.Enabled()) {
+		NanoParticles::emitter.EmitBuilderSpray(this, goal, radius, inverse, highPriority, targetUnit, fadeWhenTargetComplete);
+		return;
+	}
+
 	const int modelNanoPiece = nanoPieceCache.GetNanoPiece(script);
 
 	if (!localModel.Initialized() || !localModel.HasPiece(modelNanoPiece))

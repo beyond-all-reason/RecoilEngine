@@ -8,11 +8,9 @@
 //
 // Description:
 //
-// Loads DDS images (DXTC1, DXTC3, DXTC5, RGB (888, 888X), and RGBA (8888) are
-// supported) for use in OpenGL. Image is flipped when its loaded as DX images
-// are stored with different coordinate system. If file has mipmaps and/or
-// cubemaps then these are loaded as well. Volume textures can be loaded as
-// well but they must be uncompressed.
+// Loads DDS images for use in OpenGL. DXT1, DXT3, DXT5, BC4, BC5, BC7,
+// RGB (888, 888X), and RGBA (8888) are supported. Images are flipped to match
+// OpenGL coordinates, except BC7. Volume textures must be uncompressed.
 //
 // When multiple textures are loaded (i.e a volume or cubemap texture),
 // additional faces can be accessed using the array operator.
@@ -185,6 +183,7 @@ using namespace nv_dds;
 CDDSImage::CDDSImage()
   : m_format(0),
     m_components(0),
+    m_dataType(GL_UNSIGNED_BYTE),
     m_type(TextureNone),
     m_valid(false)
 {
@@ -349,6 +348,24 @@ bool CDDSImage::load(string filename, bool flipImage)
 	file.Read(&ddsh.dwCaps2, tmp);
 	file.Read(&ddsh.dwReserved2, tmp*3);
 
+    const bool hasDX10Header = ((swabDWord(ddsh.ddspf.dwFlags) & DDSF_FOURCC) && swabDWord(ddsh.ddspf.dwFourCC) == FOURCC_DX10);
+    DDS_HEADER_DXT10 ddsh10 = {0, 0, 0, 1, 0};
+    if (hasDX10Header)
+	{
+        if (file.Read(&ddsh10.dxgiFormat, tmp) != tmp ||
+            file.Read(&ddsh10.resourceDimension, tmp) != tmp ||
+            file.Read(&ddsh10.miscFlag, tmp) != tmp ||
+            file.Read(&ddsh10.arraySize, tmp) != tmp ||
+            file.Read(&ddsh10.miscFlags2, tmp) != tmp)
+            return false;
+
+		ddsh10.dxgiFormat = swabDWord(ddsh10.dxgiFormat);
+		ddsh10.resourceDimension = swabDWord(ddsh10.resourceDimension);
+		ddsh10.miscFlag = swabDWord(ddsh10.miscFlag);
+		ddsh10.arraySize = swabDWord(ddsh10.arraySize);
+		ddsh10.miscFlags2 = swabDWord(ddsh10.miscFlags2);
+	}
+
 	// if in VFS, read post-header data directly from buffer
 	if (file.IsBuffered()) {
 		fileBuf = std::move(file.GetBuffer());
@@ -374,16 +391,29 @@ bool CDDSImage::load(string filename, bool flipImage)
 	ddsh.dwCaps1 = swabDWord(ddsh.dwCaps1);
 	ddsh.dwCaps2 = swabDWord(ddsh.dwCaps2);
 
+    if (hasDX10Header &&
+        (ddsh10.arraySize != 1 ||
+         (ddsh10.resourceDimension != DX10_DIMENSION_TEXTURE2D && ddsh10.resourceDimension != DX10_DIMENSION_TEXTURE3D) ||
+         ((ddsh10.miscFlag & DX10_MISC_TEXTURECUBE) && ddsh10.resourceDimension != DX10_DIMENSION_TEXTURE2D)))
+		return false;
+
 	// default to flat texture type (1D, 2D, or rectangle)
 	m_type = TextureFlat;
 
-	// check if image is a cubemap
-	if (ddsh.dwCaps2 & DDSF_CUBEMAP)
-		m_type = TextureCubemap;
+	if (hasDX10Header) {
+		if (ddsh10.miscFlag & DX10_MISC_TEXTURECUBE)
+			m_type = TextureCubemap;
+		else if (ddsh10.resourceDimension == DX10_DIMENSION_TEXTURE3D)
+			m_type = Texture3D;
+	} else {
+		// check if image is a cubemap
+		if (ddsh.dwCaps2 & DDSF_CUBEMAP)
+			m_type = TextureCubemap;
 
-	// check if image is a volume texture
-	if ((ddsh.dwCaps2 & DDSF_VOLUME) && (ddsh.dwDepth > 0))
-		m_type = Texture3D;
+		// check if image is a volume texture
+		if ((ddsh.dwCaps2 & DDSF_VOLUME) && (ddsh.dwDepth > 0))
+			m_type = Texture3D;
+	}
 
 	// figure out what the image format is
 	if (ddsh.ddspf.dwFlags & DDSF_FOURCC)
@@ -401,6 +431,69 @@ bool CDDSImage::load(string filename, bool flipImage)
 			case FOURCC_DXT5:
 				m_format = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
 				m_components = 4;
+				break;
+			case FOURCC_ATI1:
+			case FOURCC_BC4U:
+				m_format = GL_COMPRESSED_RED_RGTC1;
+				m_components = 1;
+				break;
+			case FOURCC_ATI2:
+			case FOURCC_BC5U:
+				m_format = GL_COMPRESSED_RG_RGTC2;
+				m_components = 2;
+				break;
+			case D3DFMT_R16F:
+				set_float16_format(GL_RED, GL_R16F, 1);
+				break;
+			case D3DFMT_G16R16F:
+				set_float16_format(GL_RG, GL_RG16F, 2);
+				break;
+			case D3DFMT_A16B16G16R16F:
+				set_float16_format(GL_RGBA, GL_RGBA16F, 4);
+				break;
+			case FOURCC_DX10:
+				switch (ddsh10.dxgiFormat)
+				{
+					case DXGI_FORMAT_R16_FLOAT:
+						set_float16_format(GL_RED, GL_R16F, 1);
+						break;
+					case DXGI_FORMAT_R16G16_FLOAT:
+						set_float16_format(GL_RG, GL_RG16F, 2);
+						break;
+					case DXGI_FORMAT_R16G16B16A16_FLOAT:
+						set_float16_format(GL_RGBA, GL_RGBA16F, 4);
+						break;
+					case DXGI_FORMAT_BC1_UNORM:
+						m_format = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
+						m_components = 3;
+						break;
+					case DXGI_FORMAT_BC2_UNORM:
+						m_format = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
+						m_components = 4;
+						break;
+					case DXGI_FORMAT_BC3_UNORM:
+						m_format = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+						m_components = 4;
+						break;
+					case DXGI_FORMAT_BC4_UNORM:
+						m_format = GL_COMPRESSED_RED_RGTC1;
+						m_components = 1;
+						break;
+					case DXGI_FORMAT_BC5_UNORM:
+						m_format = GL_COMPRESSED_RG_RGTC2;
+						m_components = 2;
+						break;
+					case DXGI_FORMAT_BC7_UNORM:
+						m_format = GL_COMPRESSED_RGBA_BPTC_UNORM;
+						m_components = 4;
+						break;
+					case DXGI_FORMAT_BC7_UNORM_SRGB:
+						m_format = GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM;
+						m_components = 4;
+						break;
+					default:
+						return false;
+				}
 				break;
 			default:
 				//fclose(fp);
@@ -433,6 +526,11 @@ bool CDDSImage::load(string filename, bool flipImage)
 		fclose(fp);
 		#endif
 		return false;
+	}
+
+	if (flipImage && (m_format == GL_COMPRESSED_RGBA_BPTC_UNORM || m_format == GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM)) {
+		LOG_L(L_WARNING, "[nv_dds] cannot vertically flip BC7 image \"%s\", author it pre-flipped", filename.c_str());
+		flipImage = false;
 	}
 
 	// store primary surface width/height/depth
@@ -578,6 +676,16 @@ bool CDDSImage::save(std::string filename, bool flipImage) const
     assert(m_valid);
     assert(m_type != TextureNone);
 
+    // writing float formats is not supported
+    if (is_float())
+        return false;
+
+    if (is_compressed() &&
+        m_format != GL_COMPRESSED_RGBA_S3TC_DXT1_EXT &&
+        m_format != GL_COMPRESSED_RGBA_S3TC_DXT3_EXT &&
+        m_format != GL_COMPRESSED_RGBA_S3TC_DXT5_EXT)
+        return false;
+
     DDS_HEADER ddsh;
     unsigned int headerSize = sizeof(DDS_HEADER);
     memset(&ddsh, 0, headerSize);
@@ -716,10 +824,30 @@ void CDDSImage::clear()
 	RECOIL_DETAILED_TRACY_ZONE;
     m_components = 0;
     m_format = 0;
+    m_internalFormat = 0;
+    m_dataType = GL_UNSIGNED_BYTE;
+    m_bytesPerComponent = 1;
     m_type = TextureNone;
     m_valid = false;
 
     m_images.clear();
+}
+
+bool CDDSImage::is_float() const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	return (m_dataType == GL_HALF_FLOAT);
+}
+
+// selects an uncompressed 16-bit float layout: tightly packed, no padding, component order as in memory
+void CDDSImage::set_float16_format(unsigned int format, unsigned int internalFormat, unsigned int components)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	m_format = format;
+	m_internalFormat = internalFormat;
+	m_dataType = GL_HALF_FLOAT;
+	m_components = components;
+	m_bytesPerComponent = sizeof(uint16_t);
 }
 
 bool CDDSImage::is_compressed() const
@@ -727,7 +855,11 @@ bool CDDSImage::is_compressed() const
 	RECOIL_DETAILED_TRACY_ZONE;
 	return ((m_format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT) ||
 		   (m_format == GL_COMPRESSED_RGBA_S3TC_DXT3_EXT) ||
-		   (m_format == GL_COMPRESSED_RGBA_S3TC_DXT5_EXT));
+		   (m_format == GL_COMPRESSED_RGBA_S3TC_DXT5_EXT) ||
+		   (m_format == GL_COMPRESSED_RED_RGTC1) ||
+		   (m_format == GL_COMPRESSED_RG_RGTC2) ||
+		   (m_format == GL_COMPRESSED_RGBA_BPTC_UNORM) ||
+		   (m_format == GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM));
 }
 
 #ifndef HEADLESS
@@ -761,22 +893,22 @@ bool CDDSImage::upload_texture1D() const
     else
     {
         GLint alignment = -1;
-        if (!is_dword_aligned())
+        if (is_float() || !is_dword_aligned())
         {
             glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         }
 
-        glTexImage1D(GL_TEXTURE_1D, 0, m_components, baseImage.get_width(), 0,
-            m_format, GL_UNSIGNED_BYTE, baseImage);
+        glTexImage1D(GL_TEXTURE_1D, 0, get_internal_format(), baseImage.get_width(), 0,
+            m_format, m_dataType, baseImage);
 
         // load all mipmaps
         for (unsigned int i = 0; i < baseImage.get_num_mipmaps(); i++)
         {
             const CSurface &mipmap = baseImage.get_mipmap(i);
 
-            glTexImage1D(GL_TEXTURE_1D, i+1, m_components,
-                mipmap.get_width(), 0, m_format, GL_UNSIGNED_BYTE, mipmap);
+            glTexImage1D(GL_TEXTURE_1D, i+1, get_internal_format(),
+                mipmap.get_width(), 0, m_format, m_dataType, mipmap);
         }
 
         if (alignment != -1)
@@ -832,14 +964,15 @@ bool CDDSImage::upload_texture2D(unsigned int imageIndex, int target) const
     else
     {
         GLint alignment = -1;
-        if (!is_dword_aligned())
+        // Half-float mip rows can be unaligned even when the base row is aligned.
+        if (is_float() || !is_dword_aligned())
         {
             glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         }
 
-        glTexImage2D(target, 0, m_components, image.get_width(),
-            image.get_height(), 0, m_format, GL_UNSIGNED_BYTE,
+        glTexImage2D(target, 0, get_internal_format(), image.get_width(),
+            image.get_height(), 0, m_format, m_dataType,
             image);
 
         // load all mipmaps
@@ -847,8 +980,8 @@ bool CDDSImage::upload_texture2D(unsigned int imageIndex, int target) const
         {
             const CSurface &mipmap = image.get_mipmap(i);
 
-            glTexImage2D(target, i+1, m_components, mipmap.get_width(),
-                mipmap.get_height(), 0, m_format, GL_UNSIGNED_BYTE, mipmap);
+            glTexImage2D(target, i+1, get_internal_format(), mipmap.get_width(),
+                mipmap.get_height(), 0, m_format, m_dataType, mipmap);
         }
 
         if (alignment != -1)
@@ -889,24 +1022,25 @@ bool CDDSImage::upload_texture3D() const
     else
     {
         GLint alignment = -1;
-        if (!is_dword_aligned())
+        // Half-float mip rows can be unaligned even when the base row is aligned.
+        if (is_float() || !is_dword_aligned())
         {
             glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         }
 
-        glTexImage3D(GL_TEXTURE_3D, 0, m_components, baseImage.get_width(),
+        glTexImage3D(GL_TEXTURE_3D, 0, get_internal_format(), baseImage.get_width(),
             baseImage.get_height(), baseImage.get_depth(), 0, m_format,
-            GL_UNSIGNED_BYTE, baseImage);
+            m_dataType, baseImage);
 
         // load all mipmap volumes
         for (unsigned int i = 0; i < baseImage.get_num_mipmaps(); i++)
         {
             const CSurface &mipmap = baseImage.get_mipmap(i);
 
-            glTexImage3D(GL_TEXTURE_3D, i+1, m_components,
+            glTexImage3D(GL_TEXTURE_3D, i+1, get_internal_format(),
                 mipmap.get_width(), mipmap.get_height(), mipmap.get_depth(), 0,
-                m_format, GL_UNSIGNED_BYTE,  mipmap);
+                m_format, m_dataType,  mipmap);
         }
 
         if (alignment != -1)
@@ -969,7 +1103,7 @@ inline unsigned int CDDSImage::size_dxtc(unsigned int width, unsigned int height
 {
 	RECOIL_DETAILED_TRACY_ZONE;
     return ((width+3)/4)*((height+3)/4)*
-        (m_format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT ? 8 : 16);
+        ((m_format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT || m_format == GL_COMPRESSED_RED_RGTC1) ? 8 : 16);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -977,7 +1111,7 @@ inline unsigned int CDDSImage::size_dxtc(unsigned int width, unsigned int height
 inline unsigned int CDDSImage::size_rgb(unsigned int width, unsigned int height) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-    return width*height*m_components;
+    return width*height*m_components*m_bytesPerComponent;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1029,6 +1163,14 @@ void CDDSImage::flip(CSurface &surface) const
             case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
                 blocksize = 16;
                 flipblocks = &CDDSImage::flip_blocks_dxtc5;
+                break;
+            case GL_COMPRESSED_RED_RGTC1:
+                blocksize = 8;
+                flipblocks = &CDDSImage::flip_blocks_bc4;
+                break;
+            case GL_COMPRESSED_RG_RGTC2:
+                blocksize = 16;
+                flipblocks = &CDDSImage::flip_blocks_bc5;
                 break;
             default:
                 return;
@@ -1163,37 +1305,19 @@ void CDDSImage::flip_dxt5_alpha(DXT5AlphaBlock *block) const
     bits >>= 3;
     gBits[3][3] = (unsigned char)(bits & mask);
 
-    memset(block->row, 0, sizeof(unsigned char) * 6);
+    // The packed rows are unaligned 24-bit groups. A fourth byte at row[3]
+    // belongs to the next block (or lies beyond the final BC4/BC5 block).
+    bits = (gBits[3][0] << 0)  | (gBits[3][1] << 3)
+         | (gBits[3][2] << 6)  | (gBits[3][3] << 9)
+         | (gBits[2][0] << 12) | (gBits[2][1] << 15)
+         | (gBits[2][2] << 18) | (gBits[2][3] << 21);
+    memcpy(&block->row[0], &bits, sizeof(unsigned char) * 3);
 
-    unsigned int *pBits = ((unsigned int*) &(block->row[0]));
-
-    *pBits = *pBits | (gBits[3][0] << 0);
-    *pBits = *pBits | (gBits[3][1] << 3);
-    *pBits = *pBits | (gBits[3][2] << 6);
-    *pBits = *pBits | (gBits[3][3] << 9);
-
-    *pBits = *pBits | (gBits[2][0] << 12);
-    *pBits = *pBits | (gBits[2][1] << 15);
-    *pBits = *pBits | (gBits[2][2] << 18);
-    *pBits = *pBits | (gBits[2][3] << 21);
-
-    pBits = ((unsigned int*) &(block->row[3]));
-
-#ifdef MACOS
-    *pBits &= 0x000000ff;
-#else
-    *pBits &= 0xff000000;
-#endif
-
-    *pBits = *pBits | (gBits[1][0] << 0);
-    *pBits = *pBits | (gBits[1][1] << 3);
-    *pBits = *pBits | (gBits[1][2] << 6);
-    *pBits = *pBits | (gBits[1][3] << 9);
-
-    *pBits = *pBits | (gBits[0][0] << 12);
-    *pBits = *pBits | (gBits[0][1] << 15);
-    *pBits = *pBits | (gBits[0][2] << 18);
-    *pBits = *pBits | (gBits[0][3] << 21);
+    bits = (gBits[1][0] << 0)  | (gBits[1][1] << 3)
+         | (gBits[1][2] << 6)  | (gBits[1][3] << 9)
+         | (gBits[0][0] << 12) | (gBits[0][1] << 15)
+         | (gBits[0][2] << 18) | (gBits[0][3] << 21);
+    memcpy(&block->row[3], &bits, sizeof(unsigned char) * 3);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1214,6 +1338,40 @@ void CDDSImage::flip_blocks_dxtc5(DXTColBlock *line, unsigned int numBlocks) con
 
         swap(&curblock->row[0], &curblock->row[3], sizeof(unsigned char));
         swap(&curblock->row[1], &curblock->row[2], sizeof(unsigned char));
+
+        curblock++;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// flip a line of BC4 blocks
+void CDDSImage::flip_blocks_bc4(DXTColBlock *line, unsigned int numBlocks) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+    DXT5AlphaBlock *curblock = reinterpret_cast<DXT5AlphaBlock*>(line);
+
+    for (unsigned int i = 0; i < numBlocks; i++)
+    {
+        flip_dxt5_alpha(curblock);
+
+        curblock++;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// flip a line of BC5 blocks
+void CDDSImage::flip_blocks_bc5(DXTColBlock *line, unsigned int numBlocks) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+    DXT5AlphaBlock *curblock = reinterpret_cast<DXT5AlphaBlock*>(line);
+
+    for (unsigned int i = 0; i < numBlocks; i++)
+    {
+        flip_dxt5_alpha(curblock);
+
+        curblock++;
+
+        flip_dxt5_alpha(curblock);
 
         curblock++;
     }

@@ -3,15 +3,18 @@ add_definitions(-DCATCH_AMALGAMATED_CUSTOM_MAIN)
 # defines spring_test_compile_fail macro
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/CompileFailTest/CompileFailTest.cmake)
 
-if    (UNIX AND (NOT APPLE) AND (NOT MINGW))
+if    (UNIX AND NOT APPLE AND NOT MINGW AND
+       NOT (CMAKE_SYSTEM_NAME MATCHES "OpenBSD"))
 	find_library(REALTIME_LIBRARY rt)
 
 	if    (PREFER_STATIC_LIBS AND NOT EXISTS "${REALTIME_LIBRARY}")
 		message(FATAL_ERROR "librt.[so|a] not found! Needed by std::chrono when statically linked!")
 	endif (PREFER_STATIC_LIBS AND NOT EXISTS "${REALTIME_LIBRARY}")
-else  (UNIX AND (NOT APPLE) AND (NOT MINGW))
+else  (UNIX AND NOT APPLE AND NOT MINGW AND
+       NOT (CMAKE_SYSTEM_NAME MATCHES "OpenBSD"))
 	set(REALTIME_LIBRARY "")
-endif (UNIX AND (NOT APPLE) AND (NOT MINGW))
+endif (UNIX AND NOT APPLE AND NOT MINGW AND
+       NOT (CMAKE_SYSTEM_NAME MATCHES "OpenBSD"))
 
 ADD_SUBDIRECTORY(lib/catch2)
 # Engine-wide -fsingle-precision-constant (gcc) makes `0.` a float, which
@@ -36,7 +39,7 @@ if (WIN32)
 		RESULT_VARIABLE IPV6_RET
 		ERROR_QUIET)
 else(WIN32)
-	execute_process(COMMAND ping6 ::1 -c 1
+	execute_process(COMMAND ping6 -c 1 ::1
 		RESULT_VARIABLE IPV6_RET
 		ERROR_QUIET)
 endif (WIN32)
@@ -73,7 +76,9 @@ set(test_common_libraries
 	fmt::fmt
 )
 
-add_custom_target(tests)
+if(NOT TARGET tests)
+	add_custom_target(tests)
+endif()
 add_custom_target(check ${CMAKE_CTEST_COMMAND} --output-on-failure -V
 	DEPENDS engine-headless)
 add_custom_target(install-tests)
@@ -171,10 +176,50 @@ endif()
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG")
 
 ################################################################################
+### DDSFloat
+	set(test_name DDSFloat)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Rendering/testDDSFloat.cpp"
+			"${ENGINE_SOURCE_DIR}/Rendering/Textures/nv_dds.cpp"
+			${test_Common_sources}
+		)
+
+	# headlessStubs: no-op OpenGL entry points for the glad symbols myGL.h refers to
+	set(test_libs
+			headlessStubs
+			nowide::nowide
+		)
+
+	# Compile the upload code too; tests replace the GL entry points with capture stubs.
+	# -UUNIT_TEST: nv_dds.cpp includes myGL.h, which refuses to compile under UNIT_TEST (it guards its glOrtho wrappers);
+	# nothing here calls them.
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-UUNIT_TEST")
+
+################################################################################
 ### Float3
 	set(test_name Float3)
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/testFloat3.cpp"
+			"${ENGINE_SOURCE_DIR}/System/float3.cpp"
+			"${ENGINE_SOURCE_DIR}/System/float4.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
+			"${ENGINE_SOURCE_DIR}/System/TimeProfiler.cpp"
+			${sources_engine_System_Threading}
+			${test_Common_sources}
+		)
+
+	set(test_libs
+			streflop
+			${WINMM_LIBRARY}
+		)
+
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG -DBUILDING_AI")
+
+################################################################################
+### CameraProjection
+	set(test_name CameraProjection)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Game/testCameraProjection.cpp"
 			"${ENGINE_SOURCE_DIR}/System/float3.cpp"
 			"${ENGINE_SOURCE_DIR}/System/float4.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
@@ -338,6 +383,25 @@ endif()
 
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DTEST")
 
+################################################################################
+### DemoFileExtension
+	set(test_name DemoFileExtension)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/LoadSave/testDemoFileExtension.cpp"
+			"${ENGINE_SOURCE_DIR}/System/LoadSave/DemoFileExtension.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Config/ConfigVariable.cpp"
+			"${ENGINE_SOURCE_DIR}/System/StringUtil.cpp"
+			${test_Common_sources}
+		)
+
+	find_package_static(ZLIB 1.2.7 REQUIRED)
+
+	set(test_libs
+			ZLIB::ZLIB
+		)
+
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
+
 	if    (NOT NO_CREG)
 ################################################################################
 ### CREG
@@ -384,6 +448,11 @@ endif()
 	set(test_flags "-DUNITSYNC")
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "${test_flags}")
 	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/)
+	if (WIN32)
+		# unitsync.dll is built outside test_UnitSync.exe's folder; ctest would otherwise hang on the DLL-not-found box
+		set_tests_properties(test${test_name} PROPERTIES
+			ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:unitsync>")
+	endif ()
 	add_dependencies(test_${test_name} springcontent.sdz)
 
 ################################################################################
@@ -407,7 +476,9 @@ endif()
 	set(test_libs
 			${WINMM_LIBRARY}
 		)
-	if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+	if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND
+            NOT (CMAKE_SYSTEM_NAME STREQUAL "FreeBSD") AND
+            NOT (CMAKE_SYSTEM_NAME STREQUAL "OpenBSD"))
 		list(APPEND test_libs atomic)
 	endif()
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DTHREADPOOL -DUNITSYNC")
@@ -432,6 +503,28 @@ endif()
 
 	set(test_flags "-DNOT_USING_CREG -DBUILDING_AI")
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "${test_flags}")
+
+################################################################################
+### PointerWarp
+	set(test_name PointerWarp)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/Input/testPointerWarp.cpp"
+			${test_Common_sources}
+		)
+	set(test_libs "")
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG -DNOT_USING_STREFLOP -DBUILDING_AI")
+
+################################################################################
+### QueuedBuildOverlap
+	set(test_name QueuedBuildOverlap)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Sim/Misc/testQueuedBuildOverlap.cpp"
+			"${ENGINE_SOURCE_DIR}/Sim/Units/QueuedBuildOverlap.cpp"
+			${test_Common_sources}
+		)
+
+	set(test_libs "")
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG -DNOT_USING_STREFLOP -DBUILDING_AI")
 
 ################################################################################
 ### Ellipsoid
@@ -530,6 +623,25 @@ endif()
 	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/lua/include)
 
 ################################################################################
+### LuaAbsIndex
+	set(test_name LuaAbsIndex)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/testLuaAbsIndex.cpp"
+			"${ENGINE_SOURCE_DIR}/Lua/LuaMemPool.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
+			${sources_engine_System_Threading}
+			${test_Common_sources}
+		)
+	set(test_libs
+			lua
+			headlessStubs
+			smmalloc
+		)
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
+	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/)
+	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/lua/include)
+
+################################################################################
 ### MemPoolTypes
 	set(test_name MemPoolTypes)
 	set(test_src
@@ -574,6 +686,19 @@ endif()
 	if (USE_MIMALLOC)
 		target_compile_definitions(test_${test_name} PRIVATE USE_MIMALLOC)
 	endif()
+
+################################################################################
+### DisplayTransforms
+# CPU curves of the display pass against float64 reference values (generate_display_transform_golden.py).
+	set(test_name DisplayTransforms)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Rendering/Display/testDisplayTransforms.cpp"
+			${test_Common_sources}
+		)
+	set(test_libs
+			""
+		)
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
 
 ################################################################################
 

@@ -435,7 +435,9 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	groundFrictionCoefficient = udTable.GetFloat("groundFrictionCoefficient", 0.01f);
 	atmosphericDragCoefficient = udTable.GetFloat("atmosphericDragCoefficient", 1.0f);
 	pushResistant = udTable.GetBool("pushResistant", false);
-	selfDCountdown = udTable.GetInt("selfDestructCountdown", 5);
+	selfDCountdown = udTable.GetFloat("selfDestructCountdown", 5.0f);
+	if (selfDCountdown < 0.0f)
+		throw content_error(unitName + ".selfDestructCountdown < 0");
 
 	/* Note that the legacy unit is elmo/frame
 	 * whereas the modern one is elmo/second */
@@ -468,7 +470,7 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	flankingBonusMode = udTable.GetInt("flankingBonusMode", modInfo.flankingBonusModeDefault);
 	flankingBonusMax  = udTable.GetFloat("flankingBonusMax", modInfo.flankingBonusMaxDefault);
 	flankingBonusMin  = udTable.GetFloat("flankingBonusMin", modInfo.flankingBonusMinDefault);
-	flankingBonusDir  = udTable.GetFloat3("flankingBonusDir", FwdVector);
+	flankingBonusDir  = udTable.GetFloat3("flankingBonusDir", FwdVector).SafeNormalize();
 	flankingBonusMobilityAdd = udTable.GetFloat("flankingBonusMobilityAdd", 0.01f);
 
 	armoredMultiple = udTable.GetFloat("damageModifier", 1.0f);

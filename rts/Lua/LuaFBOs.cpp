@@ -19,6 +19,7 @@
 
 #include "System/Misc/TracyDefs.h"
 #include "Rendering/GL/FBO.h"
+#include "Rendering/GL/SceneTarget.h"
 #include "Rendering/GlobalRendering.h"
 
 
@@ -64,9 +65,9 @@ bool LuaFBOs::CreateMetatable(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	luaL_newmetatable(L, "FBO");
-	HSTR_PUSH_CFUNC(L, "__gc",        meta_gc);
-	HSTR_PUSH_CFUNC(L, "__index",     meta_index);
-	HSTR_PUSH_CFUNC(L, "__newindex",  meta_newindex);
+	LuaPushNamedCFunc(L, "__gc",        meta_gc);
+	LuaPushNamedCFunc(L, "__index",     meta_index);
+	LuaPushNamedCFunc(L, "__newindex",  meta_newindex);
 	lua_pop(L, 1);
 	return true;
 }
@@ -390,7 +391,8 @@ bool LuaFBOs::ApplyAttachment(
 	if (!lua_istable(L, index))
 		return AttachObject(__func__, L, index, fbo, attachID);
 
-	const int table = (index < 0) ? index : (lua_gettop(L) + index + 1);
+	// meta_newindex passes 3, CreateFBO passes -1; the lua_rawgeti calls below push
+	const int table = lua_absindex(L, index);
 
 	GLenum target = 0;
 	GLint  level  = 0;
@@ -521,7 +523,16 @@ int LuaFBOs::CreateFBO(lua_State* L)
 				else if (key == "drawbuffers") {
 					ApplyDrawBuffers(L, -1);
 				}
+				else if (key == "readbuffer") {
+					if (lua_isnumber(L, -1))
+						glReadBuffer((GLenum)lua_toint(L, -1));
+				}
 			}
+			lua_rawgeti(L, LUA_REGISTRYINDEX, fboPtr->luaRef);
+			lua_pushvalue(L, -3); // key
+			lua_pushvalue(L, -3); // value
+			lua_rawset(L, -3);
+			lua_pop(L, 1);
 		}
 	}
 
@@ -563,7 +574,7 @@ int LuaFBOs::DeleteFBO(lua_State* L)
  * @param fbo FBO
  * @param target GL?
  * @return boolean valid
- * @return number? status
+ * @return GL? status
  */
 int LuaFBOs::IsValidFBO(lua_State* L)
 {
@@ -688,7 +699,7 @@ int LuaFBOs::ActiveFBO(lua_State* L)
  * @function gl.RawBindFBO
  * @param fbo FBO
  * @param target GL? (Default: `fbo.target`)
- * @return number previouslyBoundRawFboId
+ * @return integer previouslyBoundRawFboId
  */
 int LuaFBOs::RawBindFBO(lua_State* L)
 {
@@ -697,7 +708,7 @@ int LuaFBOs::RawBindFBO(lua_State* L)
 
 	if (lua_isnil(L, 1)) {
 		// revert to default or specified FB
-		glBindFramebufferEXT((GLenum) luaL_optinteger(L, 2, GL_FRAMEBUFFER_EXT), luaL_optinteger(L, 3, 0));
+		glBindFramebufferEXT((GLenum) luaL_optinteger(L, 2, GL_FRAMEBUFFER_EXT), luaL_optinteger(L, 3, sceneTarget.GetDefaultFBO()));
 		return 0;
 	}
 		
@@ -720,32 +731,32 @@ int LuaFBOs::RawBindFBO(lua_State* L)
 /*** needs `GLAD_GL_EXT_framebuffer_blit`
  *
  * @function gl.BlitFBO
- * @param x0Src number
- * @param y0Src number
- * @param x1Src number
- * @param y1Src number
- * @param x0Dst number
- * @param y0Dst number
- * @param x1Dst number
- * @param y1Dst number
- * @param mask number? (Default: GL_COLOR_BUFFER_BIT)
- * @param filter number? (Default: GL_NEAREST)
+ * @param x0Src integer
+ * @param y0Src integer
+ * @param x1Src integer
+ * @param y1Src integer
+ * @param x0Dst integer
+ * @param y0Dst integer
+ * @param x1Dst integer
+ * @param y1Dst integer
+ * @param mask GL? (Default: GL_COLOR_BUFFER_BIT)
+ * @param filter GL? (Default: GL_NEAREST)
  */
 /*** needs `GLAD_GL_EXT_framebuffer_blit`
  *
  * @function gl.BlitFBO
  * @param fboSrc FBO
- * @param x0Src number
- * @param y0Src number
- * @param x1Src number
- * @param y1Src number
+ * @param x0Src integer
+ * @param y0Src integer
+ * @param x1Src integer
+ * @param y1Src integer
  * @param fboDst FBO
- * @param x0Dst number
- * @param y0Dst number
- * @param x1Dst number
- * @param y1Dst number
- * @param mask number? (Default: GL_COLOR_BUFFER_BIT)
- * @param filter number? (Default: GL_NEAREST)
+ * @param x0Dst integer
+ * @param y0Dst integer
+ * @param x1Dst integer
+ * @param y1Dst integer
+ * @param mask GL? (Default: GL_COLOR_BUFFER_BIT)
+ * @param filter GL? (Default: GL_NEAREST)
  */
 int LuaFBOs::BlitFBO(lua_State* L)
 {
@@ -764,6 +775,7 @@ int LuaFBOs::BlitFBO(lua_State* L)
 		const GLbitfield mask = (GLbitfield)luaL_optint(L, 9, GL_COLOR_BUFFER_BIT);
 		const GLenum filter = (GLenum)luaL_optint(L, 10, GL_NEAREST);
 
+		ScopedSceneReadResolve resolve;
 		glBlitFramebufferEXT(x0Src, y0Src, x1Src, y1Src,  x0Dst, y0Dst, x1Dst, y1Dst,  mask, filter);
 		return 0;
 	}
@@ -794,8 +806,10 @@ int LuaFBOs::BlitFBO(lua_State* L)
 	GLint currentFBO;
 	glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &currentFBO);
 
-	glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, (fboSrc == nullptr)? 0: fboSrc->id);
-	glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, (fboDst == nullptr)? 0: fboDst->id);
+	// nil is the window, or the scene target during the world phase (read through its resolve if multisampled)
+	const GLuint defaultFBO = sceneTarget.GetDefaultFBO();
+	glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, (fboSrc == nullptr)? sceneTarget.ResolvedReadFBO(defaultFBO): fboSrc->id);
+	glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, (fboDst == nullptr)? defaultFBO: fboDst->id);
 
 	glBlitFramebufferEXT(x0Src, y0Src, x1Src, y1Src,  x0Dst, y0Dst, x1Dst, y1Dst,  mask, filter);
 
@@ -820,7 +834,7 @@ namespace Impl {
  * Clears the "attachment" of the currently bound FBO type "target" with "clearValues"
  * 
  * @function gl.ClearAttachmentFBO
- * @param target number? (Default: `GL.FRAMEBUFFER`)
+ * @param target GL? (Default: `GL.FRAMEBUFFER`)
  * @param attachment GL|Attachment (e.g. `"color0"` or `GL.COLOR_ATTACHMENT0`)
  * @param clearValue0 number? (Default: `0`)
  * @param clearValue1 number? (Default: `0`)
@@ -869,7 +883,7 @@ int LuaFBOs::ClearAttachmentFBO(lua_State* L)
 	GLenum attachment = 0;
 	GLenum drawBuffer = 0;
 
-	if (lua_isstring(L, nextArg)) {
+	if (lua_israwstring(L, nextArg)) {
 		const char* attachmentStr = luaL_checkstring(L, nextArg++);
 		switch (hashString(attachmentStr)) {
 			case hashString("color0"): { bufferType = GL_COLOR;   attachment = GL_COLOR_ATTACHMENT0;  drawBuffer = 0; } break;

@@ -29,11 +29,6 @@ public:
 	void AddResources(SResourcePack res, bool useIncomeMultiplier = true);
 	bool UseResources(const SResourcePack& res);
 
-	void AddMetal(float amount, bool useIncomeMultiplier = true);
-	void AddEnergy(float amount, bool useIncomeMultiplier = true);
-	bool UseEnergy(float amount);
-	bool UseMetal(float amount);
-
 	void GiveEverythingTo(const unsigned toTeam);
 
 	void Died(bool normalDeath = true);
@@ -88,6 +83,7 @@ public:
 	SResourcePack resIncome,  resPrevIncome;
 	SResourcePack resExpense, resPrevExpense;
 	SResourcePack resShare;
+	SResourcePack resExcessThisFrame; //< accumulates excess over a gameframe
 	SResourcePack resDelayedShare; //< excess that might be shared next SlowUpdate
 	SResourcePack resSent,     resPrevSent;
 	SResourcePack resReceived, resPrevReceived;

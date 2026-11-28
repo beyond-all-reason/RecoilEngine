@@ -22,7 +22,9 @@ CallInsList = {
 	"MiniMapStateChanged",
 	"MiniMapGeometryChanged",
 	"CommandNotify",
+	"UpdateTimeOffset",
 
+	"KeyBindingsChanged",
 	"KeyMapChanged",
 	"KeyPress",
 	"KeyRelease",
@@ -65,6 +67,8 @@ CallInsList = {
 	"UnitLoaded",
 	"UnitUnloaded",
 	"UnitHarvestStorageFull",
+	"UnitSelfDestructStarted",
+	"UnitSelfDestructCancelled",
 
 	"UnitEnteredUnderwater",
 	"UnitEnteredWater",

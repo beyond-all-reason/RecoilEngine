@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _UDP_LISTENER_H
-#define _UDP_LISTENER_H
+#pragma once
 
 #include "System/Misc/NonCopyable.h"
 #include <memory>
@@ -45,8 +44,9 @@ public:
 	 * @param  ip local IP (v4 or v6) to bind to,
 	 *         the default value "" results in the v6 any address "::",
 	 *         or the v4 equivalent "0.0.0.0", if v6 is no supported
+	 * @param  portInUse if not null, set to true when the bind failed because the port is in use
 	 */
-	static std::string TryBindSocket(int port, std::shared_ptr<asio::ip::udp::socket>& sock, const std::string& ip = "");
+	static std::string TryBindSocket(int port, std::shared_ptr<asio::ip::udp::socket>& sock, const std::string& ip = "", bool* portInUse = nullptr);
 
 	/**
 	 * @brief Run this from time to time
@@ -97,5 +97,3 @@ private:
 };
 
 }
-
-#endif // _UDP_LISTENER_H

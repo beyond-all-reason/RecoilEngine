@@ -10,6 +10,7 @@
 class float3;
 class LuaParser;
 class CSoundSource;
+class IAudioChannel;
 class SoundItem;
 
 
@@ -43,6 +44,8 @@ public:
 	 * the one with the lowest priority otherwise.
 	 */
 	virtual CSoundSource* GetNextBestSource(bool lock = true) = 0;
+	/// stops the item wherever it plays or is queued; a null channel means all of them
+	virtual bool StopSoundItem(const std::string& name, const IAudioChannel* channel) = 0;
 
 
 	virtual void UpdateListener(const float3& camPos, const float3& camDir, const float3& camUp) = 0;
@@ -55,7 +58,7 @@ public:
 	virtual bool Mute() = 0;
 	virtual bool IsMuted() const = 0;
 
-	virtual void DeviceChanged(uint32_t sdlDeviceIndex) = 0;
+	virtual void DeviceChanged(uint32_t sdlDeviceIndex, bool added) = 0;
 
 	///change current output device
 	static bool ChangeOutput(bool forceNullSound = false);

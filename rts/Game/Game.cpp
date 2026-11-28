@@ -33,6 +33,7 @@
 #include "ExternalAI/EngineOutHandler.h"
 #include "ExternalAI/SkirmishAIHandler.h"
 #include "Rendering/WorldDrawer.h"
+#include "Rendering/GL/SceneTarget.h"
 #include "Rendering/Env/IWater.h"
 #include "Rendering/Env/WaterRendering.h"
 #include "Rendering/Env/MapRendering.h"
@@ -40,6 +41,7 @@
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/CommandDrawer.h"
 #include "Rendering/LineDrawer.h"
+#include "Rendering/Env/NanoParticles/NanoParticleSystem.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/DebugDrawerAI.h"
 #include "Rendering/HUDDrawer.h"
@@ -53,6 +55,7 @@
 #include "Rendering/Textures/NamedTextures.h"
 #include "Lua/LuaGaia.h"
 #include "Lua/LuaHandle.h"
+#include "Lua/LuaDebugExtra.h"
 #include "Lua/LuaInputReceiver.h"
 #include "Lua/LuaMenu.h"
 #include "Lua/LuaRules.h"
@@ -385,35 +388,39 @@ void CGame::Load(const std::string& mapFileName)
 		defsParser = &nullDefsParser;
 		defsParser->Execute();
 
-		// we can not (yet) do a clean early exit here because the dtor assumes
-		// all loading stages proceeded normally; just force automatic shutdown
+		// Skip later loading stages, which depend on the failed stage.
+		// Cleanup routines must tolerate components that were never initialized.
 		forcedQuit = true;
 	}
 
-	try {
-		LOG("[Game::%s][2] globalQuit=%d forcedQuit=%d", __func__, globalQuit.load(), forcedQuit);
+	if (!forcedQuit) {
+		try {
+			LOG("[Game::%s][2] globalQuit=%d forcedQuit=%d", __func__, globalQuit.load(), forcedQuit);
 
-		PreLoadSimulation(defsParser);
-		Watchdog::ClearTimer(WDT_LOAD);
-		PreLoadRendering();
-		Watchdog::ClearTimer(WDT_LOAD);
-	} catch (const content_error& e) {
-		contentErrors.emplace_back(e.what());
-		LOG_L(L_ERROR, "[Game::%s][2] forced quit with exception \"%s\"", __func__, e.what());
-		forcedQuit = true;
+			PreLoadSimulation(defsParser);
+			Watchdog::ClearTimer(WDT_LOAD);
+			PreLoadRendering();
+			Watchdog::ClearTimer(WDT_LOAD);
+		} catch (const content_error& e) {
+			contentErrors.emplace_back(e.what());
+			LOG_L(L_ERROR, "[Game::%s][2] forced quit with exception \"%s\"", __func__, e.what());
+			forcedQuit = true;
+		}
 	}
 
-	try {
-		LOG("[Game::%s][3] globalQuit=%d forcedQuit=%d", __func__, globalQuit.load(), forcedQuit);
+	if (!forcedQuit) {
+		try {
+			LOG("[Game::%s][3] globalQuit=%d forcedQuit=%d", __func__, globalQuit.load(), forcedQuit);
 
-		PostLoadSimulation(defsParser);
-		Watchdog::ClearTimer(WDT_LOAD);
-		PostLoadRendering();
-		Watchdog::ClearTimer(WDT_LOAD);
-	} catch (const content_error& e) {
-		contentErrors.emplace_back(e.what());
-		LOG_L(L_ERROR, "[Game::%s][3] forced quit with exception \"%s\"", __func__, e.what());
-		forcedQuit = true;
+			PostLoadSimulation(defsParser);
+			Watchdog::ClearTimer(WDT_LOAD);
+			PostLoadRendering();
+			Watchdog::ClearTimer(WDT_LOAD);
+		} catch (const content_error& e) {
+			contentErrors.emplace_back(e.what());
+			LOG_L(L_ERROR, "[Game::%s][3] forced quit with exception \"%s\"", __func__, e.what());
+			forcedQuit = true;
+		}
 	}
 	if (!forcedQuit) {
 		try {
@@ -454,50 +461,52 @@ void CGame::Load(const std::string& mapFileName)
 		}
 	}
 
-	try {
-		LOG("[Game::%s][7] globalQuit=%d forcedQuit=%d", __func__, globalQuit.load(), forcedQuit);
+	if (!forcedQuit) {
+		try {
+			LOG("[Game::%s][7] globalQuit=%d forcedQuit=%d", __func__, globalQuit.load(), forcedQuit);
 
-		if (!globalQuit && saveFileHandler != nullptr) {
-			loadscreen->SetLoadMessage("Loading Saved Game");
-			{
-				auto lock = CLoadLock::GetUniqueLock();
-				saveFileHandler->LoadGame();
+			if (!globalQuit && saveFileHandler != nullptr) {
+				loadscreen->SetLoadMessage("Loading Saved Game");
+				{
+					auto lock = CLoadLock::GetUniqueLock();
+					saveFileHandler->LoadGame();
+					Watchdog::ClearTimer(WDT_LOAD);
+				}
+				LoadLua(false, true);
 				Watchdog::ClearTimer(WDT_LOAD);
+			} else {
+				ENTER_SYNCED_CODE();
+				{
+					auto lock = CLoadLock::GetUniqueLock();
+					eventHandler.GamePreload();
+					Watchdog::ClearTimer(WDT_LOAD);
+					eventHandler.CollectGarbage(true);
+					Watchdog::ClearTimer(WDT_LOAD);
+				}
+				LEAVE_SYNCED_CODE();
 			}
-			LoadLua(false, true);
-			Watchdog::ClearTimer(WDT_LOAD);
-		} else {
-			ENTER_SYNCED_CODE();
+			// Update height bounds and pathing after pregame or a saved game load.
 			{
-				auto lock = CLoadLock::GetUniqueLock();
-				eventHandler.GamePreload();
+				ENTER_SYNCED_CODE();
+				//needed in case pre-game terraform changed the map
+				readMap->UpdateHeightBounds();
 				Watchdog::ClearTimer(WDT_LOAD);
-				eventHandler.CollectGarbage(true);
+				pathManager->PostFinalizeRefresh();
 				Watchdog::ClearTimer(WDT_LOAD);
+				LEAVE_SYNCED_CODE();
 			}
-			LEAVE_SYNCED_CODE();
-		}
-		// Update height bounds and pathing after pregame or a saved game load.
-		{
-			ENTER_SYNCED_CODE();
-			//needed in case pre-game terraform changed the map
-			readMap->UpdateHeightBounds();
-			Watchdog::ClearTimer(WDT_LOAD);
-			pathManager->PostFinalizeRefresh();
-			Watchdog::ClearTimer(WDT_LOAD);
-			LEAVE_SYNCED_CODE();
-		}
 
-		{
-			char msgBuf[512];
+			{
+				char msgBuf[512];
 
-			SNPRINTF(msgBuf, sizeof(msgBuf), "[Game::%s][lua{Rules,Gaia}={%p,%p}][locale=\"%s\"]", __func__, luaRules, luaGaia, setlocale(LC_ALL, nullptr));
-			CLIENT_NETLOG(gu->myPlayerNum, LOG_LEVEL_INFO, msgBuf);
+				SNPRINTF(msgBuf, sizeof(msgBuf), "[Game::%s][lua{Rules,Gaia}={%p,%p}][locale=\"%s\"]", __func__, luaRules, luaGaia, setlocale(LC_ALL, nullptr));
+				CLIENT_NETLOG(gu->myPlayerNum, LOG_LEVEL_INFO, msgBuf);
+			}
+		} catch (const content_error& e) {
+			contentErrors.emplace_back(e.what());
+			LOG_L(L_ERROR, "[Game::%s][7] forced quit with exception \"%s\"", __func__, e.what());
+			forcedQuit = true;
 		}
-	} catch (const content_error& e) {
-		contentErrors.emplace_back(e.what());
-		LOG_L(L_ERROR, "[Game::%s][7] forced quit with exception \"%s\"", __func__, e.what());
-		forcedQuit = true;
 	}
 
 	if (!forcedQuit) {
@@ -512,6 +521,9 @@ void CGame::Load(const std::string& mapFileName)
 			forcedQuit = true;
 		}
 	}
+
+	if (!forcedQuit && IsSavedGame())
+		saveFileHandler->PostLoad();
 
 	Watchdog::DeregisterThread(WDT_LOAD);
 	AddTimedJobs();
@@ -685,6 +697,7 @@ void CGame::PostLoadSimulation(LuaParser* defsParser)
 	unitHandler.Init();
 	featureHandler.Init();
 	projectileHandler.Init();
+	NanoParticles::Init();
 	CLosHandler::InitStatic();
 
 	readMap->InitHeightMapDigestVectors(losHandler->los.size);
@@ -1002,6 +1015,7 @@ void CGame::KillRendering()
 	icon::iconHandler.Kill();
 	spring::SafeDelete(geometricObjects);
 	worldDrawer.Kill();
+	sceneTarget.Kill();
 
 	modelUniformsStorage.Kill();
 	//transformsMemStorage.Kill(); //Add?
@@ -1016,12 +1030,16 @@ void CGame::KillInterface()
 	LOG("[Game::%s][1]", __func__);
 	ProfileDrawer::SetEnabled(false);
 	camHandler->Kill();
+	selectedUnitsHandler.Kill();
 	spring::SafeDelete(guihandler);
 	spring::SafeDelete(minimap);
 	spring::SafeDelete(resourceBar);
 	spring::SafeDelete(tooltip); // CTooltipConsole*
 
 	LOG("[Game::%s][2]", __func__);
+	// drop emulated input state (game-scoped, like the bindings below); no-fire
+	// since the Lua handles are being destroyed
+	LuaDebugExtra::ClearEmulatedInput(false);
 	keyBindings.Kill();
 	selectionKeys.Kill(); // CSelectionKeyHandler*
 	spring::SafeDelete(inMapDrawerModel);
@@ -1032,6 +1050,12 @@ void CGame::KillSimulation()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LOG("[Game::%s][1]", __func__);
+
+	// a failed load leaves half-initialized objects behind, freeing them crashes
+	if (spring::exitCode == spring::EXIT_CODE_NOLOAD && gu->globalQuit) {
+		LOG_L(L_WARNING, "[Game::%s] simulation never finished loading, leaking it", __func__);
+		return;
+	}
 
 	// Kill all teams that are still alive, in
 	// case the game did not do so through Lua.
@@ -1049,6 +1073,7 @@ void CGame::KillSimulation()
 	featureHandler.Kill(); // depends on unitHandler (via ~CFeature)
 	unitHandler.Kill();
 	projectileHandler.Kill();
+	NanoParticles::Kill();
 
 	LOG("[Game::%s][3]", __func__);
 	IPathManager::FreeInstance(pathManager);
@@ -1218,6 +1243,7 @@ bool CGame::UpdateUnsynced(const spring_time currentTime)
 		// update game timings
 		globalRendering->lastFrameStart = currentTime;
 		globalRendering->lastFrameTime = deltaDrawFrameTime.toMilliSecsf();
+		globalRendering->UpdatePresentedFrameTime(globalRendering->lastFrameTime);
 
 		gu->avgFrameTime = mix(gu->avgFrameTime, deltaDrawFrameTime.toMilliSecsf(), 0.05f);
 		gu->gameTime += modGameDeltaTimeSecs;
@@ -1338,6 +1364,36 @@ bool CGame::UpdateUnsynced(const spring_time currentTime)
 
 		lastSimFrameTime = currentTime;
 		lastFrameTime = currentTime;
+	}
+
+	{
+		// the game may replace this frame's time offset and presented frame time
+		constexpr float MIN_TIME_OFFSET = -0.5f;
+		constexpr float MAX_TIME_OFFSET = 1.5f;
+		// ceiling for a replaced presented time while the display period is unknown
+		constexpr float MAX_PRESENTED_SECS_NO_PERIOD = 0.25f;
+
+		const float engineTimeOffset = globalRendering->timeOffset;
+		const float enginePresentedSecs = globalRendering->presentedFrameTime * 0.001f;
+
+		float timeOffset = engineTimeOffset;
+		float presentedSecs = enginePresentedSecs;
+
+		eventHandler.UpdateTimeOffset(timeOffset, gu->simFPS * gu->avgFrameTime * 0.001f, presentedSecs);
+
+		// clamp only a replaced value: the engine's own can exceed these on a slow frame
+		if (timeOffset != engineTimeOffset)
+			globalRendering->timeOffset = std::clamp(timeOffset, MIN_TIME_OFFSET, MAX_TIME_OFFSET);
+
+		if (presentedSecs != enginePresentedSecs) {
+			const float period = globalRendering->displayPeriod;
+			const float maxSecs = std::max((period > 0.0f) ? (period * CGlobalRendering::MAX_SNAP_PERIODS * 0.001f) : MAX_PRESENTED_SECS_NO_PERIOD, enginePresentedSecs);
+
+			globalRendering->OverridePresentedFrameTime(std::clamp(presentedSecs, 0.0f, maxSecs) * 1000.0f);
+		}
+
+		TracyPlot("PresentedFrameTime", globalRendering->presentedFrameTime);
+		TracyPlot("PresentedFrameLag", globalRendering->presentedFrameLag);
 	}
 
 	if ((currentTime - frameStartTime).toMilliSecsf() >= 1000.0f) {
@@ -1504,9 +1560,12 @@ bool CGame::Draw() {
 			FBO::Unbind();
 		camera->LoadViewport();
 
+		sceneTarget.BeginFrame();
 		worldDrawer.Draw();
 		worldDrawer.ResetMVPMatrices();
 	}
+
+	sceneTarget.Present(CSceneTarget::Boundary::AfterWorld);
 
 	{
 		SCOPED_TIMER("Draw::Screen");
@@ -1515,6 +1574,7 @@ bool CGame::Draw() {
 			unitDrawer->DrawUnitIconsScreen();
 
 		eventHandler.DrawScreenEffects();
+		sceneTarget.Present(CSceneTarget::Boundary::AfterScreenEffects);
 
 		hudDrawer->Draw((gu->GetMyPlayer())->fpsController.GetControllee());
 		debugDrawerAI->Draw();
@@ -1766,6 +1826,7 @@ void CGame::SimFrame() {
 		unitHandler.Update();
 		pathManager->Update();
 		projectileHandler.Update();
+		NanoParticles::system.Update();
 		featureHandler.Update();
 		{
 			/* The default GAME_SPEED is 30, which doesn't divide 1000 well,

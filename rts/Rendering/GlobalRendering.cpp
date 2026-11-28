@@ -1,5 +1,8 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include <algorithm>
+#include <cmath>
+#include <numeric>
 #include <string>
 #include <sstream>
 #include <iomanip>
@@ -12,6 +15,8 @@
 #include "Rendering/GL/StreamBuffer.h"
 #include "Rendering/GL/RenderBuffers.h"
 #include "Rendering/GL/myGL.h"
+#include "Rendering/GL/glDebugGroupTimers.h"
+#include "Rendering/GL/glVRAMTracker.h"
 #include "Rendering/GL/FBO.h"
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/glxHandler.h"
@@ -41,7 +46,13 @@
 #include <SDL_syswm.h>
 #include <SDL_rect.h>
 
+// SDL before 2.0.18 (the Linux builds use Ubuntu 18.04's 2.0.8) has no name for this hint and ignores it
+#ifndef SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN
+#define SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN "SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN"
+#endif
+
 #include "System/Misc/TracyDefs.h"
+#include "System/Misc/TracyGpu.h"
 
 CONFIG(bool, DebugGL).defaultValue(false).description("Enables GL debug-context and output. (see GL_ARB_debug_output)");
 CONFIG(bool, DebugGLStacktraces).defaultValue(false).description("Create a stacktrace when an OpenGL error occurs");
@@ -125,6 +136,16 @@ CR_REG_METADATA(CGlobalRendering, (
 	CR_MEMBER(lastFrameTime),
 	CR_MEMBER(lastFrameStart),
 	CR_MEMBER(lastSwapBuffersEnd),
+	CR_MEMBER(lastSwapBuffersDuration),
+	CR_IGNORED(presentedFrameTime),
+	CR_IGNORED(presentedTime),
+	CR_IGNORED(presentedFrameLag),
+	CR_IGNORED(displayPeriod),
+	CR_IGNORED(recentFrameTimes),
+	CR_IGNORED(recentFrameTimeIdx),
+	CR_IGNORED(recentFrameTimeCnt),
+	CR_IGNORED(recentFrameTimeSum),
+	CR_IGNORED(fastSyncDetected),
 	CR_MEMBER(weightedSpeedFactor),
 	CR_MEMBER(drawFrame),
 	CR_MEMBER(FPS),
@@ -230,6 +251,11 @@ CGlobalRendering::CGlobalRendering()
 	, lastFrameTime(0.0f)
 	, lastFrameStart(spring_notime)
 	, lastSwapBuffersEnd(spring_notime)
+	, lastSwapBuffersDuration(spring_notime)
+	, presentedFrameTime(0.0f)
+	, presentedTime(0.0)
+	, presentedFrameLag(0.0f)
+	, displayPeriod(0.0f)
 	, weightedSpeedFactor(0.0f)
 	, drawFrame(1)
 	, FPS(1.0f)
@@ -340,6 +366,7 @@ CGlobalRendering::CGlobalRendering()
 	, dualScreenMiniMapOnLeft(false)
 	, fullScreen(configHandler->GetBool("Fullscreen"))
 	, borderless(configHandler->GetBool("WindowBorderless"))
+	, backgroundWindow(false)
 	, underExternalDebug(false)
 	, forceDWMFlush(configHandler->GetInt("DWMFlush"))
 	, sdlWindow{nullptr}
@@ -367,7 +394,9 @@ CGlobalRendering::CGlobalRendering()
 		"YResolutionWindowed",
 		"WindowPosX",
 		"WindowPosY",
-		"MinSampleShadingRate"
+		"MinSampleShadingRate",
+		"MinimizeOnFocusLoss",
+		"TeamNanoSpray"
 	});
 	SetDualScreenParams();
 }
@@ -377,8 +406,8 @@ CGlobalRendering::~CGlobalRendering()
 	configHandler->RemoveObserver(this);
 	verticalSync->WrapRemoveObserver();
 
-	// protect against aborted startup
-	if (glContext) {
+	// protect against aborted startup (also when glDeleteQueries was not loaded)
+	if (glContext && glDeleteQueries != nullptr) {
 		glDeleteQueries(glTimerQueries.size(), glTimerQueries.data());
 	}
 
@@ -427,6 +456,8 @@ SDL_Window* CGlobalRendering::CreateSDLWindow(const char* title) const
 
 	uint32_t sdlFlags  = (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 	         sdlFlags |= (borderless_ ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN) * fullScreen_;
+	         // a background window is shown later, once it is behind the other windows
+	         sdlFlags |= (SDL_WINDOW_HIDDEN * backgroundWindow);
 	         sdlFlags |= (SDL_WINDOW_BORDERLESS * borderless_);
 
 	for (size_t i = 0; i < (aaLvls.size()) && (newWindow == nullptr); i++) {
@@ -567,10 +598,29 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 			++msaaLevel;
 	}
 
+	// a background window is created hidden and shown without activation, so it does
+	// not take the keyboard focus
+	if (backgroundWindow) {
+		SDL_SetHint(SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN, "1");
+		WindowManagerHelper::DisableWindowGhosting();
+	}
+
 	if ((sdlWindow = CreateSDLWindow(title)) == nullptr)
 		return false;
 
-	if (configHandler->GetInt("MinimizeOnFocusLoss") == 0)
+	// a window shown without activation still opens on top of the others, so it is
+	// lowered too; it stays behind until the user clicks it
+	if (backgroundWindow) {
+		WindowManagerHelper::SetNoInitialFocus(sdlWindow);
+		WindowManagerHelper::LowerWindow(sdlWindow);
+		SDL_ShowWindow(sdlWindow);
+		WindowManagerHelper::LowerWindow(sdlWindow);
+		// CreateSDLWindow measured the borders while the window was hidden
+		UpdateWindowBorders(sdlWindow);
+		LOG("[GR::%s] background window: shown without activation, lowered, never minimized", __func__);
+	}
+
+	if (backgroundWindow || configHandler->GetInt("MinimizeOnFocusLoss") == 0)
 		SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
 
 	SetWindowAttributes(sdlWindow);
@@ -588,6 +638,13 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 		return false;
 
 	gladLoadGL();
+	// Some drivers (Intel, Parallels) report GL_EXT_framebuffer_blit but do not export glBlitFramebufferEXT.
+	// Use the core GL 3.0 glBlitFramebuffer, which has the same signature, or report the extension as missing.
+	if (glBlitFramebufferEXT == nullptr) {
+		glad_glBlitFramebufferEXT = glad_glBlitFramebuffer;
+		GLAD_GL_EXT_framebuffer_blit &= (glBlitFramebufferEXT != nullptr);
+	}
+	GL::VRAMTracker::Init(); // before anything allocates
 	GLX::Load(sdlWindow);
 
 	if (!CheckGLContextVersion(minCtx)) {
@@ -621,6 +678,8 @@ void CGlobalRendering::DestroyWindowAndContext() {
 	WindowManagerHelper::SetIconSurface(sdlWindow, nullptr);
 	SetWindowInputGrabbing(false);
 
+	GL::DebugGroupTimers::Kill(); // frees its GL queries, needs the context still current
+	GL::VRAMTracker::Kill();
 	SDL_GL_MakeCurrent(sdlWindow, nullptr);
 	SDL_DestroyWindow(sdlWindow);
 
@@ -662,6 +721,7 @@ void CGlobalRendering::PostInit() {
 	UniformConstants::GetInstance().Init();
 	ModelUniformData::Init();
 	glGenQueries(glTimerQueries.size(), glTimerQueries.data());
+	CreateTracyGpuContext();
 	RenderBuffer::InitStatic();
 	GL::shapes.Init();
 
@@ -671,6 +731,7 @@ void CGlobalRendering::PostInit() {
 void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 {
 	spring_time pre;
+	spring_time swapEnd;
 	{
 		SCOPED_TIMER("Misc::SwapBuffers");
 		SCOPED_GL_DEBUGGROUP("Misc::SwapBuffers");
@@ -710,16 +771,50 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 			}
 		#endif
 
+		swapEnd = spring_now();
+
 		FrameMark;
+		CollectTracyGpuZones();
+		GL::DebugGroupTimers::EndFrame();
+		GL::VRAMTracker::Update();
 	}
 	// exclude debug from SCOPED_TIMER("Misc::SwapBuffers");
 	eventHandler.DbgTimingInfo(TIMING_SWAP, pre, spring_now());
 	globalRendering->lastSwapBuffersEnd = spring_now();
+	globalRendering->lastSwapBuffersDuration = swapEnd - pre;
+}
+
+bool TracyGpu::ready = false;
+
+// Tracy GPU zones (System/Misc/TracyGpu.h) time GL work with GL_TIMESTAMP queries,
+// which need OpenGL 3.3 or ARB_timer_query. One context per GL context, created once; zones
+// issued before this stay inactive (TracyGpu::ready).
+void CGlobalRendering::CreateTracyGpuContext() const
+{
+#ifdef TRACY_ENABLE
+	if (TracyGpu::ready || !GLTimerQueriesSupported())
+		return;
+
+	TracyGpuContext;
+	TracyGpuContextName("OpenGL", 6);
+	TracyGpu::ready = true;
+#endif
+}
+
+// reads back the finished GPU zone timestamps; once per frame, after the swap
+void CGlobalRendering::CollectTracyGpuZones() const
+{
+#ifdef TRACY_ENABLE
+	if (!TracyGpu::ready)
+		return;
+
+	TracyGpuCollect;
+#endif
 }
 
 void CGlobalRendering::SetGLTimeStamp(uint32_t queryIdx) const
 {
-	if (!GLAD_GL_ARB_timer_query)
+	if (!GLTimerQueriesSupported())
 		return;
 
 	glQueryCounter(glTimerQueries[(NUM_OPENGL_TIMER_QUERIES * (drawFrame & 1)) + queryIdx], GL_TIMESTAMP);
@@ -727,7 +822,7 @@ void CGlobalRendering::SetGLTimeStamp(uint32_t queryIdx) const
 
 uint64_t CGlobalRendering::CalcGLDeltaTime(uint32_t queryIdx0, uint32_t queryIdx1) const
 {
-	if (!GLAD_GL_ARB_timer_query)
+	if (!GLTimerQueriesSupported())
 		return 0;
 
 	const uint32_t queryBase = NUM_OPENGL_TIMER_QUERIES * (1 - (drawFrame & 1));
@@ -866,7 +961,7 @@ void CGlobalRendering::SetGLSupportFlags()
 		}
 	}
 	if (int2 glVerNum = { 0, 0 }; sscanf(globalRenderingInfo.glVersionShort.data(), "%d.%d", &glVerNum.x, &glVerNum.y) == 2) {
-		globalRenderingInfo.glslVersionNum = glVerNum.x * 10 + glVerNum.y;
+		globalRenderingInfo.glVersionNum = glVerNum.x * 10 + glVerNum.y;
 	}
 
 	for (size_t n = 0; (n < sizeof(globalRenderingInfo.glslVersionShort) && globalRenderingInfo.glslVersion[n] != 0); n++) {
@@ -1153,6 +1248,118 @@ void CGlobalRendering::LogVersionInfo(const char* sdlVersionStr, const char* glV
 	LOG("\tCompressed texture formats: %s", ss.str().c_str());
 }
 
+// the current mode of the window's display: SDL3 keeps this call (by display id), not SDL_GetWindowDisplayMode
+void CGlobalRendering::UpdateDisplayPeriod()
+{
+	static bool loggedFailure = false;
+
+	SDL_DisplayMode dmode;
+
+	displayPeriod = 0.0f;
+
+	if (sdlWindow == nullptr)
+		return;
+
+	if (SDL_GetCurrentDisplayMode(GetCurrentDisplayIndex(), &dmode) != 0 || dmode.refresh_rate <= 0) {
+		if (!loggedFailure)
+			LOG_L(L_WARNING, "[GR::%s] display refresh rate unknown (%s), the presented frame time is the raw frame time", __func__, SDL_GetError());
+
+		loggedFailure = true;
+		return;
+	}
+
+	displayPeriod = 1000.0f / dmode.refresh_rate;
+}
+
+// With vsync on a frame is shown for whole display periods however unevenly draws start, so the
+// frame time is snapped to periods and the remainder paid back over LAG_PAYBACK_SECONDS.
+// Vsync off, fast sync, an unknown refresh rate or a slow frame: the raw frame time.
+void CGlobalRendering::UpdatePresentedFrameTime(float frameTimeMs)
+{
+	// spreads a dropped frame's extra period over many frames, follows a frame rate change within a second
+	constexpr float LAG_PAYBACK_SECONDS = 0.5f;
+
+	float presentedMs = frameTimeMs;
+
+	const bool vsyncPeriodKnown = (verticalSync->IsEnabled() && displayPeriod > 0.0f);
+
+	if (vsyncPeriodKnown) {
+		UpdateFastSyncDetection(frameTimeMs);
+	} else {
+		recentFrameTimes = {};
+		recentFrameTimeSum = 0.0f;
+		recentFrameTimeCnt = 0;
+		fastSyncDetected = false;
+	}
+
+	if (vsyncPeriodKnown && !fastSyncDetected && frameTimeMs > 0.0f) {
+		// a slow frame takes the raw frame time, the lag is still paid back
+		const bool snap = (frameTimeMs < MAX_SNAP_PERIODS * displayPeriod);
+		const float targetMs = snap ? std::max(1.0f, std::round(frameTimeMs / displayPeriod)) * displayPeriod : frameTimeMs;
+		const float lag = presentedFrameLag + frameTimeMs - targetMs;
+		const float payback = lag * std::min(1.0f, targetMs / (LAG_PAYBACK_SECONDS * 1000.0f));
+
+		presentedFrameLag = lag - payback;
+		presentedMs = targetMs + payback;
+	} else {
+		presentedFrameLag = 0.0f;
+	}
+
+	presentedFrameTime = presentedMs;
+	presentedTime += presentedMs;
+}
+
+// the UpdateTimeOffset call-in's value for this frame
+void CGlobalRendering::OverridePresentedFrameTime(float frameTimeMs)
+{
+	presentedTime += (frameTimeMs - presentedFrameTime);
+	presentedFrameTime = frameTimeMs;
+}
+
+// vsync on but the mean frame time well under a period: frames outpace the refresh (fast sync).
+// The mean, not the median: frames queued after a sim frame bunch up but still drain at the refresh rate.
+void CGlobalRendering::UpdateFastSyncDetection(float frameTimeMs)
+{
+	// a vsync'd frame lasts a period or more: 0.75 leaves room for timer noise, the gap to 0.9 stops flapping
+	constexpr float ENTER_BELOW_PERIODS = 0.75f;
+	constexpr float LEAVE_ABOVE_PERIODS = 0.9f;
+
+	static bool loggedEnter = false;
+	static bool loggedLeave = false;
+
+	recentFrameTimeSum += (frameTimeMs - recentFrameTimes[recentFrameTimeIdx]);
+	recentFrameTimes[recentFrameTimeIdx] = frameTimeMs;
+	recentFrameTimeIdx = (recentFrameTimeIdx + 1) % FAST_SYNC_WINDOW;
+	recentFrameTimeCnt = std::min(recentFrameTimeCnt + 1, FAST_SYNC_WINDOW);
+
+	// resum once per window so float rounding cannot accumulate
+	if (recentFrameTimeIdx == 0)
+		recentFrameTimeSum = std::accumulate(recentFrameTimes.begin(), recentFrameTimes.end(), 0.0f);
+
+	if (recentFrameTimeCnt < FAST_SYNC_WINDOW)
+		return;
+
+	const float meanPeriods = recentFrameTimeSum / (FAST_SYNC_WINDOW * displayPeriod);
+	const bool detected = fastSyncDetected ? (meanPeriods < LEAVE_ABOVE_PERIODS) : (meanPeriods < ENTER_BELOW_PERIODS);
+
+	if (detected == fastSyncDetected)
+		return;
+
+	fastSyncDetected = detected;
+	presentedFrameLag = 0.0f;
+
+	// once each way: a frame rate near the thresholds would spam the log
+	bool& logged = detected ? loggedEnter : loggedLeave;
+
+	if (logged)
+		return;
+
+	logged = true;
+	LOG("[GR::%s] frames %s the display refresh (mean %.2f ms, period %.2f ms), the presented frame time is %s", __func__,
+		detected ? "outpace" : "are held to", meanPeriods * displayPeriod, displayPeriod,
+		detected ? "the raw frame time" : "snapped to whole periods");
+}
+
 void CGlobalRendering::LogDisplayMode(SDL_Window* window) const
 {
 	// print final mode (call after SetupViewportGeometry, which updates viewSizeX/Y)
@@ -1224,7 +1431,9 @@ void CGlobalRendering::SetWindowAttributes(SDL_Window* window)
 {
 	// Get wanted state
 	borderless = configHandler->GetBool("WindowBorderless");
-	fullScreen = configHandler->GetBool("Fullscreen");
+	// SetFullScreen's overlay only covers start-up; a later Fullscreen=1 (Spring.SetWindowGeometry)
+	// must not take a background window to fullscreen either
+	fullScreen = configHandler->GetBool("Fullscreen") && !backgroundWindow;
 	winPosX = configHandler->GetInt("WindowPosX");
 	winPosY = configHandler->GetInt("WindowPosY");
 
@@ -1255,15 +1464,31 @@ void CGlobalRendering::SetWindowAttributes(SDL_Window* window)
 
 	SDL_SetWindowBordered(window, borderless ? SDL_FALSE : SDL_TRUE);
 
-	if (newRes == maxRes)
+	// maximizing activates the window, which a background window must not be
+	if (newRes == maxRes && !backgroundWindow)
 		SDL_MaximizeWindow(window);
 
 	WindowManagerHelper::SetWindowResizable(window, !borderless && !fullScreen);
+
+	// openbox raises the window again on the border and geometry changes above
+	if (backgroundWindow && (SDL_GetWindowFlags(window) & SDL_WINDOW_SHOWN) != 0)
+		WindowManagerHelper::LowerWindow(window);
 }
 
 void CGlobalRendering::ConfigNotify(const std::string& key, const std::string& value)
 {
 	LOG("[GR::%s][1] key=%s val=%s", __func__, key.c_str(), value.c_str());
+
+	// neither needs the window updated; SDL reads the hint on each focus loss
+	if (key == "MinimizeOnFocusLoss") {
+		const bool minimize = (configHandler->GetInt(key) != 0) && !backgroundWindow;
+		SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, minimize ? "1" : "0");
+		return;
+	}
+	if (key == "TeamNanoSpray") {
+		teamNanospray = configHandler->GetBool(key);
+		return;
+	}
 
 	if (key == "MinSampleShadingRate") {
 		auto newMSSR = configHandler->GetFloat("MinSampleShadingRate");
@@ -1421,6 +1646,13 @@ void CGlobalRendering::SetFullScreen(bool cliWindowed, bool cliFullScreen)
 
 	fullScreen = (cfgFullScreen && !cliWindowed  );
 	fullScreen = (cfgFullScreen ||  cliFullScreen);
+
+	// a background window is never fullscreen; the overlay keeps the saved setting
+	if (backgroundWindow) {
+		fullScreen = false;
+		configHandler->Set("Fullscreen", fullScreen, true);
+		return;
+	}
 
 	configHandler->Set("Fullscreen", fullScreen);
 }
@@ -1736,6 +1968,7 @@ void CGlobalRendering::InitGLState()
 	// this does not accomplish much
 	// SwapBuffers(true, true);
 	LogDisplayMode(sdlWindow);
+	UpdateDisplayPeriod();
 }
 
 void CGlobalRendering::ToggleMultisampling() const
@@ -1839,6 +2072,12 @@ bool CGlobalRendering::SetWindowMinMaximized(bool maximize) const
 	};
 	if ((SDL_GetWindowFlags(sdlWindow) & mmFlags[maximize]) != 0)
 		return false; //already in desired state
+
+	// minimizing stalls rendering, maximizing activates the window
+	if (backgroundWindow) {
+		LOG_L(L_WARNING, "[GR::%s] not %s: --background-window is set", __func__, maximize ? "maximizing" : "minimizing");
+		return false;
+	}
 
 	if (maximize)
 		SDL_MaximizeWindow(sdlWindow);

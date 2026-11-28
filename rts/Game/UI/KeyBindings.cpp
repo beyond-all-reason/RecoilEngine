@@ -9,6 +9,7 @@
 #include "KeySet.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitDefHandler.h"
+#include "System/EventHandler.h"
 #include "System/FileSystem/FileHandler.h"
 #include "System/FileSystem/SimpleParser.h"
 #include "System/Log/ILog.h"
@@ -250,7 +251,6 @@ static const DefaultBinding defaultBindings[] = {
 	{ "Ctrl+b",    "select AllMap+_Builder_Idle+_ClearSelection_SelectOne+"                            },
 	{ "Ctrl+c",    "select AllMap+_ManualFireUnit+_ClearSelection_SelectOne+"                          },
 	{ "Ctrl+r",    "select AllMap+_Radar+_ClearSelection_SelectAll+"                                   },
-	{ "Ctrl+v",    "select AllMap+_Not_Builder_Not_Commander_InPrevSel_Not_InHotkeyGroup+_SelectAll+"  },
 	{ "Ctrl+w",    "select AllMap+_Not_Aircraft_Weapons+_ClearSelection_SelectAll+"                    },
 	{ "Ctrl+x",    "select AllMap+_InPrevSel_Not_InHotkeyGroup+_SelectAll+"                            },
 	{ "Ctrl+z",    "select AllMap+_InPrevSel+_ClearSelection_SelectAll+"                               }
@@ -545,8 +545,21 @@ const CKeyBindings::HotkeyList& CKeyBindings::GetHotkeys(const std::string& acti
 	return it->second;
 }
 
+void CKeyBindings::Clear()
+{
+	codeBindings.clear();
+	scanBindings.clear();
+	keyCodes.Reset();
+	scanCodes.Reset();
+	bindingsCount = 0;
+	buildHotkeyMap = true;
+
+}
+
 
 /******************************************************************************/
+
+static constexpr char escapedComma = '\x01';
 
 static bool ParseSingleChain(const std::string& keystr, CKeyChain* kc)
 {
@@ -561,6 +574,7 @@ static bool ParseSingleChain(const std::string& keystr, CKeyChain* kc)
 		char kcstr[256];
 		ss.getline(kcstr, 256, ',');
 		std::string kstr(kcstr);
+		std::replace(kstr.begin(), kstr.end(), escapedComma, ',');
 
 		if (!ks.Parse(kstr, false))
 			return false;
@@ -576,9 +590,9 @@ static bool ParseKeyChain(std::string keystr, CKeyChain* kc, const size_t pos = 
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// recursive function to allow "," as separator-char & as shortcut
-	// -> when parsing fails, this functions replaces one by one all "," by their hexcode
-	//    and tries then to reparse it
-	// -> i.e. ",,," will at the end parsed as "0x2c,0x2c"
+	// -> when parsing fails, this functions escapes one by one all "," so they are
+	//    kept as part of their key token and tries then to reparse it
+	// -> i.e. ",,," will at the end parsed as the chain "," then ","
 
 	const size_t cpos = keystr.rfind(',', pos);
 
@@ -594,7 +608,7 @@ static bool ParseKeyChain(std::string keystr, CKeyChain* kc, const size_t pos = 
 	if ((nextpos != std::string::npos) && ParseKeyChain(keystr, kc, nextpos))
 		return true;
 
-	keystr.replace(cpos, 1, IntToString(keyCodes.GetCode(","), "%#x"));
+	keystr[cpos] = escapedComma;
 	return ParseKeyChain(keystr, kc, cpos);
 }
 
@@ -611,6 +625,7 @@ void CKeyBindings::AddActionToKeyMap(KeyMap& bindings, Action& action)
 		ActionList& al = bindings[ks];
 		action.bindingIndex = ++bindingsCount;
 		al.push_back(action);
+		buildHotkeyMap = true;
 	} else {
 		ActionList& al = it->second;
 		assert(it->first == ks);
@@ -624,6 +639,7 @@ void CKeyBindings::AddActionToKeyMap(KeyMap& bindings, Action& action)
 			// not yet bound, push it
 			action.bindingIndex = ++bindingsCount;
 			al.push_back(action);
+			buildHotkeyMap = true;
 		}
 	}
 }
@@ -662,8 +678,8 @@ bool CKeyBindings::Bind(const std::string& keystr, const std::string& line)
 bool CKeyBindings::UnBind(const std::string& keystr, const std::string& command)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	CKeySet ks;
-	if (!ks.Parse(keystr)) {
+	CKeyChain kc;
+	if (!ParseKeyChain(keystr, &kc) || kc.empty()) {
 		LOG_L(L_WARNING, "UnBind: could not parse key: %s", keystr.c_str());
 		return false;
 	}
@@ -671,19 +687,26 @@ bool CKeyBindings::UnBind(const std::string& keystr, const std::string& command)
 	if (debugEnabled)
 		LOG("[CKeyBindings::%s] keystr=%s command=%s", __func__, keystr.c_str(), command.c_str());
 
+	/* Bind does the same to the stored chain, so mirror it
+	 * here or a stateful bind can never be named exactly. */
+	if (statefulCommands.find(command) != statefulCommands.end())
+		kc.back().SetAnyBit();
+
+	const CKeySet& ks = kc.back();
 	KeyMap& bindings = ks.IsKeyCode() ? codeBindings : scanBindings;
 	const auto it = bindings.find(ks);
 
-	if (it == bindings.end())
-		return false;
+	if (it != bindings.end()) {
+		ActionList& al = it->second;
 
-	ActionList& al = it->second;
-	const bool success = RemoveCommandFromList(al, command);
+		if (RemoveCommandFromList(al, kc, command))
+			buildHotkeyMap = true;
 
-	if (al.empty())
-		bindings.erase(it);
+		if (al.empty())
+			bindings.erase(it);
+	}
 
-	return success;
+	return true;
 }
 
 
@@ -703,10 +726,11 @@ bool CKeyBindings::UnBindKeyset(const std::string& keystr)
 
 	const auto it = bindings.find(ks);
 
-	if (it == bindings.end())
-		return false;
+	if (it != bindings.end()) {
+		bindings.erase(it);
+		buildHotkeyMap = true;
+	}
 
-	bindings.erase(it);
 	return true;
 }
 
@@ -740,7 +764,16 @@ bool CKeyBindings::UnBindAction(const std::string& command)
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (debugEnabled)
 		LOG("[CKeyBindings::%s] command=%s", __func__, command.c_str());
-	return RemoveActionFromKeyMap(command, codeBindings) || RemoveActionFromKeyMap(command, scanBindings);
+	// clear both maps; || would short-circuit and leave the scancode binding when
+	// the action is also bound to a keycode
+	const bool removedFromCode = RemoveActionFromKeyMap(command, codeBindings);
+	const bool removedFromScan = RemoveActionFromKeyMap(command, scanBindings);
+	const bool changed = removedFromCode || removedFromScan;
+
+	if (changed)
+		buildHotkeyMap = true;
+
+	return true;
 }
 
 
@@ -801,6 +834,23 @@ bool CKeyBindings::RemoveCommandFromList(ActionList& al, const std::string& comm
 }
 
 
+/* Chains are stored under their last keyset, so
+ * a bucket holds every chain ending in that key. */
+bool CKeyBindings::RemoveCommandFromList(ActionList& al, const CKeyChain& kc, const std::string& command)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	const auto removedCount = std::erase_if(al, [&kc, &command] (const auto& x) {
+		/* exact compare, not .fit(): naming one modifier
+		 * combination must not remove a different one.
+		 * operator== also rejects differing chain lengths. */
+		return x.command == command && x.keyChain == kc;
+	});
+
+	return removedCount > 0;
+}
+
+
 void CKeyBindings::ConfigNotify(const std::string& key, const std::string& value)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -811,9 +861,6 @@ void CKeyBindings::ConfigNotify(const std::string& key, const std::string& value
 void CKeyBindings::LoadDefaults()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const bool tmpBuildHotkeyMap = buildHotkeyMap;
-	buildHotkeyMap = false;
-
 	if (debugEnabled)
 		LOG("[CKeyBindings::%s]", __func__);
 
@@ -822,8 +869,7 @@ void CKeyBindings::LoadDefaults()
 	for (const auto& b: defaultBindings) {
 		Bind(b.key, b.action);
 	}
-
-	buildHotkeyMap = tmpBuildHotkeyMap;
+	// no rebuild here: only ever used as a building block, the caller rebuilds
 }
 
 
@@ -858,7 +904,7 @@ void CKeyBindings::PushAction(const Action& action)
 	}
 }
 
-bool CKeyBindings::ExecuteCommand(const std::string& line)
+bool CKeyBindings::ExecuteCommandInternal(const std::string& line)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const std::vector<std::string> words = CSimpleParser::Tokenize(line, 2);
@@ -868,6 +914,9 @@ bool CKeyBindings::ExecuteCommand(const std::string& line)
 
 	const std::string command = StringToLower(words[0]);
 
+	// emit even on a no-op command so clients can tell it ran; keydebug is logging-only, so skip it
+	bool emitEvent = true;
+
 	if (command == "keydebug") {
 		if (words.size() == 1) {
 			// toggle
@@ -876,6 +925,7 @@ bool CKeyBindings::ExecuteCommand(const std::string& line)
 			// set
 			debugEnabled = atoi(words[1].c_str());
 		}
+		emitEvent = false;
 	}
 	else if (command == "keyload") {
 		const std::string& filename = words.size() > 1 ? words[1] : DEFAULT_FILENAME;
@@ -887,7 +937,7 @@ bool CKeyBindings::ExecuteCommand(const std::string& line)
 		if (loadStack.empty() && words.size() == 1)
 			LoadDefaults();
 
-		Load(filename);
+		LoadInternal(filename);
 	}
 	else if (command == "keyreload") {
 		const std::string& filename = words.size() > 1 ? words[1] : DEFAULT_FILENAME;
@@ -895,13 +945,13 @@ bool CKeyBindings::ExecuteCommand(const std::string& line)
 		if (debugEnabled)
 			LOG("[CKeyBindings::%s] line=%s", __func__, line.c_str());
 
-		ExecuteCommand("unbindall");
-		ExecuteCommand("unbind enter chat");
+		ExecuteCommandInternal("unbindall");
+		ExecuteCommandInternal("unbind enter chat");
 
 		if (loadStack.empty() && words.size() == 1)
 			LoadDefaults();
 
-		Load(filename);
+		LoadInternal(filename);
 	}
 	else if (command == "keydefaults") {
 		LoadDefaults();
@@ -925,12 +975,15 @@ bool CKeyBindings::ExecuteCommand(const std::string& line)
 		if (!UnBindKeyset(words[1])) { return false; }
 	}
 	else if (command == "unbindall") {
-		codeBindings.clear();
-		scanBindings.clear();
-		keyCodes.Reset();
-		scanCodes.Reset();
-		bindingsCount = 0;
-		Bind("enter", "chat"); // bare minimum
+		Clear();
+
+		Bind("enter", "chat"); // opens chat window
+		Bind("enter", "edit_return"); // confirms the input in chat window
+		Bind("escape", "edit_escape");
+		Bind("backspace", "edit_backspace");
+		Bind("delete", "edit_delete");
+		Bind("left", "edit_prev_char");
+		Bind("right", "edit_next_char");
 
 		if (debugEnabled)
 			LOG("[CKeyBindings::%s] line=%s", __func__, line.c_str());
@@ -939,14 +992,23 @@ bool CKeyBindings::ExecuteCommand(const std::string& line)
 		return false;
 	}
 
-	if (buildHotkeyMap)
-		BuildHotkeyMap();
-
-	return false;
+	return emitEvent;
 }
 
 
-bool CKeyBindings::Load(const std::string& filename)
+bool CKeyBindings::ExecuteCommand(const std::string& line)
+{
+	const bool emitEvent = ExecuteCommandInternal(line);
+	MaybeBuildHotkeyMap();
+
+	if (emitEvent)
+		eventHandler.KeyBindingsChanged();
+
+	return emitEvent;
+}
+
+
+bool CKeyBindings::LoadInternal(const std::string& filename)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (std::find(loadStack.begin(), loadStack.end(), filename) != loadStack.end()) {
@@ -957,9 +1019,6 @@ bool CKeyBindings::Load(const std::string& filename)
 
 		return false;
 	}
-
-	const bool tmpBuildHotkeyMap = buildHotkeyMap;
-	buildHotkeyMap = false;
 
 	if (debugEnabled) {
 		LOG("[CKeyBindings::%s] filename=%s%s", __func__, filename.c_str(), loadStack.empty() ? "" : ", load stack:");
@@ -973,14 +1032,35 @@ bool CKeyBindings::Load(const std::string& filename)
 	CSimpleParser parser(ifs);
 
 	while (!parser.Eof()) {
-		ExecuteCommand(parser.GetCleanLine());
+		ExecuteCommandInternal(parser.GetCleanLine());
 	}
 
 	loadStack.pop_back();
 
-	buildHotkeyMap = tmpBuildHotkeyMap;
-
 	return true;
+}
+
+
+bool CKeyBindings::Load(const std::string& filename)
+{
+	const bool ret = LoadInternal(filename);
+	MaybeBuildHotkeyMap();
+
+	if (ret)
+		eventHandler.KeyBindingsChanged();
+
+	return ret;
+}
+
+
+void CKeyBindings::MaybeBuildHotkeyMap()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (!buildHotkeyMap)
+		return;
+
+	BuildHotkeyMap();
+	buildHotkeyMap = false;
 }
 
 

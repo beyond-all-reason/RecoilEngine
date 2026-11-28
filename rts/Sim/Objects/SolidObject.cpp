@@ -51,6 +51,8 @@ CR_REG_METADATA(CSolidObject,
 	CR_MEMBER(team),
 	CR_MEMBER(allyteam),
 
+	CR_MEMBER_UN(paletteIndex),
+
 	CR_MEMBER(creationFrame),
 
 	CR_MEMBER(pieceHitFrames),
@@ -92,6 +94,9 @@ CSolidObject::CSolidObject()
 void CSolidObject::PostLoad()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// not saved (custom palette colors are not either), so start from the team color again
+	paletteIndex = static_cast<uint16_t>(team);
+
 	if ((model = GetDef()->LoadModel()) == nullptr)
 		return;
 

@@ -39,6 +39,7 @@ public:
 
 	SoundItem* GetSoundItem(size_t id) override;
 	CSoundSource* GetNextBestSource(bool lock = true) override;
+	bool StopSoundItem(const std::string& name, const IAudioChannel* channel) override;
 
 	void NewFrame() override;
 	void UpdateListener(const float3& campos, const float3& camdir, const float3& camup) override {
@@ -57,7 +58,7 @@ public:
 	bool Mute() override;
 	bool IsMuted() const override { return mute; }
 
-	void DeviceChanged(uint32_t sdlDeviceIndex) override;
+	void DeviceChanged(uint32_t sdlDeviceIndex, bool added) override;
 
 	void Iconified(bool state) override;
 
@@ -81,6 +82,7 @@ private:
 	void Cleanup();
 	void OpenOpenALDevice(const std::string& deviceName);
 	bool OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtainedSpec);
+	void ReopenSdlDevice();
 	void OpenLoopbackDevice(const std::string& deviceName);
 
 	void InitThread(int cfgMaxSounds);
@@ -92,6 +94,8 @@ private:
 	int GetMaxMonoSources(ALCdevice* device, int cfgMaxSounds);
 	void GenSources(int alMaxSounds);
 
+	size_t FindLoadedSoundId(const std::string& name) const;
+	const SoundItemNameMap* FindSoundItemDef(const std::string& name) const;
 	size_t MakeItemFromDef(const SoundItemNameMap& itemDef);
 	size_t LoadSoundBuffer(const std::string& filename);
 
@@ -100,6 +104,8 @@ private:
 	ALCcontext* curContext = nullptr;
 	int sdlDeviceID = -1;
 	bool hasAlcSoftLoopBack = false;
+	// OpenAL renders into the loopback device and SDL plays it
+	bool sdlOutput = false;
 
 	std::string selectedDeviceName = "";
 

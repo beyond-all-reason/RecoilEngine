@@ -171,9 +171,6 @@ CFeature* CFeatureHandler::CreateWreckage(const FeatureLoadParams& cparams)
 	if (!eventHandler.AllowFeatureCreation(fd, cparams.teamID, cparams.pos))
 		return nullptr;
 
-	if (fd->modelName.empty())
-		return nullptr;
-
 	FeatureLoadParams params = cparams;
 
 	params.parentObj = cparams.parentObj;

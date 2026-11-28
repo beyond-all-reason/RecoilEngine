@@ -213,6 +213,37 @@ CBuilderCAI::CBuilderCAI(CUnit* owner):
 	unitHandler.AddBuilderCAI(this);
 }
 
+
+bool CBuilderCAI::HasCurrentBuild() const
+{
+	return (ownerBuilder != nullptr && ownerBuilder->curBuild != nullptr);
+}
+
+bool CBuilderCAI::GetCurrentBuildCommandTag(unsigned int& commandTag) const
+{
+	if (!HasCurrentBuild())
+		return false;
+
+	const CUnit* currentBuild = ownerBuilder->curBuild;
+
+	for (const Command& queuedCommand: commandQue) {
+		BuildInfo queuedBuild;
+		if (!queuedBuild.Parse(queuedCommand))
+			continue;
+		if (queuedBuild.def != currentBuild->unitDef)
+			continue;
+		if (queuedBuild.buildFacing != currentBuild->buildFacing)
+			continue;
+		if (CSolidObject::GetMapPosStatic(queuedBuild.pos, queuedBuild.GetXSize(), queuedBuild.GetZSize()) != currentBuild->mapPos)
+			continue;
+
+		commandTag = queuedCommand.GetTag();
+		return true;
+	}
+
+	return false;
+}
+
 CBuilderCAI::~CBuilderCAI()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -611,6 +642,9 @@ void CBuilderCAI::ExecuteBuildCmd(Command& c)
 
 		// <build> is never parsed (except in PostLoad) so just copy it
 		build = bi;
+		// snap to the position the build will actually use, so the early check
+		// below tests the same footprint the rest of this function does
+		build.pos = CGameHelper::Pos2BuildPos(build, true);
 		inCommand = c.GetID();
 
 		// One-time early check: if repeating the order (or first run), skip immediately if now blocked
@@ -891,13 +925,13 @@ void CBuilderCAI::ExecuteGuard(Command& c)
 				StopSlowGuard();
 			}
 			return;
-		} else if (b->curReclaim && owner->unitDef->canReclaim) {
+		} else if (b->curReclaim && !b->curReclaim->detached && owner->unitDef->canReclaim) {
 			StopSlowGuard();
 			if (!ReclaimObject(b->curReclaim)) {
 				StopMove();
 			}
 			return;
-		} else if (b->curResurrect && owner->unitDef->canResurrect) {
+		} else if (b->curResurrect && !b->curResurrect->detached && owner->unitDef->canResurrect) {
 			StopSlowGuard();
 			if (!ResurrectObject(b->curResurrect)) {
 				StopMove();
@@ -916,7 +950,8 @@ void CBuilderCAI::ExecuteGuard(Command& c)
 		if (pushRepairCommand) {
 			StopSlowGuard();
 
-			Command nc(CMD_REPAIR, c.GetOpts(), b->curBuild->id);
+			// Guard-generated repairs must not be copied into a repeating queue.
+			Command nc(CMD_REPAIR, c.GetOpts() | INTERNAL_ORDER, b->curBuild->id);
 
 			commandQue.push_front(nc);
 			inCommand = CMD_STOP;
@@ -935,7 +970,7 @@ void CBuilderCAI::ExecuteGuard(Command& c)
 		if (pushRepairCommand) {
 			StopSlowGuard();
 
-			commandQue.push_front(Command(CMD_REPAIR, c.GetOpts(), fac->curBuild->id));
+			commandQue.push_front(Command(CMD_REPAIR, c.GetOpts() | INTERNAL_ORDER, fac->curBuild->id));
 			inCommand = CMD_STOP;
 			// SlowUpdate();
 			return;
@@ -1747,4 +1782,3 @@ void CBuilderCAI::BuggerOff(const float3& pos, float radius) {
 
 	CMobileCAI::BuggerOff(pos, radius);
 }
-

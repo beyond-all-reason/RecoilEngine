@@ -89,15 +89,7 @@ CMouseHandler::CMouseHandler()
 
 	UpdateCursorCameraDir();
 
-#ifndef __APPLE__
 	hardwareCursor = configHandler->GetBool("HardwareCursor");
-#endif
-
-	crossSize      = configHandler->GetFloat("CrossSize");
-	crossAlpha     = configHandler->GetFloat("CrossAlpha");
-	crossMoveScale = configHandler->GetFloat("CrossMoveScale") * 0.005f;
-
-	doubleClickTime = configHandler->GetFloat("DoubleClickTime") / 1000.0f;
 
 	ConfigUpdate();
 
@@ -110,6 +102,10 @@ CMouseHandler::CMouseHandler()
 		"MouseDragFrontCommandThreshold",
 		"InvertMouse",
 		"ScrollWheelSpeed",
+		"CrossSize",
+		"CrossAlpha",
+		"CrossMoveScale",
+		"DoubleClickTime",
 	});
 }
 
@@ -305,6 +301,33 @@ void CMouseHandler::MouseMove(int x, int y, int dx, int dy)
 }
 
 
+void CMouseHandler::SetButtonEmulated(int button, bool pressed)
+{
+	if (button < 1 || button > NUM_BUTTONS)
+		return;
+
+	const bool physicalDown = (SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON(button)) != 0;
+	const bool wasDown = physicalDown || buttons[button].emulated;
+
+	buttons[button].emulated = pressed;
+
+	// fire only on an effective (physical-or-emulated) edge, so a real press
+	// underneath an emulated one doesn't produce a duplicate event
+	if (pressed && !wasDown) {
+		MousePress(lastx, lasty, button);
+	} else if (!pressed && wasDown && !physicalDown) {
+		MouseRelease(lastx, lasty, button);
+	}
+}
+
+
+void CMouseHandler::ClearEmulatedButtons()
+{
+	for (int button = 1; button <= NUM_BUTTONS; ++button)
+		buttons[button].emulated = false;
+}
+
+
 void CMouseHandler::MousePress(int x, int y, int button)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -333,6 +356,24 @@ void CMouseHandler::MousePress(int x, int y, int button)
 	bp.movement = 0;
 
 	pressedBitMask |= 1 << button;
+
+	const bool isXButton = (button == SDL_BUTTON_X1 || button == SDL_BUTTON_X2);
+	if (isXButton) {
+
+		// 1. Lua first
+		if (luaInputReceiver->MousePress(x, y, button)) {
+			return;
+		}
+
+		// 2. GameInputReceiver via the same path as mouse buttons
+		auto activeControllerReceiver = (activeController == nullptr) ? nullptr : activeController->GetInputReceiver();
+		if (activeControllerReceiver && activeControllerReceiver->MousePress(x, y, button)) {
+			// NOTE: X‑buttons bypass ownership so they can be pressed/released without stealing or confusing activeReceiver
+			return;
+		}
+		return;
+	}
+
 
 	if (activeReceiver != nullptr && activeReceiver->MousePress(x, y, button))
 		return;
@@ -500,6 +541,22 @@ void CMouseHandler::MouseRelease(int x, int y, int button)
 	}
 
 	if (RmlGui::ProcessMouseRelease(x, y, button)) {
+		return;
+	}
+
+	const bool isXButton = (button == SDL_BUTTON_X1 || button == SDL_BUTTON_X2);
+	if (isXButton) {
+
+		// 1. Lua first
+		luaInputReceiver->MouseRelease(x, y, button);
+
+		// 2. GameInputReceiver via the same path as mouse buttons
+		auto activeControllerReceiver = (activeController == nullptr) ? nullptr : activeController->GetInputReceiver();
+		if (activeControllerReceiver) {
+			activeControllerReceiver->MouseRelease(x, y, button);
+		}
+
+		// 3. Skip ownership funnel
 		return;
 	}
 
@@ -730,7 +787,8 @@ void CMouseHandler::Update()
 		if (auto& rmlCursor = RmlGui::GetMouseCursor(); !rmlCursor.empty())
 			queuedCursorName = rmlCursor;
 
-	SetCursor(queuedCursorName);
+	SetCursor(queuedCursorName, rebindCursorAfterWarp);
+	rebindCursorAfterWarp = false;
 
 	if (!hideCursor) {
 		mouse->UpdateCursorCameraDir();
@@ -757,7 +815,7 @@ void CMouseHandler::Update()
 }
 
 
-void CMouseHandler::WarpMouse(int x, int y)
+void CMouseHandler::WarpMouse(int x, int y, bool moveSystemPointer)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (locked)
@@ -766,7 +824,14 @@ void CMouseHandler::WarpMouse(int x, int y)
 	lastx = x + globalRendering->viewPosX;
 	lasty = y;
 
-	mouseInput->SetWarpPos({lastx, lasty});
+	if (!moveSystemPointer) {
+		mouseInput->SetPos({lastx, lasty});
+		return;
+	}
+
+	// WarpPos temporarily hides the SDL cursor on Wayland. Rebind the hardware
+	// cursor during the next update, after SDL has processed the warp.
+	rebindCursorAfterWarp |= mouseInput->SetWarpPos({lastx, lasty});
 }
 
 
@@ -819,15 +884,21 @@ void CMouseHandler::HideMouse()
 void CMouseHandler::ToggleMiddleClickScroll()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (locked) {
-		ShowMouse();
-	} else {
-		HideMouse();
-	}
-
 	locked = !locked;
 	mmbScroll = !mmbScroll;
 	ignoreMove = mmbScroll;
+
+	if (locked) {
+		HideMouse();
+	} else {
+		ShowMouse();
+
+		const int2 cursorPos = GetViewMouseCenter();
+		lastx = cursorPos.x;
+		lasty = cursorPos.y;
+		mouseInput->SetWarpPos(cursorPos);
+		UpdateCursorCameraDir();
+	}
 }
 
 
@@ -1107,6 +1178,12 @@ bool CMouseHandler::ReplaceMouseCursor(
 
 	CMouseCursor newCursor = CMouseCursor(newName, hotSpot);
 
+	// a replacement that loaded no frames draws nothing, so this silently turns
+	// a working cursor invisible. Whether the engine should refuse it is a
+	// behaviour question, since content may rely on it to hide the cursor.
+	if (!newCursor.IsValid())
+		LOG_L(L_WARNING, "[MouseHandler::%s] replacement \"%s\" for \"%s\" has no frames, the cursor will draw nothing", __func__, newName.c_str(), oldName.c_str());
+
 	// replace here so SetCursor() operates with new CMouseCursor() object
 	// hold on the destruction of old CMouseCursor() in this place. Otherwise bad things will happen.
 	std::swap(loadedCursors.at(fileIt->second), newCursor);
@@ -1139,4 +1216,10 @@ void CMouseHandler::ConfigUpdate()
 	invertMouse = configHandler->GetBool("InvertMouse");
 	miniMapMouseWheel = configHandler->GetBool("MiniMapMouseWheel");
 	scrollWheelSpeed = configHandler->GetFloat("ScrollWheelSpeed");
+
+	crossSize = configHandler->GetFloat("CrossSize");
+	crossAlpha = configHandler->GetFloat("CrossAlpha");
+	crossMoveScale = configHandler->GetFloat("CrossMoveScale") * 0.005f;
+
+	doubleClickTime = configHandler->GetFloat("DoubleClickTime") / 1000.0f;
 }

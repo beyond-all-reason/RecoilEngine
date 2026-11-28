@@ -64,7 +64,7 @@ bool LuaMathExtra::PushEntries(lua_State* L)
  * @function math.hypot
  * @param x number
  * @param y number
- * @return number `sqrt(x*x+y*y)`
+ * @return number hypotenuse `sqrt(x*x+y*y)`
  */
 int LuaMathExtra::hypot(lua_State* L) {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -146,7 +146,7 @@ int LuaMathExtra::sgn(lua_State* L) {
  * @param x number
  * @param y number
  * @param a number
- * @return number (x+(y-x)*a)
+ * @return number mixed (x+(y-x)*a)
  */
 int LuaMathExtra::mix(lua_State* L) {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -234,6 +234,7 @@ int LuaMathExtra::normalize(lua_State* L)
 	RECOIL_DETAILED_TRACY_ZONE;
 	lua_Number res = 0.0f;
 	const int param = lua_gettop(L);
+	luaL_checkstack(L, param, __func__);
 	for (int i = param; i >= 1; i--) {
 		res += Square(luaL_checknumber_noassert(L, i));
 	}

@@ -94,4 +94,16 @@
 			border-radius: .4rem !important;
 		}
 	}
+
+	/* "view source" link to the C++, right-aligned in a heading or field */
+	.source-link {
+		float: right;
+		font-size: .8rem;
+		font-weight: normal;
+		opacity: .7;
+	}
+
+	.source-link:hover {
+		opacity: 1;
+	}
 }

@@ -167,11 +167,26 @@ void CGameServer::Initialize()
 	rng.Seed((myGameData->GetSetupText()).length());
 
 	// start network
-	if (!myGameSetup->onlyLocal)
-		udpListener.reset(new netcode::UDPListener(myClientSetup->hostPort, myClientSetup->hostIP));
+	int serverPort = myClientSetup->hostPort;
+
+	if (!myGameSetup->onlyLocal) {
+		try {
+			udpListener.reset(new netcode::UDPListener(myClientSetup->hostPort, myClientSetup->hostIP));
+		} catch (const port_in_use_error&) {
+			// a replay is watched through a local connection; only remote spectators need the
+			// configured port, so a port in use (e.g. by a running game) must not stop playback
+			if (!myGameSetup->hostDemo)
+				throw;
+
+			udpListener.reset(new netcode::UDPListener(0, myClientSetup->hostIP));
+			serverPort = udpListener->GetSocket()->local_endpoint().port();
+
+			LOG_L(L_WARNING, "port %d is in use; the replay server uses port %d instead", myClientSetup->hostPort, serverPort);
+		}
+	}
 
 	AddAutohostInterface(StringToLower(configHandler->GetString("AutohostIP")), configHandler->GetInt("AutohostPort"));
-	Message(spring::format(ServerStart, myClientSetup->hostPort), false);
+	Message(spring::format(ServerStart, serverPort), false);
 
 	// start script
 	maxUserSpeed = myGameSetup->maxSpeed;
@@ -180,6 +195,11 @@ void CGameServer::Initialize()
 
 	// modify and save GameSetup text (remove passwords)
 	StripGameSetupText(const_cast<GameData*>(myGameData.get()));
+
+	myGameDataPacket.reset(myGameData->Pack());
+
+	if (myGameDataPacket == nullptr)
+		Message(spring::format(GameDataTooLarge, unsigned(myGameData->GetPackedSize()), unsigned(GameData::MAX_PACKED_SIZE)));
 
 	// load demo (if there is one)
 	if (myGameSetup->hostDemo) {
@@ -205,6 +225,8 @@ void CGameServer::Initialize()
 		if (demoReader != nullptr) {
 			const size_t demoPlayers = demoReader->GetFileHeader().numPlayers;
 			players.resize(std::max(demoPlayers, playerStartData.size()));
+			for (size_t n = 0; n < demoPlayers; ++n)
+				players[n].isFromDemo = true;
 			if (players.size() >= MAX_PLAYERS)
 				Message(spring::format("Too many Players (%d) in the demo", players.size()));
 		}
@@ -246,12 +268,10 @@ void CGameServer::Initialize()
 		std::sort(commandBlacklist.begin(), commandBlacklist.end());
 	}
 
-	if (configHandler->GetBool("ServerRecordDemos")) {
+	if (configHandler->GetBool("ServerRecordDemos") && myGameDataPacket != nullptr) {
 		demoRecorder.reset(new CDemoRecorder(myGameSetup->mapName, myGameSetup->modName, true));
 		demoRecorder->WriteSetupText(myGameData->GetSetupText());
-		const netcode::RawPacket* ret = myGameData->Pack();
-		demoRecorder->SaveToDemo(ret->data, ret->length, GetDemoTime());
-		delete ret;
+		demoRecorder->SaveToDemo(myGameDataPacket->data, myGameDataPacket->length, GetDemoTime());
 	}
 
 	loopSleepTime = configHandler->GetInt("ServerSleepTime");
@@ -291,6 +311,13 @@ void CGameServer::PostLoad(int newServerFrameNum)
 	for (GameParticipant& p: players) {
 		p.lastFrameResponse = newServerFrameNum;
 	}
+
+	// a loaded save starts paused; any later and frames past the saved one are sent
+	isPaused = true;
+
+	// a regular pause message, so every client and its GamePaused callin agree
+	if (HasLocalClient())
+		Broadcast(CBaseNetProtocol::Get().SendPause(localClientNumber, true));
 }
 
 
@@ -404,7 +431,6 @@ void CGameServer::SkipTo(int targetFrameNum)
 {
 	const bool wasPaused = isPaused;
 
-	if (!gameHasStarted) { return; }
 	if (serverFrameNum >= targetFrameNum) { return; }
 	if (demoReader == nullptr) { return; }
 
@@ -412,13 +438,16 @@ void CGameServer::SkipTo(int targetFrameNum)
 	CommandMessage endMsg("skip end", SERVER_PLAYER);
 	Broadcast(std::shared_ptr<const netcode::RawPacket>(startMsg.Pack()));
 
+	if (!gameHasStarted)
+		StartGame(true); // this skips the countdown
+
 	// fast-read and send demo data
 	//
 	// note that we must maintain <modGameTime> ourselves
 	// since we do we NOT go through ::Update when skipping
 	while (SendDemoData(targetFrameNum)) {
 		gameTime = GetDemoTime();
-		modGameTime = demoReader->GetModGameTime() + 0.001f;
+		modGameTime = demoReader->GetNextDemoReadTime() + 0.001f;
 
 		if (udpListener == nullptr) { continue; }
 		if ((serverFrameNum % 20) != 0) { continue; }
@@ -2194,6 +2223,9 @@ void CGameServer::CheckForGameStart(bool forced)
 	bool anyReady = false;
 
 	for (size_t a = static_cast<size_t>(myGameSetup->numDemoPlayers); a < players.size(); a++) {
+		if (players[a].isFromDemo)
+			continue;
+
 		if (players[a].myState == GameParticipant::UNCONNECTED && serverStartTime + spring_secs(30) < spring_gettime()) {
 			// autostart the game when 30 seconds have passed and everyone who managed to connect is ready
 			continue;
@@ -2953,7 +2985,12 @@ unsigned CGameServer::BindConnection(
 	bool killExistingLink = false;
 	// bool reconnectAllowed = canReconnect;
 
-	if (clientVersion != refClientVersion.second) {
+	if (myGameDataPacket == nullptr) {
+		errMsg = spring::format(GameDataTooLarge, unsigned(myGameData->GetPackedSize()), unsigned(GameData::MAX_PACKED_SIZE));
+
+	if (!reconnect)
+		clientLink->Unmute();
+	} else if (clientVersion != refClientVersion.second) {
 		errMsg = "client version '" + clientVersion + "' mismatch, reference is '" + refClientVersion.second + "' set by '" + refClientVersion.first + "'";
 	} else {
 		struct ConnectionFlags {
@@ -3075,7 +3112,7 @@ unsigned CGameServer::BindConnection(
 	}
 
 	newPlayer.Connected(clientLink, isLocal);
-	newPlayer.SendData(std::shared_ptr<const RawPacket>(myGameData->Pack()));
+	newPlayer.SendData(myGameDataPacket);
 	newPlayer.SendData(CBaseNetProtocol::Get().SendSetPlayerNum((unsigned char)newPlayerNumber));
 
 	// after gamedata and playerNum, the player can start loading
@@ -3092,6 +3129,12 @@ unsigned CGameServer::BindConnection(
 
 			Broadcast(CBaseNetProtocol::Get().SendJoinTeam(newPlayerNumber, newPlayerTeam));
 		}
+	}
+
+	// inform player of the current frame
+	if (gameHasStarted) {
+		CBaseNetProtocol::PacketType progressPacket = CBaseNetProtocol::Get().SendCurrentFrameProgress(serverFrameNum);
+		newPlayer.SendData(progressPacket);
 	}
 
 	// finally send player all packets he missed until now

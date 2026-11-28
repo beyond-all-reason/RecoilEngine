@@ -41,6 +41,25 @@ VOID_COMPONENT(ProcessPath);
 ALIAS_COMPONENT(PathSearchRef, QTPFS::entity);
 ALIAS_COMPONENT(PathRequeueSearch, bool);
 
+// Sometimes a path request cannot be scheduled immediately. This is used to hold the request information until the
+// request can be scheduled.
+struct PendingPathRequestDetails {
+	const CSolidObject* object;
+
+	float3 startPos;
+	float3 endPos;
+	float radius;
+	unsigned int pathType; // looks up movedef
+	bool synced;
+	bool externalRequest; // true if the request came form Lua or AI
+	bool allowRawSearch;
+};
+
+// used to cross reference entities in the internal and external registries that refer to the same path request.
+ALIAS_COMPONENT(ExternalPathEntityId, QTPFS::entity);
+ALIAS_COMPONENT(InternalPathEntityId, QTPFS::entity);
+
+
 }
 
 #endif

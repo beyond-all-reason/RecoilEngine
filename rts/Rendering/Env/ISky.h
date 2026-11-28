@@ -25,6 +25,8 @@ public:
 	virtual void SetLuaTexture(const MapTextureData& td) {}
 
 	virtual bool IsValid() const = 0;
+	// a painted skybox has the sun in its texels and cannot leave it out
+	virtual bool SupportsSunFreeDraw() const { return false; }
 
 	virtual std::string GetName() const = 0;
 
@@ -50,6 +52,7 @@ public:
 	void SetUpdated() { updated = true; }
 public:
 	static void SetSky();
+	static void SetSkyLuaTexture(const MapTextureData& td);
 	static auto& GetSky() { return sky; }
 	static void KillSky() { sky = nullptr; }
 public:
@@ -64,6 +67,9 @@ public:
 	float fogStart;
 	float fogEnd;
 	float cloudDensity;
+
+	// set around one Draw() by gl.RenderEnvironmentFace(..., sunFree = true)
+	bool drawWithoutSunLobe = false;
 protected:
 	float4 skyAxisAngle;
 protected:

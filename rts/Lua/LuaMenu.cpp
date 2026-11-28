@@ -24,7 +24,6 @@
 #include "System/FileSystem/FileHandler.h"
 #include "System/FileSystem/FileSystem.h"
 #include "System/Threading/SpringThreading.h"
-#include "lib/luasocket/src/luasocket.h"
 #include "LuaUI.h"
 
 #include "System/Misc/TracyDefs.h"
@@ -134,22 +133,6 @@ string CLuaMenu::LoadFile(const string& name) const
 }
 
 
-void CLuaMenu::InitLuaSocket(lua_State* L) {
-	RECOIL_DETAILED_TRACY_ZONE;
-	std::string code;
-	std::string filename = "socket.lua";
-	CFileHandler f(filename);
-
-	LUA_OPEN_LIB(L, luaopen_socket_core);
-
-	if (f.LoadStringData(code)) {
-		LoadCode(L, std::move(code), filename);
-	} else {
-		LOG_L(L_ERROR, "Error loading %s", filename.c_str());
-	}
-}
-
-
 bool CLuaMenu::RemoveSomeOpenGLFunctions(lua_State* L)
 {
 	// remove some spring opengl functions that don't work preloading
@@ -190,6 +173,7 @@ bool CLuaMenu::LoadUnsyncedCtrlFunctions(lua_State* L)
 
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, LoadSoundDef);
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, PlaySoundFile);
+	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, StopSoundByFilename);
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, PlaySoundStream);
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, StopSoundStream);
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, PauseSoundStream);

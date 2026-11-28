@@ -14,8 +14,6 @@
 #include <filesystem>
 #include <variant>
 
-#include <unistd.h>
-
 #include <fmt/printf.h>
 #include <fmt/format.h>
 
@@ -47,6 +45,7 @@
 		#undef CreateDirectory
 	#endif
 #else
+	#include <unistd.h>
 	#include <sys/types.h>
 	#include <dirent.h>
 #endif // _WIN32
@@ -61,7 +60,7 @@ namespace Impl {
 		return std::string(reinterpret_cast<const char*>(utf8.c_str()));
 	}
 	RECOIL_FORCE_INLINE std::string StoreUTF8AsString(const std::u8string_view& utf8) {
-		return std::string(reinterpret_cast<const char*>(utf8.data()));
+		return std::string(reinterpret_cast<const char*>(utf8.data()), utf8.size());
 	}
 	RECOIL_FORCE_INLINE std::string StorePathAsString(const fs::path& path) {
 		return StoreUTF8AsString(path.u8string());
@@ -274,6 +273,9 @@ bool FileSystem::IsPathOnSpinningDisk(const std::string& path)
 	}
 	CloseHandle(volHandle);
 	return result.IncursSeekPenalty;
+#elif defined(__APPLE__)
+	// Macs have shipped with SSDs for years, and the /sys lookup below does not exist here
+	return false;
 #else
 	struct stat info;
 
@@ -912,7 +914,7 @@ std::string FileSystem::GetExtensionLowerCase(const std::string& pathStr)
 }
 
 std::string FileSystem::GetNormalizedPath(const std::string& path) {
-	return Impl::StoreUTF8AsString(std::filesystem::path(ForwardSlashes(path)).lexically_normal().generic_u8string());
+	return Impl::StoreUTF8AsString(Recoil::filesystem::u8path(ForwardSlashes(path)).lexically_normal().generic_u8string());
 }
 
 bool FileSystem::CheckFile(const std::string& file)

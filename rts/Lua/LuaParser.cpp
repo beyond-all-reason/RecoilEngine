@@ -501,12 +501,13 @@ void LuaParser::AddString(int key, const std::string& value)
 
 int LuaParser::TimeCheck(lua_State* L)
 {
-	#if (!defined(UNITSYNC) && !defined(DEDICATED))
 	if (!lua_isstring(L, 1) || !lua_isfunction(L, 2))
 		luaL_error(L, "Invalid arguments to TimeCheck('string', func, ...)");
 
 	{
+		#if (!defined(UNITSYNC) && !defined(DEDICATED))
 		ScopedOnceTimer timer(lua_tostring(L, 1));
+		#endif
 
 		lua_remove(L, 1);
 
@@ -519,9 +520,6 @@ int LuaParser::TimeCheck(lua_State* L)
 	}
 
 	return lua_gettop(L);
-	#else
-	return 0;
-	#endif
 }
 
 
@@ -1417,7 +1415,7 @@ static bool ParseTableFloat(lua_State* L,
 static bool ParseFloat3(lua_State* L, int index, float3& value)
 {
 	if (lua_istable(L, index)) {
-		const int table = (index > 0) ? index : lua_gettop(L) + index + 1;
+		const int table = lua_absindex(L, index);
 		if (ParseTableFloat(L, table, 1, value.x) &&
 		    ParseTableFloat(L, table, 2, value.y) &&
 		    ParseTableFloat(L, table, 3, value.z)) {
@@ -1435,7 +1433,7 @@ static bool ParseFloat3(lua_State* L, int index, float3& value)
 static bool ParseFloat4(lua_State* L, int index, float4& value)
 {
 	if (lua_istable(L, index)) {
-		const int table = (index > 0) ? index : lua_gettop(L) + index + 1;
+		const int table = lua_absindex(L, index);
 		if (ParseTableFloat(L, table, 1, value.x) &&
 		    ParseTableFloat(L, table, 2, value.y) &&
 		    ParseTableFloat(L, table, 3, value.z) &&

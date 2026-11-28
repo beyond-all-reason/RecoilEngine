@@ -4,6 +4,7 @@
 #define EVENT_CLIENT_H
 
 #include <algorithm>
+#include <map>
 #include <typeinfo>
 #include <string>
 #include <vector>
@@ -35,6 +36,8 @@ struct BuildInfo;
 struct FeatureDef;
 class LuaMaterial;
 struct WeaponDef;
+struct SResourcePack;
+namespace NanoParticles { struct Event; }
 
 #ifndef zipFile
 	// might be defined through zip.h already
@@ -114,6 +117,7 @@ class CEventClient
 
 		virtual void GamePreload() {}
 		virtual void GameStart() {}
+		virtual void GameLoaded() {}
 		virtual void GameOver(const std::vector<unsigned char>& winningAllyTeams) {}
 		virtual void GamePaused(int playerID, bool paused) {}
 		virtual void GameFrame(int gameFrame) {}
@@ -122,6 +126,8 @@ class CEventClient
 
 		virtual void TeamDied(int teamID) {}
 		virtual void TeamChanged(int teamID) {}
+		virtual bool ResourceExcess(const std::map <int, SResourcePack>& excess) { return false; }
+
 		virtual void PlayerChanged(int playerID) {}
 		virtual void PlayerAdded(int playerID) {}
 		virtual void PlayerRemoved(int playerID, int reason) {}
@@ -134,6 +140,9 @@ class CEventClient
 		virtual void UnitDestroyed(const CUnit* unit, const CUnit* attacker, int weaponDefID) {}
 		virtual void UnitTaken(const CUnit* unit, int oldTeam, int newTeam) {}
 		virtual void UnitGiven(const CUnit* unit, int oldTeam, int newTeam) {}
+
+		virtual void UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds) {}
+		virtual void UnitSelfDestructCancelled(const CUnit* unit, float remainingSeconds) {}
 
 		virtual void UnitIdle(const CUnit* unit) {}
 		virtual void UnitCommand(const CUnit* unit, const Command& command, int playerNum, bool fromSynced, bool fromLua) {}
@@ -281,8 +290,11 @@ class CEventClient
 		virtual void Save(zipFile archive);
 
 		virtual void Update();
+		virtual void UpdateTimeOffset(float& timeOffset, float drawSimRatio, float& presentedUpdateSecs);
+		virtual void NanoParticleUpdate(const std::vector<NanoParticles::Event>& events) {}
 		virtual void UnsyncedHeightMapUpdate(const SRectangle& rect);
 
+		virtual void KeyBindingsChanged();
 		virtual bool KeyMapChanged();
 		virtual bool KeyPress(int keyCode, int scanCode, bool isRepeat);
 		virtual bool KeyRelease(int keyCode, int scanCode);
@@ -311,6 +323,7 @@ class CEventClient
 		virtual void MiniMapStateChanged(const bool isMinimized, const bool isMaximized, const bool isSlaved);
 		virtual void MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim);
 		virtual bool CommandNotify(const Command& cmd);
+		virtual bool AllowQuit();
 
 		virtual bool AddConsoleLine(const std::string& msg, const std::string& section, int level);
 
@@ -362,6 +375,7 @@ class CEventClient
 		virtual bool DrawShield(const CUnit* unit, const CWeapon* weapon) { return false; }
 		virtual bool DrawProjectile(const CProjectile* projectile) { return false; }
 		virtual bool DrawMaterial(const LuaMaterial* material) { return false; }
+		virtual bool DrawSceneDisplay() { return false; }
 
 		virtual void DrawOpaqueUnitsLua(bool deferredPass, bool drawReflection, bool drawRefraction) {}
 		virtual void DrawOpaqueFeaturesLua(bool deferredPass, bool drawReflection, bool drawRefraction) {}

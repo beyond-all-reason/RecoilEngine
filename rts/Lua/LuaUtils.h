@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_UTILS_H
-#define LUA_UTILS_H
+#pragma once
 
 #include <cstdint>
 #include <string>
@@ -12,6 +11,7 @@
 #include "LuaInclude.h"
 #include "LuaHandle.h"
 #include "LuaDefs.h"
+#include "System/StringHash.h"
 // FIXME: use fwd-decls
 #include "System/EventClient.h"
 #include "Sim/Units/CommandAI/Command.h"
@@ -247,7 +247,18 @@ static void PushObjectDefProxyTable(
 	lua_rawset(L, -3); // set the proxy table
 }
 
+// Note: The `const char (&key) [N]` overloads are a specialization for string literals to allow hashing at compile time.
+//		 For a `char buf[N]` the hasher will assume its a C style string of size N terminated at index N-1.
+//		 This can lead to hashing after the null terminator if the string only uses part of the buffer. 
+//       Use a std::string if you want to pass in dynamic keys.
 
+template <unsigned N>
+static inline void LuaPushNamedNil(lua_State* L, const char (&key) [N])
+{
+	lua_pushhstring(L, CompileTimeHash(key), key, N - 1);
+	lua_pushnil(L);
+	lua_rawset(L, -3);
+}
 
 static inline void LuaPushNamedNil(lua_State* L,
                              const string& key)
@@ -257,6 +268,13 @@ static inline void LuaPushNamedNil(lua_State* L,
 	lua_rawset(L, -3);
 }
 
+template <unsigned N>
+static inline void LuaPushNamedBool(lua_State* L, const char (&key) [N], bool value)
+{
+	lua_pushhstring(L, CompileTimeHash(key), key, N - 1);
+	lua_pushboolean(L, value);
+	lua_rawset(L, -3);
+}
 
 static inline void LuaPushNamedBool(lua_State* L, const string& key, bool value)
 {
@@ -265,6 +283,13 @@ static inline void LuaPushNamedBool(lua_State* L, const string& key, bool value)
 	lua_rawset(L, -3);
 }
 
+template <unsigned N>
+static inline void LuaPushNamedNumber(lua_State* L, const char (&key) [N], lua_Number value) 
+{
+	lua_pushhstring(L, CompileTimeHash(key), key, N - 1);
+	lua_pushnumber(L, value);
+	lua_rawset(L, -3);
+}
 
 static inline void LuaPushNamedNumber(lua_State* L, const string& key, lua_Number value)
 {
@@ -273,11 +298,34 @@ static inline void LuaPushNamedNumber(lua_State* L, const string& key, lua_Numbe
 	lua_rawset(L, -3);
 }
 
+template <unsigned N>
+static inline void LuaPushNamedChar(lua_State* L, const char (&key) [N], char value)
+{
+	lua_pushhstring(L, CompileTimeHash(key), key, N - 1);
+	lua_pushlstring(L, &value, 1);
+	lua_rawset(L, -3);
+}
 
 static inline void LuaPushNamedChar(lua_State* L, char const *name, char value)
 {
 	lua_pushstring(L, name);
 	lua_pushlstring(L, &value, 1);
+	lua_rawset(L, -3);
+}
+
+template <unsigned N0, unsigned N1>
+static inline void LuaPushNamedString(lua_State* L, const char (&key) [N0], const char (&value) [N1])
+{
+	lua_pushhstring(L, CompileTimeHash(key), key, N0 - 1);
+	lua_pushhstring(L, CompileTimeHash(value), value, N1 - 1);
+	lua_rawset(L, -3);
+}
+
+template <unsigned N>
+static inline void LuaPushNamedString(lua_State* L, const char (&key) [N], const string& value)
+{
+	lua_pushhstring(L, CompileTimeHash(key), key, N - 1);
+	lua_pushsstring(L, value);
 	lua_rawset(L, -3);
 }
 
@@ -288,6 +336,13 @@ static inline void LuaPushNamedString(lua_State* L, const string& key, const str
 	lua_rawset(L, -3);
 }
 
+template <unsigned N>
+static inline void LuaPushNamedCFunc(lua_State* L, const char (&key) [N], lua_CFunction func)
+{
+	lua_pushhstring(L, CompileTimeHash(key), key, N - 1);
+	lua_pushcfunction(L, func);
+	lua_rawset(L, -3);
+}
 
 static inline void LuaPushNamedCFunc(lua_State* L, const string& key, lua_CFunction func)
 {
@@ -302,6 +357,17 @@ static inline void LuaPushRawNamedCFunc(lua_State* L, const char* key, lua_CFunc
 	lua_pushcfunction(L, func);
 	lua_rawset(L, -3);
 }
+
+template <unsigned N>
+static inline void LuaPushString(lua_State* L, const char (&str)[N])
+{
+	static_assert(N > 1);
+	lua_pushhstring(L, CompileTimeHash(str), str, N - 1);
+}
+
+static inline void LuaPushString(lua_State* L, const string& str) {
+	lua_pushsstring(L, str);
+} 
 
 #define REGISTER_LUA_CFUNC(func)                LuaPushRawNamedCFunc(L, #func,        func)
 #define REGISTER_NAMED_LUA_CFUNC(name, func)    LuaPushRawNamedCFunc(L,  name,        func)
@@ -552,5 +618,3 @@ const inline FeatureDef* LuaUtils::SolIdToObject(int id, const char* func)
 
 	return obj;
 }
-
-#endif // LUA_UTILS_H

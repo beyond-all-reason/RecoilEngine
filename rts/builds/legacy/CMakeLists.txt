@@ -7,18 +7,10 @@
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 
-add_library(Game STATIC)
-target_sources(Game PRIVATE ${sources_engine_Game})
-add_dependencies(Game generateVersionFiles)
-target_include_directories(Game PRIVATE "${CMAKE_BINARY_DIR}/src-generated/engine")
+recoil_add_variant_library(Game GameCommon)
 target_link_libraries(Game PRIVATE
-	 Tracy::TracyClient
 	 SDL2::SDL2
-	 RmlUi::RmlUi
 	 ${sound-impl}
-	 prd::jsoncpp
-	 streflop
-	 fmt::fmt
 )
 
 ### Assemble libraries
@@ -49,7 +41,7 @@ find_freetype_hack() # hack to find different named freetype.dll
 find_package_static(Freetype 2.8.1 REQUIRED)
 list(APPEND engineLibraries Freetype::Freetype)
 
-if    (UNIX)
+if    (UNIX AND NOT APPLE)
 	find_package(X11 REQUIRED)
 	target_link_libraries(Game PRIVATE X11::Xcursor)
 	list(APPEND engineLibraries ${X11_Xcursor_LIB} ${X11_X11_LIB})

@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _COMMAND_AI_H
-#define _COMMAND_AI_H
+#pragma once
 
 #include <functional>
 #include <vector>
@@ -64,7 +63,6 @@ public:
 	 * @return true if c will cancel a queued command
 	 */
 	bool WillCancelQueued(const Command& c) const;
-
 	bool HasCommand(int cmdID) const;
 	bool HasMoreMoveCommands(bool skipFirstCmd = true) const;
 
@@ -76,7 +74,7 @@ public:
 	 */
 	CCommandQueue::const_iterator GetCancelQueued(const Command& c, const CCommandQueue& queue) const;
 	/**
-	 * @brief Returns commands that overlap c, but will not be canceled by c
+	 * @brief Returns commands that overlap c, including commands canceled by c
 	 * @return a vector containing commands that overlap c
 	 */
 	std::vector<Command> GetOverlapQueued(const Command& c) const;
@@ -122,8 +120,9 @@ public:
 	CCommandQueue commandQue;
 
 	int lastUserCommand;
-	int selfDCountdown;
 	int lastFinishCommand;
+	// how many more FinishCommand calls may re-enter SlowUpdate this frame
+	int finishCommandBudget;
 
 	CUnit* owner;
 	CUnit* orderTarget;
@@ -139,6 +138,7 @@ protected:
 	virtual bool SelectNewAreaAttackTargetOrPos(const Command& ac) { return true; }
 
 	bool IsAttackCapable() const;
+	bool SkipCrashingTarget(const CUnit* target) const;
 	bool SkipParalyzeTarget(const CUnit* target) const;
 
 	void GiveAllowedCommand(const Command& c, bool fromSynced = true);
@@ -176,5 +176,3 @@ inline void CCommandAI::SetOrderTarget(CUnit* o) {
 		AddDeathDependence(reinterpret_cast<CObject*>(orderTarget), DEPENDENCE_ORDERTARGET);
 	}
 }
-
-#endif // _COMMAND_AI_H

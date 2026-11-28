@@ -23,6 +23,7 @@ struct SVertexData {
 		boneIDsLow  = DEFAULT_BONEIDS_LOW;
 		boneWeights = DEFAULT_BONEWEIGHTS;
 		boneIDsHigh = DEFAULT_BONEIDS_HIGH;
+		color       = DEFAULT_COLOR;
 	}
 	SVertexData(
 		const float3& p,
@@ -42,12 +43,14 @@ struct SVertexData {
 		boneIDsLow  = DEFAULT_BONEIDS_LOW;
 		boneWeights = DEFAULT_BONEWEIGHTS;
 		boneIDsHigh = DEFAULT_BONEIDS_HIGH;
+		color       = DEFAULT_COLOR;
 	}
 
 	static constexpr size_t NUM_MODEL_UVCHANNS = 2;
 	static constexpr std::array<uint8_t, 4> DEFAULT_BONEIDS_HIGH = { 255, 255, 255, 255 };
 	static constexpr std::array<uint8_t, 4> DEFAULT_BONEIDS_LOW = { 255, 255, 255, 255 };
 	static constexpr std::array<uint8_t, 4> DEFAULT_BONEWEIGHTS = { 255, 0  ,   0,   0 };
+	static constexpr std::array<uint8_t, 4> DEFAULT_COLOR       = { 255, 255, 255, 255 };
 	static constexpr uint16_t INVALID_BONEID = 0xFFFF;
 	static constexpr size_t MAX_BONES_PER_VERTEX = 4;
 
@@ -60,6 +63,8 @@ struct SVertexData {
 	std::array<uint8_t, MAX_BONES_PER_VERTEX> boneIDsLow;
 	std::array<uint8_t, MAX_BONES_PER_VERTEX> boneWeights;
 	std::array<uint8_t, MAX_BONES_PER_VERTEX> boneIDsHigh;
+
+	std::array<uint8_t, 4> color;
 
 	template <Concepts::HasSizeAndData C>
 	void SetBones(const C& bi) {

@@ -19,6 +19,7 @@
 #include <climits>
 #include <cinttypes>
 #include <functional>
+#include <string_view>
 
 #include "System/Sound/ISoundChannels.h"
 #include "System/Sound/SoundLog.h"
@@ -47,10 +48,21 @@
 
 spring::recursive_mutex soundMutex;
 
+// snd_device used to be filled from OpenAL's device list, whose names put this before the system's
+static std::string ToSdlDeviceName(const std::string& deviceName)
+{
+	constexpr std::string_view openALPrefix = "OpenAL Soft on ";
+
+	if (deviceName.starts_with(openALPrefix))
+		return deviceName.substr(openALPrefix.size());
+
+	return deviceName;
+}
+
 
 CSound::CSound()
 {
-	configHandler->NotifyOnChange(this, {"snd_volmaster", "snd_eaxpreset", "snd_filter", "UseEFX", "snd_volgeneral", "snd_volunitreply", "snd_volbattle", "snd_volui", "snd_volmusic", "PitchAdjust"});
+	configHandler->NotifyOnChange(this, {"snd_volmaster", "snd_eaxpreset", "snd_filter", "UseEFX", "snd_volgeneral", "snd_volunitreply", "snd_volbattle", "snd_volui", "snd_volmusic", "PitchAdjust", "snd_device"});
 }
 
 CSound::~CSound()
@@ -135,6 +147,7 @@ void CSound::Cleanup() {
 
 		sdlDeviceID = -1;
 	}
+	sdlOutput = false;
 #endif
 
 	if (curContext != nullptr) {
@@ -160,7 +173,7 @@ bool CSound::HasSoundItem(const std::string& name) const
 	if (soundMap.find(name) != soundMap.end())
 		return true;
 
-	return (soundItemDefsMap.find(StringToLower(name)) != soundItemDefsMap.end());
+	return (FindSoundItemDef(name) != nullptr);
 }
 
 bool CSound::PreloadSoundItem(const std::string& name)
@@ -183,6 +196,28 @@ size_t CSound::GetDefSoundId(const std::string& name)
 	return (GetSoundId(name));
 }
 
+size_t CSound::FindLoadedSoundId(const std::string& name) const
+{
+	auto soundMapIt = soundMap.find(name);
+
+	// the name as written first; sounds.lua lower-cases its keys unless the game turns that off
+	if (soundMapIt == soundMap.end())
+		soundMapIt = soundMap.find(StringToLower(name));
+
+	return (soundMapIt != soundMap.end()) ? soundMapIt->second : 0;
+}
+
+const CSound::SoundItemNameMap* CSound::FindSoundItemDef(const std::string& name) const
+{
+	auto itemDefIt = soundItemDefsMap.find(name);
+
+	// same order as FindLoadedSoundId
+	if (itemDefIt == soundItemDefsMap.end())
+		itemDefIt = soundItemDefsMap.find(StringToLower(name));
+
+	return (itemDefIt != soundItemDefsMap.end()) ? &itemDefIt->second : nullptr;
+}
+
 size_t CSound::GetSoundId(const std::string& name)
 {
 	std::lock_guard<spring::recursive_mutex> lck(soundMutex);
@@ -193,14 +228,14 @@ size_t CSound::GetSoundId(const std::string& name)
 	if (soundSources.empty())
 		return (preloadSet.erase(name), 0);
 
-	const auto soundMapIt = soundMap.find(name);
-	if (soundMapIt != soundMap.end())
-		return (preloadSet.erase(name), soundMapIt->second);
+	const size_t loadedId = FindLoadedSoundId(name);
+	if (loadedId != 0)
+		return (preloadSet.erase(name), loadedId);
 
-	const auto itemDefIt = soundItemDefsMap.find(StringToLower(name));
+	const SoundItemNameMap* itemDef = FindSoundItemDef(name);
 
-	if (itemDefIt != soundItemDefsMap.end())
-		return (preloadSet.erase(name), MakeItemFromDef(itemDefIt->second));
+	if (itemDef != nullptr)
+		return (preloadSet.erase(name), MakeItemFromDef(*itemDef));
 
 	// name does not match any sounds.lua item, interpret as raw file reference
 	if (LoadSoundBuffer(name) > 0) {
@@ -257,6 +292,23 @@ CSoundSource* CSound::GetNextBestSource(bool lock)
 	}
 
 	return bestSrc;
+}
+
+bool CSound::StopSoundItem(const std::string& name, const IAudioChannel* channel)
+{
+	std::lock_guard<spring::recursive_mutex> lck(soundMutex);
+
+	const size_t itemID = FindLoadedSoundId(name);
+	if (itemID == 0)
+		return false;
+
+	bool stopped = false;
+
+	for (CSoundSource& src: soundSources) {
+		stopped |= src.StopItem(itemID, channel);
+	}
+
+	return stopped;
 }
 
 void CSound::PitchAdjust(const float newPitch)
@@ -328,6 +380,18 @@ void CSound::ConfigNotify(const std::string& key, const std::string& value)
 			pitchAdjustMode = tempPitchAdjustMode;
 		} break;
 
+		case hashString("snd_device"): {
+			if (!sdlOutput) {
+				LOG("[Sound::%s] snd_device takes effect after a restart when OpenAL plays without SDL (UseSDLAudio=0)", __func__);
+				break;
+			}
+			// unset means the default device, which is how a failed open ends up too
+			const std::string deviceName = configHandler->IsSet("snd_device") ? configHandler->GetString("snd_device") : "";
+
+			if (ToSdlDeviceName(deviceName) != selectedDeviceName && !(deviceName.empty() && selectedDeviceName == "default"))
+				ReopenSdlDevice();
+		} break;
+
 		default: {
 		} break;
 	}
@@ -345,11 +409,15 @@ bool CSound::Mute()
 	return mute;
 }
 
-void CSound::DeviceChanged(uint32_t sdlDeviceIndex)
+void CSound::DeviceChanged(uint32_t sdlDeviceIndex, bool added)
 {
 	// handles SDL_AUDIODEVICEREMOVED and SDL_AUDIODEVICEADDED
 
-	if (!hasAlcSoftLoopBack || sdlDeviceIndex != sdlDeviceID)
+	if (!hasAlcSoftLoopBack)
+		return;
+
+	// sdlDeviceIndex is an instance id for REMOVED events but a device index for ADDED ones
+	if (added ? (sdlDeviceID != 0) : (sdlDeviceIndex != sdlDeviceID))
 		return;
 
 	LOG("[Sound::%s] SDL failed to handle device change, reopening", __func__);
@@ -361,6 +429,12 @@ void CSound::DeviceChanged(uint32_t sdlDeviceIndex)
 	
 	// This behavior can be reproduced on several test systems, for example when switching the Windows default device from monitor audio over HDMI to a sound card (HDMI->analog)
 
+	ReopenSdlDevice();
+}
+
+void CSound::ReopenSdlDevice()
+{
+	// also how a snd_device change is applied while SDL plays our output
 	std::lock_guard<spring::recursive_mutex> lck(soundMutex);
 
 	LOG("[Sound::%s] Pausing audio", __func__);
@@ -528,9 +602,11 @@ bool CSound::OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtaine
 		sdlDeviceID = 0;
 
 		if (!deviceName.empty()) {
-			LOG("[Sound::%s] opening configured device \"%s\"", __func__, deviceName.c_str());
-			sdlDeviceID = SDL_OpenAudioDevice(deviceName.c_str(), 0, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_ANY_CHANGE & ~SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
-			selectedDeviceName = deviceName;
+			const std::string sdlDeviceName = ToSdlDeviceName(deviceName);
+
+			LOG("[Sound::%s] opening configured device \"%s\"", __func__, sdlDeviceName.c_str());
+			sdlDeviceID = SDL_OpenAudioDevice(sdlDeviceName.c_str(), 0, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_ANY_CHANGE & ~SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
+			selectedDeviceName = sdlDeviceName;
 		}
 
 		if (sdlDeviceID == 0) {
@@ -653,6 +729,8 @@ void CSound::OpenLoopbackDevice(const std::string& deviceName)
 		Cleanup();
 		return;
 	}
+
+	sdlOutput = true;
 
 	LOG("[Sound::%s] device=%p(%s) context=%p  numChannels=%d frameSize=%d", __func__, curDevice, selectedDeviceName.c_str(), curContext, obtainedSpec.channels, frameSize);
 #endif
@@ -1093,7 +1171,18 @@ void CSound::GenSources(int alMaxSounds)
 
 std::vector<std::string> CSound::GetSoundDevices()
 {
+	std::lock_guard<spring::recursive_mutex> lck(soundMutex);
 	std::vector<std::string> devices;
+
+	// SDL opens snd_device when it plays our output, so offer the names it knows
+	if (sdlOutput) {
+		for (int i = 0, n = SDL_GetNumAudioDevices(0); i < n; ++i) {
+			if (const char* deviceName = SDL_GetAudioDeviceName(i, 0); deviceName != nullptr)
+				devices.emplace_back(deviceName);
+		}
+		return devices;
+	}
+
 	const bool hasAllEnumExt = alcIsExtensionPresent(nullptr, "ALC_ENUMERATE_ALL_EXT");
 	const bool hasDefEnumExt = alcIsExtensionPresent(nullptr, "ALC_ENUMERATION_EXT");
 

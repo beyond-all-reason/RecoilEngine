@@ -107,6 +107,7 @@ macro    (create_install_target targetName var_list_depends var_list_instDirs)
 		endif (NOT EXISTS "${CMAKE_SOURCE_DIR}/${instDir}/CMakeLists.txt")
 		set(installCmds ${installCmds}
 			COMMAND "${CMAKE_COMMAND}"
+				"-DBUILD_TYPE=$<CONFIG>"
 				"-P" "${CMAKE_BINARY_DIR}/${instDir}/cmake_install.cmake"
 				# NOTE: The following does not work in CMake 2.6.4
 				#"-DCMAKE_INSTALL_COMPONENT=${targetName}"

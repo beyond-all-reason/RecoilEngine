@@ -20,6 +20,10 @@ It is **great for automated tasks** such as:
  * simulate games played on a dedicated binary, to **verify results**. See below.
  * be a game server for a multiplayer game, though only **on limited scale** (perhaps for important games like tournaments). See below.
 
+For unattended tasks that **need rendering** (screenshots, captures, GPU tests), start the regular binary with `--background-window`: like headless, but rendering.
+The window opens **without the keyboard focus and behind other windows**, and never minimizes, maximizes or goes fullscreen.
+Lua can check it with `Spring.IsBackgroundWindow()`.
+
 ### Dedicated (aka dedi)
 
 Simulating games can get fairly heavy, such that a game server would **struggle to simulate more than a handful**.

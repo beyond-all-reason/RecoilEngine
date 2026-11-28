@@ -866,6 +866,12 @@ function gadgetHandler:GameStart()
   end
 end
 
+function gadgetHandler:GameLoaded()
+  for _,g in r_ipairs(self.GameLoadedList) do
+    g:GameLoaded()
+  end
+end
+
 function gadgetHandler:GameOver(winningAllyTeams)
   for _,g in r_ipairs(self.GameOverList) do
     g:GameOver(winningAllyTeams)
@@ -1691,6 +1697,18 @@ function gadgetHandler:UnitHarvestStorageFull(unitID, unitDefID, unitTeam)
   end
 end
 
+function gadgetHandler:UnitSelfDestructStarted(unitID, unitDefID, unitTeam, remainingSeconds)
+  for _,g in r_ipairs(self.UnitSelfDestructStartedList) do
+    g:UnitSelfDestructStarted(unitID, unitDefID, unitTeam, remainingSeconds)
+  end
+end
+
+function gadgetHandler:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam, remainingSeconds)
+  for _,g in r_ipairs(self.UnitSelfDestructCancelledList) do
+    g:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam, remainingSeconds)
+  end
+end
+
 --------------------------------------------------------------------------------
 --
 --  Feature call-ins
@@ -1832,6 +1850,22 @@ function gadgetHandler:Update()
   for _,g in r_ipairs(self.UpdateList) do
     g:Update()
   end
+end
+
+
+-- each gadget sees the values the one before it returned; nil keeps a value
+function gadgetHandler:UpdateTimeOffset(timeOffset, drawSimRatio, presentedUpdateSeconds)
+  local newTimeOffset, newPresented
+  for _,g in r_ipairs(self.UpdateTimeOffsetList) do
+    local t, p = g:UpdateTimeOffset(timeOffset, drawSimRatio, presentedUpdateSeconds)
+    if (type(t) == 'number') then
+      timeOffset, newTimeOffset = t, t
+    end
+    if (type(p) == 'number') then
+      presentedUpdateSeconds, newPresented = p, p
+    end
+  end
+  return newTimeOffset, newPresented
 end
 
 
@@ -2031,6 +2065,16 @@ function gadgetHandler:DrawScreenEffects(vsx, vsy)
   end
 end
 
+-- the first gadget that drew the display pass wins
+function gadgetHandler:DrawSceneDisplay(winSizeX, winSizeY)
+  for _,g in r_ipairs(self.DrawSceneDisplayList) do
+    if g:DrawSceneDisplay(winSizeX, winSizeY) then
+      return true
+    end
+  end
+  return false
+end
+
 function gadgetHandler:DrawScreenPost(vsx, vsy)
   for _,g in r_ipairs(self.DrawScreenPostList) do
     g:DrawScreenPost(vsx, vsy)
@@ -2059,6 +2103,13 @@ end
 
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
+
+function gadgetHandler:KeyBindingsChanged()
+  for _,g in r_ipairs(self.KeyBindingsChangedList) do
+    g:KeyBindingsChanged()
+  end
+end
+
 
 function gadgetHandler:KeyPress(key, mods, isRepeat, label, unicode, scanCode)
   for _,g in r_ipairs(self.KeyPressList) do

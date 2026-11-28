@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 #include <cstdio>
+#include <cstdint>
 #include <assert.h>
 
 namespace nv_dds
@@ -51,6 +52,34 @@ namespace nv_dds
     const unsigned int FOURCC_DXT1 = 0x31545844; //(MAKEFOURCC('D','X','T','1'))
     const unsigned int FOURCC_DXT3 = 0x33545844; //(MAKEFOURCC('D','X','T','3'))
     const unsigned int FOURCC_DXT5 = 0x35545844; //(MAKEFOURCC('D','X','T','5'))
+    const unsigned int FOURCC_ATI1 = 0x31495441; //(MAKEFOURCC('A','T','I','1')), BC4
+    const unsigned int FOURCC_BC4U = 0x55344342; //(MAKEFOURCC('B','C','4','U'))
+    const unsigned int FOURCC_ATI2 = 0x32495441; //(MAKEFOURCC('A','T','I','2')), BC5
+    const unsigned int FOURCC_BC5U = 0x55354342; //(MAKEFOURCC('B','C','5','U'))
+    const unsigned int FOURCC_DX10 = 0x30315844; //(MAKEFOURCC('D','X','1','0'))
+
+    // uncompressed half-float types, legacy header (the FourCC field holds a D3DFORMAT value)
+    const unsigned int D3DFMT_R16F          = 111;
+    const unsigned int D3DFMT_G16R16F       = 112;
+    const unsigned int D3DFMT_A16B16G16R16F = 113; // named high to low, memory order is R,G,B,A
+
+    // Supported DXGI formats
+    const unsigned int DXGI_FORMAT_BC1_UNORM = 71;
+    const unsigned int DXGI_FORMAT_BC2_UNORM = 74;
+    const unsigned int DXGI_FORMAT_BC3_UNORM = 77;
+    const unsigned int DXGI_FORMAT_BC4_UNORM = 80;
+    const unsigned int DXGI_FORMAT_BC5_UNORM = 83;
+    const unsigned int DXGI_FORMAT_BC7_UNORM = 98;
+    const unsigned int DXGI_FORMAT_BC7_UNORM_SRGB = 99;
+    // uncompressed half-float formats
+    const unsigned int DXGI_FORMAT_R16G16B16A16_FLOAT = 10;
+    const unsigned int DXGI_FORMAT_R16G16_FLOAT = 34;
+    const unsigned int DXGI_FORMAT_R16_FLOAT = 54;
+
+    // DDS_HEADER_DXT10 values
+    const unsigned int DX10_DIMENSION_TEXTURE2D = 3;
+    const unsigned int DX10_DIMENSION_TEXTURE3D = 4;
+    const unsigned int DX10_MISC_TEXTURECUBE = 0x00000004;
 
     struct DXTColBlock
     {
@@ -83,6 +112,15 @@ namespace nv_dds
         unsigned int dwGBitMask;
         unsigned int dwBBitMask;
         unsigned int dwABitMask;
+    };
+
+    struct DDS_HEADER_DXT10
+    {
+        unsigned int dxgiFormat;
+        unsigned int resourceDimension;
+        unsigned int miscFlag;
+        unsigned int arraySize;
+        unsigned int miscFlags2;
     };
 
     struct DDS_HEADER
@@ -192,6 +230,9 @@ namespace nv_dds
 			CDDSImage& operator = (const CDDSImage& img) {
 				m_format = img.m_format;
 				m_components = img.m_components;
+				m_internalFormat = img.m_internalFormat;
+				m_dataType = img.m_dataType;
+				m_bytesPerComponent = img.m_bytesPerComponent;
 				m_type = img.m_type;
 				m_valid = img.m_valid;
 
@@ -201,6 +242,9 @@ namespace nv_dds
 			CDDSImage& operator = (CDDSImage&& img) {
 				m_format = img.m_format;
 				m_components = img.m_components;
+				m_internalFormat = img.m_internalFormat;
+				m_dataType = img.m_dataType;
+				m_bytesPerComponent = img.m_bytesPerComponent;
 				m_type = img.m_type;
 				m_valid = img.m_valid;
 
@@ -297,9 +341,16 @@ namespace nv_dds
 
             inline unsigned int get_components() const { return m_components; }
             inline unsigned int get_format() const { return m_format; }
+            // GL internal format to upload with; for formats that name none this is the component count (legacy glTexImage behaviour)
+            inline unsigned int get_internal_format() const { return (m_internalFormat != 0) ? m_internalFormat : m_components; }
+            // GL type of one component of the uncompressed pixel data (GL_UNSIGNED_BYTE, GL_HALF_FLOAT, ...)
+            inline unsigned int get_data_type() const { return m_dataType; }
+            inline unsigned int get_bytes_per_component() const { return m_bytesPerComponent; }
             inline TextureType get_type() const { return m_type; }
 
             bool is_compressed() const;
+            // uncompressed pixel data stored as 16-bit floats (R16F, RG16F, RGBA16F)
+            bool is_float() const;
 
             inline bool is_cubemap() const { return (m_type == TextureCubemap); }
             inline bool is_volume() const { return (m_type == Texture3D); }
@@ -309,14 +360,15 @@ namespace nv_dds
             {
                 assert(m_valid);
 
-                int dwordLineSize = get_dword_aligned_linesize(get_width(), m_components*8);
-                int curLineSize = get_width() * m_components;
+                int dwordLineSize = get_dword_aligned_linesize(get_width(), m_components * m_bytesPerComponent * 8);
+                int curLineSize = get_width() * m_components * m_bytesPerComponent;
 
                 return (dwordLineSize == curLineSize);
             }
 
         private:
             unsigned int clamp_size(unsigned int size) const;
+            void set_float16_format(unsigned int format, unsigned int internalFormat, unsigned int components);
             unsigned int size_dxtc(unsigned int width, unsigned int height) const;
             unsigned int size_rgb(unsigned int width, unsigned int height) const;
 
@@ -333,12 +385,18 @@ namespace nv_dds
             void flip_blocks_dxtc1(DXTColBlock *line, unsigned int numBlocks) const;
             void flip_blocks_dxtc3(DXTColBlock *line, unsigned int numBlocks) const;
             void flip_blocks_dxtc5(DXTColBlock *line, unsigned int numBlocks) const;
+            void flip_blocks_bc4(DXTColBlock *line, unsigned int numBlocks) const;
+            void flip_blocks_bc5(DXTColBlock *line, unsigned int numBlocks) const;
             void flip_dxt5_alpha(DXT5AlphaBlock *block) const;
 
             bool write_texture(const CTexture &texture, FILE *fp) const;
 
             unsigned int m_format;
             unsigned int m_components;
+            // uncompressed formats only; the defaults describe 8-bit-per-component data
+            unsigned int m_internalFormat = 0;      // 0: pass m_components as before
+            unsigned int m_dataType;                // GL type of a component, set in the constructor and clear()
+            unsigned int m_bytesPerComponent = 1;
             TextureType m_type;
             bool m_valid;
 

@@ -113,6 +113,7 @@ class CLuaHandle : public CEventClient
 
 		void GamePreload() override;
 		void GameStart() override;
+		void GameLoaded() override;
 		void GameOver(const std::vector<unsigned char>& winningAllyTeams) override;
 		void GamePaused(int playerID, bool paused) override;
 		void GameFrame(int frameNum) override;
@@ -127,6 +128,7 @@ class CLuaHandle : public CEventClient
 
 		void UnitCreated(const CUnit* unit, const CUnit* builder) override;
 		void UnitFinished(const CUnit* unit) override;
+		void UnitResurrected(const CUnit* unit); // fake call-in, doesn't exist in CEventClient
 		void UnitFromFactory(const CUnit* unit, const CUnit* factory, bool userOrders) override;
 		void UnitReverseBuilt(const CUnit* unit) override;
 		void UnitConstructionDecayed(const CUnit* unit, float timeSinceLastBuild, float iterationPeriod, float part) override;
@@ -174,6 +176,9 @@ class CLuaHandle : public CEventClient
 		void UnitMoveFailed(const CUnit* unit) override;
 		void UnitArrivedAtGoal(const CUnit* unit) override;
 
+		void UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds) override;
+		void UnitSelfDestructCancelled(const CUnit* unit, float remainingSeconds) override;
+
 		void RenderUnitDestroyed(const CUnit* unit) override;
 
 		void FeatureCreated(const CFeature* feature) override;
@@ -199,7 +204,10 @@ class CLuaHandle : public CEventClient
 
 		void UnsyncedHeightMapUpdate(const SRectangle& rect) override;
 		void Update() override;
+		void UpdateTimeOffset(float& timeOffset, float drawSimRatio, float& presentedUpdateSecs) override;
+		void NanoParticleUpdate(const std::vector<NanoParticles::Event>& events) override;
 
+		void KeyBindingsChanged() override;
 		bool KeyMapChanged() override;
 		bool KeyPress(int keyCode, int scanCode, bool isRepeat) override;
 		bool KeyRelease(int keyCode, int scanCode) override;
@@ -223,6 +231,7 @@ class CLuaHandle : public CEventClient
 		void MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim) override;
 
 		bool CommandNotify(const Command& cmd) override;
+		bool AllowQuit() override;
 
 		bool AddConsoleLine(const std::string& msg, const std::string& section, int level) override;
 
@@ -273,6 +282,7 @@ class CLuaHandle : public CEventClient
 		void DrawScreenCommon(const LuaHashString& cmdStr);
 		void DrawScreenEffects() override;
 		void DrawScreenPost()  override;
+		bool DrawSceneDisplay() override;
 		void DrawScreen() override;
 		void DrawInMiniMap() override;
 		void DrawInMiniMapBackground() override;
@@ -329,6 +339,7 @@ class CLuaHandle : public CEventClient
 		bool AddBasicCalls(lua_State* L);
 		bool AddCommonModules(lua_State* L);
 		bool LoadCode(lua_State* L, std::string code, const std::string& debug);
+		void InitLuaSocket(lua_State* L);
 		static bool AddEntriesToTable(lua_State* L, const char* name, bool (*entriesFunc)(lua_State*));
 
 		/// returns error code and sets traceback on error
@@ -342,6 +353,7 @@ class CLuaHandle : public CEventClient
 
 		void LosCallIn(const LuaHashString& hs, const CUnit* unit, int allyTeam);
 		void UnitCallIn(const LuaHashString& hs, const CUnit* unit);
+		void UnitSelfDestructCallin(const LuaHashString& hs, const CUnit* unit, float remainingSeconds);
 
 		void RunDrawCallIn(const LuaHashString& hs);
 

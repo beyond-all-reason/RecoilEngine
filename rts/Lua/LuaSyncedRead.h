@@ -175,6 +175,7 @@ class LuaSyncedRead {
 
 		static int GetUnitBlocking(lua_State* L);
 		static int GetUnitMoveTypeData(lua_State* L);
+		static int GetUnitMaxWantedSpeed(lua_State* L);
 
 		static int GetUnitCommandCount(lua_State* L);
 		static int GetUnitCommands(lua_State* L);
@@ -263,6 +264,7 @@ class LuaSyncedRead {
 
 		static int TestMoveOrder(lua_State* L);
 		static int TestBuildOrder(lua_State* L);
+		static int TestBuildOrderOverlap(lua_State* L);
 		static int Pos2BuildPos(lua_State* L);
 		static int ClosestBuildPos(lua_State* L);
 
@@ -302,9 +304,8 @@ class LuaSyncedRead {
 
 		static int GetRadarErrorParams(lua_State* L);
 
-		static int TraceRay(lua_State* L);           //TODO: not implemented
-		static int TraceRayUnits(lua_State* L);      //TODO: not implemented
-		static int TraceRayFeatures(lua_State* L);   //TODO: not implemented
+		static int TraceRayInDirection(lua_State* L);
+		static int TraceRayBetweenPositions(lua_State* L);
 		static int TraceRayGroundBetweenPositions(lua_State* L);
 		static int TraceRayGroundInDirection(lua_State* L);
 };

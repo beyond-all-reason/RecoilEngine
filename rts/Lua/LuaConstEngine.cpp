@@ -28,6 +28,12 @@
  * @field noHandicapForReclaim boolean Whether handicap is applied to income from reclaim
  * @field groupAddDoesntSelect boolean Whether 'group add' also selects the group (does both if false)
  * @field deadTeamsKeepUnitLimit boolean Whether engine redistributes dead team unitlimit to allies (false) or keeps it as-is (true)
+ * @field reliableLuaMapShaders boolean Whether forward-only Lua map shaders activate without a deferred draw and Spring.SetMapShader program swaps refresh cached uniform locations
+ * @field nanoParticleUpdateCallin boolean Whether LuaUI receives batched `NanoParticleUpdate` lifecycle events
+ * @field nanoParticlesGL4 boolean Whether the engine has the standalone shader-based nano particle effect (the `NanoParticles*` springsettings)
+ * @field modelVertexColor boolean Whether glTF `COLOR_0` is loaded into the models VBO (`color`, attribute 15; opaque white when absent)
+ * @field liveConfigChanges integer Version of the set of springsettings that apply without a restart, bumped when more are added (1: those listed in the 2026.09 changelog)
+ * @field selfDTimeInSeconds boolean Whether `Spring.GetUnitSelfDTime` returns seconds (half seconds if false)
  */
 
 /***
@@ -42,10 +48,9 @@
  * @field commitsNumber string Number of commits after the latest named release, non-zero indicates a "dev" build
  * @field buildFlags string Gets additional engine buildflags, e.g. "Debug" or "Sync-Debug"
  * @field featureSupport FeatureSupport Table containing various engine features as keys; use for cross-version compat
- * @field wordSize number Indicates the build type always 64 these days
- * @field gameSpeed number Number of simulation gameframes per second
+ * @field wordSize integer Indicates the build type always 64 these days
+ * @field gameSpeed integer Number of simulation gameframes per second
  * @field textColorCodes TextColorCode Table containing keys that represent the color code operations during font rendering
- * @field isHeadless boolean? Whether this is a headless engine build. Not available in synced
  */
 
 bool LuaConstEngine::PushEntries(lua_State* L)
@@ -59,9 +64,6 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	LuaPushNamedString(L, "buildFlags"     , SpringVersion::GetAdditional());
 	LuaPushNamedNumber(L, "wordSize", (!CLuaHandle::GetHandleSynced(L))? Platform::NativeWordSize() * 8: 0);
 
-	if (!CLuaHandle::GetHandleSynced(L))
-		LuaPushNamedBool(L, "isHeadless", SpringVersion::IsHeadless());
-
 	LuaPushNamedNumber(L, "gameSpeed", GAME_SPEED);
 	LuaPushNamedNumber(L, "maxCustomPaletteID", MAX_CUSTOM_COLORS - 1);
 
@@ -73,7 +75,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	 *
 	 * will be compatible even on engines that don't yet know about the entry at all. */
 	lua_pushliteral(L, "FeatureSupport");
-	lua_createtable(L, 0, 11);
+	lua_createtable(L, 0, 16);
 		LuaPushNamedBool(L, "NegativeGetUnitCurrentCommand", true);
 		LuaPushNamedBool(L, "hasExitOnlyYardmaps", true);
 		LuaPushNamedNumber(L, "rmlUiApiVersion", 1);
@@ -87,6 +89,12 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 		LuaPushNamedBool(L, "noHandicapForReclaim", true);
 		LuaPushNamedBool(L, "groupAddDoesntSelect", true);
 		LuaPushNamedBool(L, "deadTeamsKeepUnitLimit", false);
+		LuaPushNamedBool(L, "reliableLuaMapShaders", true);
+		LuaPushNamedBool(L, "nanoParticleUpdateCallin", true);
+		LuaPushNamedBool(L, "nanoParticlesGL4", true);
+		LuaPushNamedBool(L, "modelVertexColor", true);
+		LuaPushNamedNumber(L, "liveConfigChanges", 1);
+		LuaPushNamedBool(L, "selfDTimeInSeconds", true);
 	lua_rawset(L, -3);
 
 	lua_pushliteral(L, "textColorCodes");

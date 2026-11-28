@@ -71,6 +71,10 @@ std::string LuaTextures::Create(const Texture& tex)
 		case GL_TEXTURE_3D: {
 			glTexImage3D(tex.target, 0, tex.format, tex.xsize, tex.ysize, tex.zsize, tex.border, dataFormat, dataType, nullptr);
 		} break;
+		case GL_TEXTURE_CUBE_MAP: {
+			for (GLenum face = GL_TEXTURE_CUBE_MAP_POSITIVE_X; face <= GL_TEXTURE_CUBE_MAP_NEGATIVE_Z; ++face)
+				glTexImage2D(face, 0, tex.format, tex.xsize, tex.ysize, tex.border, dataFormat, dataType, nullptr);
+		} break;
 
 		case GL_TEXTURE_2D_MULTISAMPLE: {
 			assert(tex.samples > 1);
@@ -90,7 +94,9 @@ std::string LuaTextures::Create(const Texture& tex)
 		} break;
 	}
 
-	if (glGetError() != GL_NO_ERROR) {
+	if (const GLenum texErr = glGetError(); texErr != GL_NO_ERROR) {
+		LOG_L(L_ERROR, "[LuaTextures::%s] glTexImage failed: target=0x%x size=%dx%d fmt=0x%x dataFmt=0x%x dataType=0x%x border=%d glError=0x%x",
+			__func__, tex.target, tex.xsize, tex.ysize, tex.format, dataFormat, dataType, tex.border, texErr);
 		glDeleteTextures(1, &texID);
 		glBindTexture(tex.target, currentBinding);
 		return "";
@@ -184,6 +190,8 @@ bool LuaTextures::Free(const std::string& name)
 
 	if (it != textureMap.end()) {
 		const Texture& tex = textureVec[it->second];
+		// before the delete: GL may reuse the name for an unrelated texture
+		Unpublish(tex.id);
 		glDeleteTextures(1, &tex.id);
 
 		if (FBO::IsSupported()) {
@@ -225,6 +233,7 @@ void LuaTextures::FreeAll()
 {
 	for (const auto& item: textureMap) {
 		const Texture& tex = textureVec[item.second];
+		Unpublish(tex.id);
 		glDeleteTextures(1, &tex.id);
 
 		if (FBO::IsSupported()) {
@@ -236,6 +245,62 @@ void LuaTextures::FreeAll()
 	textureMap.clear();
 	textureVec.clear();
 	freeIndices.clear();
+}
+
+
+// process-wide, shared by every Lua handle and by engine code without one;
+// slots are cleared but never erased, so a parsed index stays valid
+static std::vector<LuaTextures::Published> publishedSlots;
+static spring::unsynced_map<std::string, size_t> publishedIndices;
+
+size_t LuaTextures::GetPublishedIndex(const std::string& name)
+{
+	const auto it = publishedIndices.find(name);
+	if (it != publishedIndices.end())
+		return it->second;
+
+	const size_t index = publishedSlots.size();
+	publishedSlots.emplace_back().name = name;
+	publishedIndices.emplace(name, index);
+	return index;
+}
+
+// valid only until the next new name is looked up
+const LuaTextures::Published* LuaTextures::GetPublished(size_t index)
+{
+	return (index < publishedSlots.size()) ? &publishedSlots[index] : nullptr;
+}
+
+bool LuaTextures::Publish(const std::string& name, const std::string& texName, std::string& error) const
+{
+	// a widget must not be able to replace a gadget's texture under the same name
+	Published& slot = publishedSlots[GetPublishedIndex(name)];
+	if (slot.owner != nullptr && slot.owner != this) {
+		error = "\"" + name + "\" is published by another Lua handle";
+		return false;
+	}
+
+	if (texName.empty()) {
+		slot = {name};
+		return true;
+	}
+
+	const Texture* tex = GetInfo(texName);
+	if (tex == nullptr) {
+		error = "\"" + texName + "\" is not a texture of this Lua handle";
+		return false;
+	}
+
+	slot = {name, this, tex->id, tex->target, tex->xsize, tex->ysize};
+	return true;
+}
+
+void LuaTextures::Unpublish(GLuint id)
+{
+	for (Published& slot: publishedSlots) {
+		if (slot.id == id)
+			slot = {slot.name};
+	}
 }
 
 
@@ -255,8 +320,7 @@ void LuaTextures::ApplyParams(const Texture& tex) const
 		glTexParameteri(tex.target, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL); //sensible default
 	}
 
-	if (tex.lodBias != 0.0f)
-		glTexParameterf(tex.target, GL_TEXTURE_LOD_BIAS, tex.lodBias);
+	glTexParameterf(tex.target, GL_TEXTURE_LOD_BIAS, tex.lodBias);
 
 	if (tex.aniso != 0.0f && GLAD_GL_EXT_texture_filter_anisotropic)
 		glTexParameterf(tex.target, GL_TEXTURE_MAX_ANISOTROPY_EXT, std::clamp(tex.aniso, 1.0f, globalRendering->maxTexAnisoLvl));

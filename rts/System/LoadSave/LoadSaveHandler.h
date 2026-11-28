@@ -35,6 +35,8 @@ public:
 	virtual bool LoadGameStartInfo(const std::string& file) = 0;
 	virtual void LoadGame() = 0;
 	virtual void LoadAIData() = 0;
+	/// after the AIs loaded, before the loading thread ends
+	virtual void PostLoad() {}
 
 	void SaveInfo(const std::string& _mapName, const std::string& _modName) {
 		mapName = _mapName;

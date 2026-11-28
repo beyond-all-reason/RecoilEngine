@@ -263,6 +263,10 @@ CModelDrawerStateGL4::CModelDrawerStateGL4()
 		modelShaders[n]->SetFlag("GBUFFER_MISCTEX_IDX", GL::GeometryBuffer::ATTACHMENT_MISCTEX);
 		modelShaders[n]->SetFlag("GBUFFER_ZVALTEX_IDX", GL::GeometryBuffer::ATTACHMENT_ZVALTEX);
 
+		// name the matrix-mode values the shader compares against, so it reads modes by name
+		modelShaders[n]->SetFlag("MATMODE_STATIC", static_cast<int>(ShaderMatrixModes::STATIC_MATMODE));
+		modelShaders[n]->SetFlag("MATMODE_ARRAY",  static_cast<int>(ShaderMatrixModes::ARRAY_MATMODE));
+
 		modelShaders[n]->Link();
 		modelShaders[n]->Enable();
 		modelShaders[n]->Disable();
@@ -456,6 +460,17 @@ IModelDrawerState::IModelDrawerState()
 	modelShaders.fill(nullptr);
 
 	//dup with every instance, but ok
+	ConfigNotify("UnitTransparency", "");
+	configHandler->NotifyOnChange(this, {"UnitTransparency"});
+}
+
+IModelDrawerState::~IModelDrawerState()
+{
+	configHandler->RemoveObserver(this);
+}
+
+void IModelDrawerState::ConfigNotify(const std::string& key, const std::string& value)
+{
 	alphaValues.x = std::max(0.11f, std::min(1.0f, 1.0f - configHandler->GetFloat("UnitTransparency")));
 	alphaValues.y = std::min(1.0f, alphaValues.x + 0.1f);
 	alphaValues.z = std::min(1.0f, alphaValues.x + 0.2f);

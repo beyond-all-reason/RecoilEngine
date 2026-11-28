@@ -5,7 +5,9 @@
 #
 # - Local cache on runner's machine SSD disk, very efficient but prone to
 #   cache misses when workflow can't be scheduled next to the storage
-# - Remote, higher latency, S3 based storage using Cloudflare R2 bucket
+# - Remote, higher latency, S3 based storage using Cloudflare R2 bucket.
+#   Pull requests read it through the bucket's public HTTP endpoint because
+#   pull requests from forks don't have access to secrets and vars.
 # - For pull requests only: GitHub Actions Cache archive build by mounting
 #   overlay filesystem on top of two other read-only caches (because pull
 #   requests can't have write access for security reasons) to reduce build
@@ -63,13 +65,13 @@ jobs:
         system:
           - target: amd64-linux
             runs-on-arch: amd64
-            bazel-remote-sha256: 025d53aeb03a7fdd4a0e76262a5ae9eeee9f64d53ca510deff1c84cf3f276784
+            bazel-remote-sha256: 6a6b64666c2238ec6b49b7b29f5e41e4149de09417a0028897c9bffe40376876
           - target: arm64-linux
             runs-on-arch: arm64
-            bazel-remote-sha256: b8b9456d669d45bb8c5480ce0529ca4fa9d445e0c33b3aeed779df802d8164db
+            bazel-remote-sha256: 295e54fd58841211b00fb204cafc13affc6a13d8946a4520c0ecdce22626ef93
           - target: amd64-windows
             runs-on-arch: amd64
-            bazel-remote-sha256: 025d53aeb03a7fdd4a0e76262a5ae9eeee9f64d53ca510deff1c84cf3f276784
+            bazel-remote-sha256: 6a6b64666c2238ec6b49b7b29f5e41e4149de09417a0028897c9bffe40376876
     name: Build ${{ matrix.system.target }} engine
     runs-on:
       # Run on 8 core, 16GiB ubuntu 24.04 machine.
@@ -120,14 +122,18 @@ jobs:
       - name: Start remote ccache fetcher
         uses: JarvusInnovations/background-action@2428e7b970a846423095c79d43f759abf979a635  # v1.0.7
         env:
+          # S3 backend is enabled only when the bucket is set, so pull requests
+          # use only the public endpoint. It has a Cloudflare rewrite rule
+          # mapping bazel-remote's /raw/<hash> to the S3 raw/<hh>/<hash> layout.
           BAZEL_REMOTE_S3_ENDPOINT: ${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-          BAZEL_REMOTE_S3_BUCKET: ${{ vars.R2_BUCKET_BUILD_CACHE }}
-          BAZEL_REMOTE_S3_ACCESS_KEY_ID: ${{ github.event_name == 'pull_request' && vars.R2_RO_ACCESS_KEY_ID || vars.R2_ACCESS_KEY_ID }}
-          BAZEL_REMOTE_S3_SECRET_ACCESS_KEY: ${{ github.event_name == 'pull_request' && vars.R2_RO_ACCESS_KEY_SECRET || secrets.R2_ACCESS_KEY_SECRET }}
+          BAZEL_REMOTE_S3_BUCKET: ${{ github.event_name != 'pull_request' && vars.R2_BUCKET_BUILD_CACHE || '' }}
+          BAZEL_REMOTE_S3_ACCESS_KEY_ID: ${{ vars.R2_ACCESS_KEY_ID }}
+          BAZEL_REMOTE_S3_SECRET_ACCESS_KEY: ${{ github.event_name != 'pull_request' && secrets.R2_ACCESS_KEY_SECRET || '' }}
+          BAZEL_REMOTE_HTTP_PROXY_URL: ${{ github.event_name == 'pull_request' && 'https://engine-build-cache.beyondallreason.dev' || '' }}
         with:
           run: |
             if ! sha256sum --status -c <<< "${{ matrix.system.bazel-remote-sha256 }} tools/bazel-remote"; then
-              curl -L "https://github.com/buchgr/bazel-remote/releases/download/v2.6.1/bazel-remote-2.6.1-linux-${{ matrix.system.runs-on-arch }}" -o bazel-remote
+              curl -L "https://github.com/buchgr/bazel-remote/releases/download/v2.6.4/bazel-remote-2.6.4-linux-${{ matrix.system.runs-on-arch }}" -o bazel-remote
               chmod +x bazel-remote
               mv bazel-remote tools/bazel-remote
             fi

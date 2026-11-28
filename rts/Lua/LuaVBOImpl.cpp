@@ -34,13 +34,13 @@
 #include "LuaUtils.h"
 
 
-/******************************************************************************
+/***
  * Vertex Buffer Object
  * @class VBO
  *
  * @see LuaVBO.GetVBO
  * @see rts/Lua/LuaVBOImpl.cpp
-******************************************************************************/
+ */
 
 
 LuaVBOImpl::LuaVBOImpl(const sol::optional<GLenum> defTargetOpt, const sol::optional<bool> freqUpdatedOpt)
@@ -524,13 +524,8 @@ bool LuaVBOImpl::DefineElementArray(const sol::optional<sol::object> attribDefAr
  * enter your data into the Lua array correctly.
  *
  * @function VBO:Define
- * @param size number The maximum number of elements this VBO can have.
- * @param attribs number|VBOAttributeDef[]
- *
- * When number, the maximum number of elements this VBO can have.
- *
- * Otherwise, an array of arrays specifying the layout.
- *
+ * @param size integer The maximum number of elements this VBO can have.
+ * @param attribs integer|VBOAttributeDef[] When integer, the maximum number of elements this VBO can have. Otherwise, an array of arrays specifying the layout.
  * @return nil
  * @see GL.OpenGL_Data_Types
  * @see VBO:Upload
@@ -585,9 +580,9 @@ void LuaVBOImpl::Define(const int elementsCount, const sol::optional<sol::object
 /***
  *
  * @function VBO:GetBufferSize
- * @return number elementsCount
- * @return number bufferSizeInBytes
- * @return number size
+ * @return integer elementsCount
+ * @return integer bufferSizeInBytes
+ * @return integer size
  */
 std::tuple<uint32_t, uint32_t, uint32_t> LuaVBOImpl::GetBufferSize()
 {
@@ -602,17 +597,16 @@ std::tuple<uint32_t, uint32_t, uint32_t> LuaVBOImpl::GetBufferSize()
 /***
  * Uploads data into the VBO.
  *
- * @function VBO:Upload
- * @param vboData number[] Array of values to upload into the VBO.
- * @param attributeIndex integer? (Default: `-1`)
- * 
- * If supplied with non-default value then the data from `vboData` will only be
- * used to upload the data to this particular attribute.
- * 
+ * If `attributeIndex` is supplied with non-default value then the data from
+ * `vboData` will only be used to upload the data to this particular attribute.
+ *
  * The whole `vboData` is expected to contain only attributeIndex data.
- * 
+ *
  * Otherwise all attributes get updated sequentially across attributes and elements.
  *
+ * @function VBO:Upload
+ * @param vboData number[] Array of values to upload into the VBO.
+ * @param attributeIndex integer? (Default: `-1`) The attribute to upload to, or all attributes.
  * @param elemOffset integer? (Default: `0`) The index in destination VBO (on GPU) at which storing begins.
  * @param luaStartIndex integer? (Default: `1`) The index of `vboData` at which copying begins.
  * @param luaFinishIndex integer? (Default: `#vboData`) The index of `vboData` at which copying ends.
@@ -666,14 +660,11 @@ size_t LuaVBOImpl::Upload(const sol::stack_table& luaTblData, sol::optional<int>
 /***
  *
  * @function VBO:Download
- * @param attributeIndex integer? (Default: `-1`) when supplied with non-default value: only data
- * from specified attribute will be downloaded - otherwise all attributes are
- * downloaded
+ * @param attributeIndex integer? (Default: `-1`) When supplied with non-default value: only data from specified attribute will be downloaded - otherwise all attributes are downloaded.
  * @param elementOffset integer? (Default: `0`) download data starting from this element
- * @param elementCount number? number of elements to download
- * @param forceGPURead boolean? (Default: `false`) force downloading the data from GPU buffer as opposed
- * to using shadow RAM buffer
- * @return [number, ...][] vboData
+ * @param elementCount integer? number of elements to download
+ * @param forceGPURead boolean? (Default: `false`) Force downloading the data from GPU buffer as opposed to using shadow RAM buffer.
+ * @return number[] vboData
  */
 sol::as_table_t<std::vector<lua_Number>> LuaVBOImpl::Download(sol::optional<int> attribIdxOpt, sol::optional<int> elemOffsetOpt, sol::optional<int> elemCountOpt, sol::optional<bool> forceGPUReadOpt)
 {
@@ -814,6 +805,7 @@ void LuaVBOImpl::UpdateModelsVBOElementCount()
 	//   support an arbitrary number of channels, would be easy but overkill (for now)
 	float2 texCoords[NUM_MODEL_UVCHANNS];
 	uvec3 in uvec3 bonesInfo;
+	u8vec4 color;
 */
 size_t LuaVBOImpl::ModelsVBOImpl()
 {
@@ -884,7 +876,18 @@ size_t LuaVBOImpl::ModelsVBOImpl()
 			3 * sizeof(uint32_t) //strideSizeInBytes
 		};
 
-		this->attributesCount = 6;
+		// uint8_t color[4]
+		this->bufferAttribDefs[15] = {
+			GL_UNSIGNED_BYTE, //type
+			4, //size
+			GL_TRUE, //normalized
+			"color", //name
+			offsetof(SVertexData, color), //pointer
+			sizeof(uint8_t), //typeSizeInBytes
+			4 * sizeof(uint8_t) //strideSizeInBytes
+		};
+
+		this->attributesCount = 7;
 		this->elemSizeInBytes = sizeof(SVertexData);
 		this->bufferSizeInBytes = vbo->GetSize();
 		this->elementsCount = S3DModelVAO::GetInstance().GetVertElemCount();
@@ -1176,7 +1179,7 @@ size_t LuaVBOImpl::UploadImpl(const std::vector<TIn>& dataVec, uint32_t elemOffs
  *
  * Also fills in VBO definition data as they're set for engine models (no need to do VBO:Define()).
  *
- * @return nil|number buffer size in bytes
+ * @return integer? size buffer size in bytes
  */
 size_t LuaVBOImpl::ModelsVBO()
 {
@@ -1207,11 +1210,11 @@ size_t LuaVBOImpl::ModelsVBO()
  *    , aux1 { 0u }
  * ```
  *
- * @param unitDefIDs number|number[]
+ * @param unitDefIDs UnitDefID|UnitDefID[]
  * @param attrID integer
  * @param teamIdOpt integer?
  * @param elementOffset integer?
- * @return [number,number,number,number] instanceData
+ * @return [integer,integer,integer,integer] instanceData
  * @return integer elementOffset
  * @return integer attrID
  */
@@ -1246,11 +1249,11 @@ size_t LuaVBOImpl::InstanceDataFromUnitDefIDs(const sol::stack_table& ids, int a
  *    , aux1 { 0u }
  * ```
  *
- * @param featureDefIDs number|number[]
+ * @param featureDefIDs FeatureDefID|FeatureDefID[]
  * @param attrID integer
  * @param teamIdOpt integer?
  * @param elementOffset integer?
- * @return [number,number,number,number] instanceData
+ * @return [integer,integer,integer,integer] instanceData
  * @return integer elementOffset
  * @return integer attrID 
  */
@@ -1286,11 +1289,11 @@ size_t LuaVBOImpl::InstanceDataFromFeatureDefIDs(const sol::stack_table& ids, in
  *    , aux1 { 0u }
  * ```
  *
- * @param unitIDs number|number[]
+ * @param unitIDs UnitID|UnitID[]
  * @param attrID integer
  * @param teamIdOpt integer?
  * @param elementOffset integer?
- * @return [number,number,number,number] instanceData
+ * @return [integer,integer,integer,integer] instanceData
  * @return integer elementOffset
  * @return integer attrID 
  */
@@ -1314,11 +1317,11 @@ size_t LuaVBOImpl::InstanceDataFromUnitIDs(const sol::stack_table& ids, int attr
  * global per unit/feature uniform SSBO (unused for Unit/FeatureDefs), as
  * well as some auxiliary data such as palette index and number of pieces.
  *
- * @param featureIDs number|number[]
+ * @param featureIDs FeatureID|FeatureID[]
  * @param attrID integer
  * @param teamIdOpt integer?
  * @param elementOffset integer?
- * @return [number,number,number,number] instanceData
+ * @return [integer,integer,integer,integer] instanceData
  * @return integer elementOffset
  * @return integer attrID
  */
@@ -1336,11 +1339,11 @@ size_t LuaVBOImpl::InstanceDataFromFeatureIDs(const sol::stack_table& ids, int a
 /***
  *
  * @function VBO:MatrixDataFromProjectileIDs
- * @param projectileIDs integer|integer[]
+ * @param projectileIDs ProjectileID|ProjectileID[]
  * @param attrID integer
  * @param teamIdOpt integer?
  * @param elementOffset integer?
- * @return number[] matDataVec 4x4 matrix
+ * @return number[] matDataVec Flattened 4x4 matrix(es)
  * @return integer elemOffset
  * @return integer|[integer,integer,integer,integer] attrID
  */
@@ -1423,11 +1426,10 @@ int LuaVBOImpl::BindBufferRangeImpl(GLuint bindingIndex,  const sol::optional<in
  * https://registry.khronos.org/OpenGL-Refpages/gl4/html/glBindBufferRange.xhtml
  * except offset and size are specified in number of elements / element indices.
  *
- * @param index integer should be in the range between
- * `5 < index < GL_MAX_UNIFORM_BUFFER_BINDINGS` value (usually 31)
+ * @param index integer Should be in the range between `5 < index < GL_MAX_UNIFORM_BUFFER_BINDINGS` value (usually 31).
  * @param elementOffset integer?
- * @param elementCount number?
- * @param target number? glEnum
+ * @param elementCount integer?
+ * @param target GL? glEnum
  * @return integer bindingIndex when successful, -1 otherwise
  */
 int LuaVBOImpl::BindBufferRange(const GLuint index, const sol::optional<int> elemOffsetOpt, const sol::optional<int> elemCountOpt, const sol::optional<GLenum> targetOpt)
@@ -1441,9 +1443,9 @@ int LuaVBOImpl::BindBufferRange(const GLuint index, const sol::optional<int> ele
  * @function VBO:UnbindBufferRange
  * @param index integer
  * @param elementOffset integer?
- * @param elementCount number?
- * @param target number? glEnum
- * @return number bindingIndex when successful, -1 otherwise
+ * @param elementCount integer?
+ * @param target GL? glEnum
+ * @return integer bindingIndex when successful, -1 otherwise
  */
 int LuaVBOImpl::UnbindBufferRange(const GLuint index, const sol::optional<int> elemOffsetOpt, const sol::optional<int> elemCountOpt, const sol::optional<GLenum> targetOpt)
 {
@@ -1492,6 +1494,17 @@ bool LuaVBOImpl::CopyTo(const std::shared_ptr<LuaVBOImpl>& destVBO, int copySize
 		vbo->Bind();
 
 	auto result = vbo->CopyTo(*destVBO->vbo, static_cast<GLsizeiptr>(copySizeInBytes));
+
+	// VBO::CopyTo only moves GPU->GPU. We need to also copy over the CPU-side bufferData.
+	if (result && bufferData != nullptr && destVBO->bufferData != nullptr && copySizeInBytes > 0) {
+		const auto n = std::min({
+			static_cast<uint32_t>(copySizeInBytes),
+			bufferSizeInBytes,
+			destVBO->bufferSizeInBytes
+		});
+		if (n > 0)
+			memcpy(destVBO->bufferData, bufferData, n);
+	}
 
 	if (!wasBound)
 		vbo->Unbind();

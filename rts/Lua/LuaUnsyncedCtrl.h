@@ -34,6 +34,7 @@ class LuaUnsyncedCtrl {
 
 		static int LoadSoundDef(lua_State* L);
 		static int PlaySoundFile(lua_State* L);
+		static int StopSoundByFilename(lua_State* L);
 		static int PlaySoundStream(lua_State* L);
 		static int StopSoundStream(lua_State* L);
 		static int PauseSoundStream(lua_State* L);
@@ -129,6 +130,7 @@ class LuaUnsyncedCtrl {
 
 //FIXME		static int SetShockFrontFactors(lua_State* L);
 
+		static int UnbindAll(lua_State* L);
 		static int SetConfigInt(lua_State* L);
 		static int SetConfigFloat(lua_State* L);
 		static int SetConfigString(lua_State* L);

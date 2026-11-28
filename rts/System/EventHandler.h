@@ -12,6 +12,7 @@
 #include "Sim/Projectiles/Projectile.h"
 
 struct CExplosionParams;
+namespace NanoParticles { struct Event; }
 class CWeapon;
 struct Command;
 struct BuildInfo;
@@ -41,6 +42,8 @@ class CEventHandler
 		bool IsManaged(const std::string& ciName) const;
 		bool IsUnsynced(const std::string& ciName) const;
 		bool IsController(const std::string& ciName) const;
+		/// Lets the nano particle effect skip building batches nobody listens to.
+		bool HasNanoParticleUpdateClients() const { return !listNanoParticleUpdate.empty(); }
 
 
 	public:
@@ -52,6 +55,7 @@ class CEventHandler
 
 		void GamePreload();
 		void GameStart();
+		void GameLoaded();
 		void GameOver(const std::vector<unsigned char>& winningAllyTeams);
 		void GamePaused(int playerID, bool paused);
 		void GameFrame(int gameFrame);
@@ -60,6 +64,8 @@ class CEventHandler
 
 		void TeamDied(int teamID);
 		void TeamChanged(int teamID);
+		bool ResourceExcess(const std::map <int, SResourcePack>& excess);
+
 		void PlayerChanged(int playerID);
 		void PlayerAdded(int playerID);
 		void PlayerRemoved(int playerID, int reason);
@@ -97,6 +103,9 @@ class CEventHandler
 		void UnitStunned(const CUnit* unit, bool stunned);
 		void UnitExperience(const CUnit* unit, float oldExperience);
 		void UnitHarvestStorageFull(const CUnit* unit);
+
+		void UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds);
+		void UnitSelfDestructCancelled(const CUnit* unit, float remainingSeconds);
 
 		void UnitSeismicPing(const CUnit* unit, int allyTeam,
 		                     const float3& pos, float strength);
@@ -220,7 +229,10 @@ class CEventHandler
 
 		void UnsyncedHeightMapUpdate(const SRectangle& rect);
 		void Update();
+		void UpdateTimeOffset(float& timeOffset, float drawSimRatio, float& presentedUpdateSecs);
+		void NanoParticleUpdate(const std::vector<NanoParticles::Event>& events);
 
+		void KeyBindingsChanged();
 		bool KeyMapChanged();
 		bool KeyPress(int keyCode, int scanCode, bool isRepeat);
 		bool KeyRelease(int keyCode, int scanCode);
@@ -243,6 +255,7 @@ class CEventHandler
 		void MiniMapStateChanged(const bool isMinimized, const bool isMaximized, const bool isSlaved);
 		void MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim);
 		bool CommandNotify(const Command& cmd);
+		bool AllowQuit();
 
 		bool AddConsoleLine(const std::string& msg, const std::string& section, int level);
 
@@ -301,6 +314,7 @@ class CEventHandler
 		bool DrawShield(const CUnit* unit, const CWeapon* weapon);
 		bool DrawProjectile(const CProjectile* projectile);
 		bool DrawMaterial(const LuaMaterial* material);
+		bool DrawSceneDisplay();
 
 		void DrawOpaqueUnitsLua(bool deferredPass, bool drawReflection, bool drawRefraction);
 		void DrawOpaqueFeaturesLua(bool deferredPass, bool drawReflection, bool drawRefraction);
@@ -424,6 +438,16 @@ inline void CEventHandler::UnitCreated(const CUnit* unit, const CUnit* builder)
 inline void CEventHandler::UnitDestroyed(const CUnit* unit, const CUnit* attacker, int weaponDefID)
 {
 	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitDestroyed, unit, attacker, weaponDefID)
+}
+
+inline void CEventHandler::UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds)
+{
+	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitSelfDestructStarted, unit, remainingSeconds)
+}
+
+inline void CEventHandler::UnitSelfDestructCancelled(const CUnit* unit, float remainingSeconds)
+{
+	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitSelfDestructCancelled, unit, remainingSeconds)
 }
 
 #define UNIT_CALLIN_NO_PARAM(name)                                 \

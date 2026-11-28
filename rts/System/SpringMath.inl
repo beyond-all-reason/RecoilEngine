@@ -22,6 +22,17 @@ inline short int GetHeadingFromFacing(const int facing)
 	}
 }
 
+// headings are circular 16-bit integer angles, so sums of them are meant to wrap.
+// float->short is UB once out of range, so the float side has to be in range
+// already; the assert catches a caller that is not in debug builds.
+inline short int FloatToHeading(const float angle)
+{
+	assert(angle >= static_cast<float>(std::numeric_limits<short int>::min())
+		&& angle <= static_cast<float>(std::numeric_limits<short int>::max()));
+
+	return static_cast<short int>(angle);
+}
+
 inline int GetFacingFromHeading(const short int heading)
 {
 	if (heading >= 0) {
@@ -39,11 +50,11 @@ inline float GetHeadingFromVectorF(const float dx, const float dz)
 {
 	float h = 0.0f;
 
-	if (dz != 0.0f) {
-		// ensure a minimum distance between dz and 0 such that
-		// sqr(dx/dz) never exceeds abs(num_limits<float>::max)
-		const float sz = dz * 2.0f - 1.0f;
-		const float d  = dx / (dz + 0.000001f * sz);
+	if (std::fabs(dz) > SPRING_HEADING_EPSILON) {
+		// FIX: Use a tiny, sign-preserving offset to ensure dz never flips signs
+		// while protecting against division overflows.
+		const float safe_dz = dz + (std::copysign(SPRING_HEADING_EPSILON, dz));
+		const float d  = dx / safe_dz;
 		const float dd = d * d;
 
 		if (math::fabs(d) > 1.0f) {
