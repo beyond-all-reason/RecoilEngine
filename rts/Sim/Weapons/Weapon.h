@@ -40,6 +40,7 @@ public:
 
 public:
 	bool Attack(const SWeaponTarget& newTarget);
+	bool CanUseUnitTarget() const;
 	void SetAttackTarget(const SWeaponTarget& newTarget); //< does no validity checks!
 	void DropCurrentTarget();
 	void AimScriptFinished(bool retCode) { angleGood = retCode; }
@@ -104,6 +105,7 @@ public:
 	bool StopAttackingTargetIf(const std::function<bool(const SWeaponTarget&)>& pred);
 	bool StopAttackingAllyTeam(const int ally);
 
+	bool IsIndependentAutoTargetingEnabled() const { return independentAutoTargeting; }
 	bool IsFastAutoRetargetingEnabled() const { return fastAutoRetargeting; }
 	void UpdateWeaponErrorVector();
 	void UpdateWeaponVectors();
@@ -216,6 +218,7 @@ public:
 	float muzzleFlareSize;                  // size of muzzle flare if drawn
 
 	float weaponAimAdjustPriority;
+	bool independentAutoTargeting;
 	bool fastAutoRetargeting;
 	bool fastQueryPointUpdate;
 	unsigned int accurateLeading;

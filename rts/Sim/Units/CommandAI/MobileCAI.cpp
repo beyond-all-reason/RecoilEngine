@@ -925,7 +925,7 @@ void CMobileCAI::ExecuteAttack(Command& c)
 					StopMoveAndFinishCommand();
 					return;
 				}
-				if (SkipCrashingTarget(targetUnit)) {
+				if (SkipTarget(targetUnit)) {
 					StopMoveAndFinishCommand();
 					return;
 				}
@@ -960,7 +960,7 @@ void CMobileCAI::ExecuteAttack(Command& c)
 		StopMoveAndFinishCommand();
 		return;
 	}
-	if (SkipCrashingTarget(orderTarget)) {
+	if (SkipTarget(orderTarget)) {
 		owner->DropCurrentAttackTarget();
 		StopMoveAndFinishCommand();
 		return;
@@ -1283,7 +1283,14 @@ bool CMobileCAI::GenerateAttackCmd()
 bool CMobileCAI::CanWeaponAutoTarget(const CWeapon* weapon) const {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// check if the weapon actually targets the unit's order-target
-	return (!tempOrder || weapon->GetCurrentTarget() != owner->curTarget || weapon->IsFastAutoRetargetingEnabled());
+	return (!tempOrder || weapon->GetCurrentTarget() != owner->curTarget || weapon->IsFastAutoRetargetingEnabled() || weapon->IsIndependentAutoTargetingEnabled());
+}
+
+bool CMobileCAI::HasAutoAttackCommand() const
+{
+	return tempOrder && !commandQue.empty()
+		&& commandQue.front().GetID() == CMD_ATTACK
+		&& commandQue.front().IsInternalOrder();
 }
 
 void CMobileCAI::StopSlowGuard() {
