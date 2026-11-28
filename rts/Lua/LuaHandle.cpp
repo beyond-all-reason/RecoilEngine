@@ -2528,18 +2528,16 @@ void CLuaHandle::HandleLuaMsg(int playerID, int script, int mode, const std::vec
 
 				switch (mode) {
 					case 0: { sendMsg = true; } break;
-					case 's': { sendMsg = gu->spectating; } break;
+					case 's': { sendMsg = gu->spectatingFullCommunications; } break;
 					case 'a': {
 						const CPlayer* player = playerHandler.Player(playerID);
 
 						if (player == nullptr)
 							return;
 
-						if (gu->spectatingFullView) {
+						if (gu->spectatingFullCommunications) {
 							sendMsg = true;
-						} else if (player->spectator) {
-							sendMsg = gu->spectating;
-						} else {
+						} else if (!player->spectator) {
 							const int msgAllyTeam = teamHandler.AllyTeam(player->team);
 							sendMsg = teamHandler.Ally(msgAllyTeam, gu->myAllyTeam);
 						}

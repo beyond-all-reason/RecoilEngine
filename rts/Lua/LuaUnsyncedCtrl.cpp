@@ -11,6 +11,7 @@
 #include "LuaOpenGLUtils.h"
 #include "LuaParser.h"
 #include "LuaTextures.h"
+#include "LuaUI.h"
 #include "LuaUtils.h"
 
 #include "ExternalAI/EngineOutHandler.h"
@@ -150,6 +151,13 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(PauseSoundStream);
 	REGISTER_LUA_CFUNC(SetSoundStreamVolume);
 	REGISTER_LUA_CFUNC(SetSoundEffectParams);
+
+	if (!CLuaHandle::GetHandleSynced(L)) {
+		REGISTER_LUA_CFUNC(SetSpectatorTeam);
+		REGISTER_LUA_CFUNC(SetSpectatorFullCommunications);
+		REGISTER_LUA_CFUNC(SetSpectatorFullView);
+		REGISTER_LUA_CFUNC(SetSpectatorFullSelect);
+	}
 
 	REGISTER_LUA_CFUNC(SetCameraState);
 	REGISTER_LUA_CFUNC(SetCameraTarget);
@@ -693,7 +701,7 @@ int LuaUnsyncedCtrl::SendMessage(lua_State* L)
  */
 int LuaUnsyncedCtrl::SendMessageToSpectators(lua_State* L)
 {
-	if (gu->spectating)
+	if (gu->spectatingFullCommunications)
 		PrintMessage(L, luaL_checksstring(L, 1));
 
 	return 0;
@@ -1192,6 +1200,93 @@ int LuaUnsyncedCtrl::DrawUnitCommands(lua_State* L)
 		}
 	}
 
+	return 0;
+}
+
+
+/******************************************************************************
+ * Spectating
+ * @section spectating
+ *****************************************************************************/
+
+/*** Sets whether the local spectator receives other teams' chat, spectator messages and map marks.
+ * With full communications disabled, ally chat and marks follow the spectated allyteam.
+ * @function Spring.SetSpectatorFullCommunications
+ * @param enabled boolean
+ * @return nil
+ */
+int LuaUnsyncedCtrl::SetSpectatorFullCommunications(lua_State* L)
+{
+	const bool enabled = luaL_checkboolean(L, 1);
+	if (gu->spectating)
+		gu->spectatingFullCommunications = enabled;
+	return 0;
+}
+
+/*** Changes the team followed by the local spectator, preserving full view and full selection.
+ * @function Spring.SetSpectatorTeam
+ * @param teamID TeamID
+ * @return boolean accepted Whether the local client is spectating and the team ID is valid.
+ * @see Spring.GetMyTeamID
+ */
+int LuaUnsyncedCtrl::SetSpectatorTeam(lua_State* L)
+{
+	const lua_Number team = luaL_checknumber(L, 1);
+	const bool accepted = gu->spectating && team >= 0 && team < teamHandler.ActiveTeams() && team == static_cast<int>(team);
+
+	if (accepted && gu->myTeam != team) {
+		gu->myTeam = static_cast<int>(team);
+		gu->myAllyTeam = teamHandler.AllyTeam(gu->myTeam);
+		CLuaUI::UpdateTeams();
+		if (!gu->spectatingFullView && readMap != nullptr)
+			readMap->BecomeSpectator();
+
+		eventHandler.PlayerChanged(gu->myPlayerNum);
+		LOG("[SetSpectatorTeam] local client %d now spectating team %d and allyteam %d", gu->myPlayerNum, gu->myTeam, gu->myAllyTeam);
+	}
+
+	lua_pushboolean(L, accepted);
+	return 1;
+}
+
+/*** Sets whether the local spectator can see beyond the followed allyteam's LOS.
+ * Has no effect while playing. Leaves full selection unchanged.
+ * @function Spring.SetSpectatorFullView
+ * @param fullView boolean
+ * @return nil
+ * @see Spring.GetSpectatingState
+ */
+int LuaUnsyncedCtrl::SetSpectatorFullView(lua_State* L)
+{
+	const bool fullView = luaL_checkboolean(L, 1);
+	if (!gu->spectating || gu->spectatingFullView == fullView)
+		return 0;
+
+	gu->spectatingFullView = fullView;
+	CLuaUI::UpdateTeams();
+	if (fullView && readMap != nullptr)
+		readMap->CopySyncedToUnsynced();
+
+	eventHandler.PlayerChanged(gu->myPlayerNum);
+	return 0;
+}
+
+/*** Sets whether the local spectator can select units from every team.
+ * Has no effect while playing. Leaves full view unchanged.
+ * @function Spring.SetSpectatorFullSelect
+ * @param fullSelect boolean
+ * @return nil
+ * @see Spring.GetSpectatingState
+ */
+int LuaUnsyncedCtrl::SetSpectatorFullSelect(lua_State* L)
+{
+	const bool fullSelect = luaL_checkboolean(L, 1);
+	if (!gu->spectating || gu->spectatingFullSelect == fullSelect)
+		return 0;
+
+	gu->spectatingFullSelect = fullSelect;
+	CLuaUI::UpdateTeams();
+	eventHandler.PlayerChanged(gu->myPlayerNum);
 	return 0;
 }
 

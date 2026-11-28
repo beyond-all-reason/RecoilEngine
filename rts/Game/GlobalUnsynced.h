@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _GLOBAL_UNSYNCED_H
-#define _GLOBAL_UNSYNCED_H
+#pragma once
 
 #include <atomic>
 
@@ -153,6 +152,9 @@ public:
 	 */
 	bool spectatingFullSelect = false;
 
+	/// Receive spectator and enemy team messages and see all map marks.
+	bool spectatingFullCommunications = false;
+
 	/**
 	 * @brief fpsMode
 	 *
@@ -173,5 +175,3 @@ public:
 
 extern CGlobalUnsynced* gu;
 extern CGlobalUnsyncedRNG guRNG;
-
-#endif /* _GLOBAL_UNSYNCED_H */

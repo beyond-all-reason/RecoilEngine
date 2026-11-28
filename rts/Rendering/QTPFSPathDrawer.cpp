@@ -59,7 +59,7 @@ void QTPFSPathDrawer::DrawAll() const {
 	if (!enabled)
 		return;
 
-	if (!gs->cheatEnabled && !gu->spectating)
+	if (!gs->cheatEnabled && !gu->spectatingFullView)
 		return;
 
 	glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT);
@@ -394,7 +394,7 @@ void QTPFSPathDrawer::UpdateExtraTexture(int extraTex, int starty, int endy, int
 
 				auto& speedModComp = QTPFS::systemGlobals.GetSystemComponent<QTPFS::PathSpeedModInfoSystemComponent>();
 				const float smr = 1.0f / ( speedModComp.relSpeedModinfos[nl.GetNodelayer()].max );
-				const bool los = (gs->cheatEnabled || gu->spectating);
+				const bool los = (gs->cheatEnabled || gu->spectatingFullView);
 
 				for (int ty = starty; ty < endy; ++ty) {
 					for (int tx = 0; tx < mapDims.hmapx; ++tx) {

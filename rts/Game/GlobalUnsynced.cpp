@@ -51,6 +51,7 @@ CR_REG_METADATA(CGlobalUnsynced, (
 	CR_MEMBER(spectating),
 	CR_MEMBER(spectatingFullView),
 	CR_MEMBER(spectatingFullSelect),
+	CR_MEMBER(spectatingFullCommunications),
 	CR_IGNORED(fpsMode),
 	CR_IGNORED(globalQuit),
 	CR_IGNORED(globalReload)
@@ -78,6 +79,7 @@ void CGlobalUnsynced::ResetState()
 	spectating           = false;
 	spectatingFullView   = false;
 	spectatingFullSelect = false;
+	spectatingFullCommunications = false;
 
 	fpsMode = false;
 	globalQuit = false;
@@ -112,6 +114,7 @@ void CGlobalUnsynced::SetMyPlayer(const int myNumber)
 	spectating           = myPlayer->spectator;
 	spectatingFullView   = myPlayer->spectator;
 	spectatingFullSelect = myPlayer->spectator;
+	spectatingFullCommunications = myPlayer->spectator;
 
 	if (spectating)
 		return;
