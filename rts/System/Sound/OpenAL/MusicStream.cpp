@@ -215,27 +215,23 @@ void MusicStream::Update()
 	const spring_time tick = spring_gettime();
 
 	if (!paused) {
-		// releasing buffers is only allowed once the source has actually
-		// stopped playing, since it might still be reading from the last
-		// decoded chunk
-		const bool active = UpdateBuffers(); // false == decoder reached true EOF
-
-		if (!IsPlaying()) {
-			// A stopped source is either an underrun (buffers drained faster than
-			// refilled — likely on the openal-soft -> SDL loopback path) or the
-			// track genuinely ended. Re-queuing buffers does NOT auto-restart a
-			// stopped OpenAL source, so on an underrun we must alSourcePlay again;
-			// otherwise a single starvation permanently silences the music and only
-			// a volume change / re-Play briefly revives it.
+		// Read the state before refilling. A source that had already stopped has
+		// processed every buffer, so the refill leaves only fresh audio queued. Reading
+		// it after the refill could catch a source that stopped in between, with
+		// played buffers still queued, and replay them.
+		const bool wasPlaying = IsPlaying();
+		const bool active = UpdateBuffers(); // false once the decoder reaches the end
+		if (!wasPlaying) {
+			// A stopped source does not restart when buffers are queued again, so an
+			// underrun needs another alSourcePlay. Buffers can only be released once
+			// the source has stopped and the track has ended.
 			int queuedBuffers = 0;
 			alGetSourcei(source, AL_BUFFERS_QUEUED, &queuedBuffers);
 
 			if (queuedBuffers > 0) {
-				// underrun: buffers still queued -> resume playback
 				alSourcePlay(source);
 				CheckError("[MusicStream::Update][resume]");
 			} else if (!active) {
-				// no queued buffers and decoder at EOF -> track finished
 				ReleaseBuffers();
 			}
 		}
