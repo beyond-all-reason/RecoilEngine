@@ -63,7 +63,9 @@ void IStreamBufferConcept::WaitBuffer(GLsync& syncObj) const
 
 	uint32_t gWaitCount = 0;
 	while (true) {
-		GLenum waitReturn = glClientWaitSync(syncObj, GL_SYNC_FLUSH_COMMANDS_BIT, 1);
+		// the call returns as soon as the fence signals, so the timeout (in ns) only
+		// sets how often the loop goes back into the driver, not how long we wait
+		GLenum waitReturn = glClientWaitSync(syncObj, GL_SYNC_FLUSH_COMMANDS_BIT, 250000);
 		if (waitReturn == GL_ALREADY_SIGNALED || waitReturn == GL_CONDITION_SATISFIED)
 			break;
 
