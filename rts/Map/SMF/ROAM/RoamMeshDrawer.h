@@ -1,8 +1,8 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _ROAM_MESH_DRAWER_H_
-#define _ROAM_MESH_DRAWER_H_
+#pragma once
 
+#include <array>
 #include <vector>
 
 #include "Patch.h"
@@ -69,7 +69,8 @@ private:
 	int numPatchesY = 0;
 	std::array<int, MESH_COUNT> lastGroundDetail = {};
 
-	bool heightMapChanged = false;
+	// Each mesh consumes the height update when its own draw pass runs.
+	std::array<bool, MESH_COUNT> heightMapChanged = {};
 
 	std::array<float3, MESH_COUNT> lastCamPos;
 	std::array<float3, MESH_COUNT> lastCamDir;
@@ -92,5 +93,3 @@ private:
 	std::vector<float3> debugColors;
 #endif
 };
-
-#endif // _ROAM_MESH_DRAWER_H_
