@@ -954,26 +954,6 @@ void CGlobalRendering::SetGLSupportFlags()
 
 	supportTextureQueryLOD = GLAD_GL_ARB_texture_query_lod;
 
-	for (size_t n = 0; (n < sizeof(globalRenderingInfo.glVersionShort) && globalRenderingInfo.glVersion[n] != 0); n++) {
-		if ((globalRenderingInfo.glVersionShort[n] = globalRenderingInfo.glVersion[n]) == ' ') {
-			globalRenderingInfo.glVersionShort[n] = 0;
-			break;
-		}
-	}
-	if (int2 glVerNum = { 0, 0 }; sscanf(globalRenderingInfo.glVersionShort.data(), "%d.%d", &glVerNum.x, &glVerNum.y) == 2) {
-		globalRenderingInfo.glVersionNum = glVerNum.x * 10 + glVerNum.y;
-	}
-
-	for (size_t n = 0; (n < sizeof(globalRenderingInfo.glslVersionShort) && globalRenderingInfo.glslVersion[n] != 0); n++) {
-		if ((globalRenderingInfo.glslVersionShort[n] = globalRenderingInfo.glslVersion[n]) == ' ') {
-			globalRenderingInfo.glslVersionShort[n] = 0;
-			break;
-		}
-	}
-	if (int2 glslVerNum = { 0, 0 }; sscanf(globalRenderingInfo.glslVersionShort.data(), "%d.%d", &glslVerNum.x, &glslVerNum.y) == 2) {
-		globalRenderingInfo.glslVersionNum = glslVerNum.x * 100 + glslVerNum.y;
-	}
-
 	haveGL4 = static_cast<bool>(GLAD_GL_ARB_multi_draw_indirect);
 	haveGL4 &= static_cast<bool>(GLAD_GL_ARB_uniform_buffer_object);
 	haveGL4 &= static_cast<bool>(GLAD_GL_ARB_shader_storage_buffer_object);
@@ -1090,6 +1070,26 @@ void CGlobalRendering::QueryVersionInfo(char (&sdlVersionStr)[64], char (&glVidM
 	// (absence of GLSL version string would indicate bigger problems)
 	if (std::strcmp(globalRenderingInfo.glslVersion, "unknown") == 0)
 		throw unsupported_error("OpenGL shaders not supported, aborting");
+
+	for (size_t n = 0; (n < sizeof(globalRenderingInfo.glVersionShort) && globalRenderingInfo.glVersion[n] != 0); n++) {
+		if ((globalRenderingInfo.glVersionShort[n] = globalRenderingInfo.glVersion[n]) == ' ') {
+			globalRenderingInfo.glVersionShort[n] = 0;
+			break;
+		}
+	}
+	if (int2 glVerNum = { 0, 0 }; sscanf(globalRenderingInfo.glVersionShort.data(), "%d.%d", &glVerNum.x, &glVerNum.y) == 2) {
+		globalRenderingInfo.glVersionNum = glVerNum.x * 10 + glVerNum.y;
+	}
+
+	for (size_t n = 0; (n < sizeof(globalRenderingInfo.glslVersionShort) && globalRenderingInfo.glslVersion[n] != 0); n++) {
+		if ((globalRenderingInfo.glslVersionShort[n] = globalRenderingInfo.glslVersion[n]) == ' ') {
+			globalRenderingInfo.glslVersionShort[n] = 0;
+			break;
+		}
+	}
+	if (int2 glslVerNum = { 0, 0 }; sscanf(globalRenderingInfo.glslVersionShort.data(), "%d.%d", &glslVerNum.x, &glslVerNum.y) == 2) {
+		globalRenderingInfo.glslVersionNum = glslVerNum.x * 100 + glslVerNum.y;
+	}
 
 	if (!ShowDriverWarning(grInfo.glVendor))
 		throw unsupported_error("OpenGL drivers not installed, aborting");
