@@ -3720,7 +3720,8 @@ bool CGroundMoveType::SetMemberValue(unsigned int memberHash, void* memberValue)
 		const auto pred = [memberHash](const std::pair<unsigned int, short*>& p) { return (memberHash == p.first); };
 		const auto iter = std::find_if(gmtMemberData.shorts.begin(), gmtMemberData.shorts.end(), pred);
 		if (iter != gmtMemberData.shorts.end()) {
-			*(iter->second) = short(*(reinterpret_cast<float*>(memberValue))); // sic (see SetMoveTypeValue)
+			// Lua passes every number as a float (see SetMoveTypeValue), go through int so an out-of-range value wraps
+			*(iter->second) = static_cast<short>(static_cast<int>(*(reinterpret_cast<float*>(memberValue))));
 			return true;
 		}
 	}
