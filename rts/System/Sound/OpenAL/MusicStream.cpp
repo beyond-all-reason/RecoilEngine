@@ -215,12 +215,26 @@ void MusicStream::Update()
 	const spring_time tick = spring_gettime();
 
 	if (!paused) {
-		// releasing buffers is only allowed once the source has actually
-		// stopped playing, since it might still be reading from the last
-		// decoded chunk
-		UpdateBuffers();
-		if (!IsPlaying())
-			ReleaseBuffers();
+		// Read the state before refilling. A source that had already stopped has
+		// processed every buffer, so the refill leaves only fresh audio queued. Reading
+		// it after the refill could catch a source that stopped in between, with
+		// played buffers still queued, and replay them.
+		const bool wasPlaying = IsPlaying();
+		const bool active = UpdateBuffers(); // false once the decoder reaches the end
+		if (!wasPlaying) {
+			// A stopped source does not restart when buffers are queued again, so an
+			// underrun needs another alSourcePlay. Buffers can only be released once
+			// the source has stopped and the track has ended.
+			int queuedBuffers = 0;
+			alGetSourcei(source, AL_BUFFERS_QUEUED, &queuedBuffers);
+
+			if (queuedBuffers > 0) {
+				alSourcePlay(source);
+				CheckError("[MusicStream::Update][resume]");
+			} else if (!active) {
+				ReleaseBuffers();
+			}
+		}
 
 		msecsPlayed += (tick - lastTick);
 	}
